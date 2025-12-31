@@ -1,111 +1,93 @@
-name: Publish to NuGet
+name: Publish NuGet (bbx)
 
 on:
-  push:
-    branches: [master, main]
   workflow_dispatch:
     inputs:
-      version_bump:
-        description: 'Version bump type'
-        required: false
+      bump:
+        description: 'Version bump type (major|minor|patch)'
+        required: true
         default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'src/Bbx/**'
+      - '.github/workflows/publish.yml'
+
+permissions:
+  contents: write
+  packages: read
+
+env:
+  PROJECT_DIR: src/Bbx
+  CSPROJ: src/Bbx/Bbx.csproj
+  NUPKG_DIR: nupkg
+  NUGET_SOURCE: https://api.nuget.org/v3/index.json
 
 jobs:
-  publish:
+  build-pack-publish:
     runs-on: ubuntu-latest
-    
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Setup .NET SDKs
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            8.x
-            9.x
             10.x
-      
-      - name: Determine version bump
-        id: version
+            9.x
+            8.x
+
+      - name: Restore
+        run: dotnet restore $PROJECT_DIR
+
+      - name: Determine and bump version
+        id: bump
+        shell: bash
         run: |
-          # Get current version from csproj
-          CURRENT_VERSION=$(grep -oP '(?<=<Version>)[^<]+' src/Bbx/Bbx.csproj || echo "1.0.0")
-          echo "Current version: $CURRENT_VERSION"
-          
-          # Parse version components
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
-          # Determine bump type from commit message or workflow input
-          BUMP_TYPE="${{ github.event.inputs.version_bump }}"
-          if [ -z "$BUMP_TYPE" ]; then
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-            if [[ "$COMMIT_MSG" == *"[major]"* ]]; then
-              BUMP_TYPE="major"
-            elif [[ "$COMMIT_MSG" == *"[minor]"* ]]; then
-              BUMP_TYPE="minor"
-            else
-              BUMP_TYPE="patch"
-            fi
-          fi
-          
-          # Calculate new version
-          case $BUMP_TYPE in
-            major)
-              NEW_VERSION="$((MAJOR + 1)).0.0"
-              ;;
-            minor)
-              NEW_VERSION="${MAJOR}.$((MINOR + 1)).0"
-              ;;
-            patch)
-              NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-              ;;
+          set -euo pipefail
+          CURR=$(grep -oPm1 '(?<=<Version>)[^<]+' "$CSPROJ")
+          echo "Current version: $CURR"
+          IFS='.' read -r MAJ MIN PAT <<< "$CURR"
+          BUMP="${{ github.event.inputs.bump || 'patch' }}"
+          case "$BUMP" in
+            major) MAJ=$((MAJ+1)); MIN=0; PAT=0 ;;
+            minor) MIN=$((MIN+1)); PAT=0 ;;
+            patch|*) PAT=$((PAT+1)) ;;
           esac
-          
-          echo "New version: $NEW_VERSION"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-      
-      - name: Update version in csproj
+          NEW="$MAJ.$MIN.$PAT"
+          echo "New version: $NEW"
+          sed -i "s|<Version>$CURR</Version>|<Version>$NEW</Version>|" "$CSPROJ"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        if: ${{ github.ref == 'refs/heads/master' }}
         run: |
-          sed -i "s|<Version>.*</Version>|<Version>${{ steps.version.outputs.version }}</Version>|g" src/Bbx/Bbx.csproj
-      
-      - name: Restore dependencies
-        run: dotnet restore src/Bbx/Bbx.csproj
-      
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ${{ env.CSPROJ }}
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
+          git tag "v${{ steps.bump.outputs.version }}"
+          git push --follow-tags
+
       - name: Build
-        run: dotnet build src/Bbx/Bbx.csproj -c Release --no-restore
-      
+        run: dotnet build $PROJECT_DIR -c Release --no-restore
+
       - name: Pack
-        run: dotnet pack src/Bbx/Bbx.csproj -c Release --no-build -o ./nupkg
-      
-      - name: Push to NuGet
-        run: |
-          dotnet nuget push ./nupkg/*.nupkg \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
-      
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
-          generate_release_notes: true
-          files: ./nupkg/*.nupkg
+        run: dotnet pack $PROJECT_DIR -c Release --no-build
+
+      - name: Publish to NuGet
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Commit version update
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add src/Bbx/Bbx.csproj
-          git diff --staged --quiet || git commit -m "Bump version to ${{ steps.version.outputs.version }} [skip ci]"
-          git push
+          dotnet nuget push $NUPKG_DIR/*.nupkg \
+            --api-key "$NUGET_API_KEY" \
+            --source "$NUGET_SOURCE" \
+            --skip-duplicate
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          name: bbx v${{ steps.bump.outputs.version }}
+          generate_release_notes: true

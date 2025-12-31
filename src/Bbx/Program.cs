@@ -31,7 +31,7 @@ public class Program
         rootCommand.AddCommand(BranchCommand.Create(workspaceOption, repoOption));
         rootCommand.AddCommand(CommitCommand.Create(workspaceOption, repoOption));
         rootCommand.AddCommand(IssueCommand.Create(workspaceOption, repoOption));
-        rootCommand.AddCommand(PipelineCommand.Create(workspaceOption, repoOption));
+        rootCommand.AddCommand(PipelineCommand.Create());
         rootCommand.AddCommand(SnippetCommand.Create());
         rootCommand.AddCommand(WorkspaceCommand.Create());
 

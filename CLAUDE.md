@@ -30,7 +30,7 @@ dotnet tool uninstall -g solrevdev.bbx
 ```
 solrevdev.bbx/
 ├── src/Bbx/
-│   ├── Bbx.csproj              # Multi-target: net8.0;net9.0;net10.0
+│   ├── Bbx.csproj              # Multi-target: net8.0;net9.0;net10.0 (LTS: 8, 10)
 │   ├── Program.cs              # Entry point, command routing
 │   ├── Api/
 │   │   └── BitbucketClient.cs  # HTTP client with pagination
@@ -156,3 +156,10 @@ The GitHub Actions workflow handles publishing:
 
 - System.CommandLine (CLI framework)
 - No other external dependencies - uses built-in System.Text.Json
+
+## .NET Version Support
+
+Multi-targets .NET 8, 9, and 10:
+- **.NET 10** - Latest LTS (recommended)
+- **.NET 9** - Current
+- **.NET 8** - Previous LTS

@@ -1159,10 +1159,10 @@ public static class PipelineCommand
     }
 
     // Helper methods
-    private static (string? workspace, string? repo) ResolveWorkspaceRepo(string? workspace, string? repo, Credentials credentials)
+    private static (string? workspace, string? repo) ResolveWorkspaceRepo(string? workspace, string? repo, BbxConfig credentials)
     {
         var ws = workspace ?? credentials.DefaultWorkspace;
-        var repository = repo ?? credentials.DefaultRepository;
+        var repository = repo;
 
         // Handle workspace/repo format
         if (!string.IsNullOrEmpty(repository) && repository.Contains('/'))
