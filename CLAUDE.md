@@ -147,10 +147,10 @@ bbx workspace list
 ## Publishing
 
 The GitHub Actions workflow handles publishing:
-1. Push to master triggers build
-2. Version auto-bumped via commit message (`[major]`, `[minor]`, or patch by default)
+1. Push to master triggers build (or manually via workflow_dispatch)
+2. Version auto-bumped (defaults to patch; use workflow_dispatch to specify major/minor/patch)
 3. Package pushed to NuGet
-4. GitHub release created
+4. GitHub release created with auto-generated release notes
 
 ## Dependencies
 
