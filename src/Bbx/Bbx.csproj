@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- dotnet tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>bbx</ToolCommandName>
+    <PackageId>solrevdev.bbx</PackageId>
+
+    <!-- CI auto-bumps this -->
+    <Version>1.0.0</Version>
+
+    <!-- NuGet metadata -->
+    <Authors>solrevdev</Authors>
+    <PackageDescription>Bitbucket Cloud CLI for LLM integration. Manage repositories, pull requests, branches, commits, pipelines, and more via command line. JSON output optimized for AI/LLM consumption.</PackageDescription>
+    <PackageTags>Bitbucket;CLI;dotnet-tool;git;devops;LLM;API;pull-requests;pipelines;bitbucket-api;ci-cd</PackageTags>
+    <RepositoryUrl>https://github.com/solrevdev/solrevdev.bbx</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/solrevdev/solrevdev.bbx</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- where pack puts .nupkg -->
+    <PackageOutputPath>../../nupkg</PackageOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
