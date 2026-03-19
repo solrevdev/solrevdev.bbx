@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0052CC"/>
+      <stop offset="100%" style="stop-color:#172B4D"/>
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="textGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="url(#bgGrad)"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="100" cy="100" r="150" fill="rgba(255,255,255,0.03)"/>
+  <circle cx="412" cy="412" r="180" fill="rgba(255,255,255,0.03)"/>
+  
+  <!-- Terminal bracket left -->
+  <path d="M120 180 L80 256 L120 332" stroke="#4FD1C5" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+  
+  <!-- Terminal bracket right -->
+  <path d="M392 180 L432 256 L392 332" stroke="#4FD1C5" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+  
+  <!-- BBX text -->
+  <text x="256" y="280" font-family="SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="140" font-weight="800" fill="white" text-anchor="middle" filter="url(#textGlow)">bbx</text>
+  
+  <!-- Bitbucket-style bucket hint -->
+  <g transform="translate(206, 340)">
+    <path d="M0 0 L100 0 L90 50 L10 50 Z" fill="#2684FF" opacity="0.7"/>
+    <path d="M10 50 L90 50 L82 90 L18 90 Z" fill="#0052CC" opacity="0.7"/>
+  </g>
+  
+  <!-- .NET indicator -->
+  <rect x="380" y="68" width="64" height="28" rx="6" fill="#512BD4"/>
+  <text x="412" y="88" font-family="SF Pro Display, sans-serif" font-size="16" font-weight="600" fill="white" text-anchor="middle">.NET</text>
+</svg>
