@@ -25,6 +25,7 @@ public static class IssueCommand
         listCommand.AddOption(limitOption);
         listCommand.SetHandler(async (string? workspace, string? repo, string? state, string? priority, string? assignee, int limit) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -61,6 +62,7 @@ public static class IssueCommand
         viewCommand.AddArgument(idArg);
         viewCommand.SetHandler(async (string? workspace, string? repo, int id) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -95,6 +97,7 @@ public static class IssueCommand
         createCommand.AddOption(priorityCreateOption);
         createCommand.SetHandler(async (string? workspace, string? repo, string title, string? content, string? kind, string? priority) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -139,6 +142,7 @@ public static class IssueCommand
         updateCommand.AddOption(updateAssigneeOption);
         updateCommand.SetHandler(async (string? workspace, string? repo, int id, string? title, string? state, string? priority, string? assignee) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -175,6 +179,7 @@ public static class IssueCommand
         deleteCommand.AddOption(yesOption);
         deleteCommand.SetHandler(async (string? workspace, string? repo, int id, bool yes) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -213,6 +218,7 @@ public static class IssueCommand
         commentsCommand.AddArgument(commentsIdArg);
         commentsCommand.SetHandler(async (string? workspace, string? repo, int id) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -248,6 +254,7 @@ public static class IssueCommand
         commentCommand.AddOption(commentBodyOption);
         commentCommand.SetHandler(async (string? workspace, string? repo, int id, string commentBody) =>
         {
+            EmitDeprecationWarning();
             var config = CredentialManager.Load();
             workspace ??= config.DefaultWorkspace;
 
@@ -273,6 +280,15 @@ public static class IssueCommand
         command.AddCommand(commentCommand);
 
         return command;
+    }
+
+    private static void EmitDeprecationWarning()
+    {
+        Console.Error.WriteLine("WARNING: Bitbucket Cloud Issues are being sunset by Atlassian.");
+        Console.Error.WriteLine("  API endpoints will be removed on August 20, 2026.");
+        Console.Error.WriteLine("  Migrate to Jira Software: https://support.atlassian.com/bitbucket-cloud/docs/export-or-import-issue-data/");
+        Console.Error.WriteLine("  Full announcement: https://community.atlassian.com/forums/Bitbucket-articles/Announcing-sunset-of-Bitbucket-Issues-and-Wikis/ba-p/3193882");
+        Console.Error.WriteLine();
     }
 
     private static object ExtractIssueSummary(JsonElement issue)
