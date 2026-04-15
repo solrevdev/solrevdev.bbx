@@ -7,11 +7,13 @@ namespace Bbx.Commands;
 
 public static class BranchCommand
 {
-    public static Command Create(Option<string?> workspaceOption, Option<string?> repoOption)
+    public static Command Create()
     {
+        var workspaceOption = CommandOptions.CreateWorkspaceOption();
+        var repoOption = CommandOptions.CreateRepoOption();
         var command = new Command("branch", "Manage branches");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        command.AddGlobalOption(workspaceOption);
+        command.AddGlobalOption(repoOption);
 
         // bbx branch list
         var listCommand = new Command("list", "List branches");

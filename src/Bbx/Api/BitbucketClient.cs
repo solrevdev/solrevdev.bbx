@@ -9,7 +9,7 @@ namespace Bbx.Api;
 public class BitbucketClient : IDisposable
 {
     private readonly HttpClient _client;
-    private const string BaseUrl = "https://api.bitbucket.org/2.0";
+    private const string BaseUrl = "https://api.bitbucket.org/2.0/";
 
     public BitbucketClient(string? accessToken = null, string? appPassword = null, string? username = null)
     {
@@ -39,7 +39,7 @@ public class BitbucketClient : IDisposable
 
     public async Task<T?> GetAsync<T>(string endpoint, CancellationToken ct = default)
     {
-        var url = endpoint.StartsWith("http") ? endpoint : endpoint;
+        var url = NormalizeEndpoint(endpoint);
         var response = await _client.GetAsync(url, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -48,14 +48,14 @@ public class BitbucketClient : IDisposable
 
     public async Task<string> GetStringAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.GetAsync(endpoint, ct);
+        var response = await _client.GetAsync(NormalizeEndpoint(endpoint), ct);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetRawAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.GetAsync(endpoint, ct);
+        var response = await _client.GetAsync(NormalizeEndpoint(endpoint), ct);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -65,7 +65,7 @@ public class BitbucketClient : IDisposable
         var content = body != null
             ? new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json")
             : null;
-        var response = await _client.PostAsync(endpoint, content, ct);
+        var response = await _client.PostAsync(NormalizeEndpoint(endpoint), content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -73,7 +73,7 @@ public class BitbucketClient : IDisposable
 
     public async Task<T?> PostMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
     {
-        var response = await _client.PostAsync(endpoint, content, ct);
+        var response = await _client.PostAsync(NormalizeEndpoint(endpoint), content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -82,7 +82,7 @@ public class BitbucketClient : IDisposable
     public async Task<T?> PutAsync<T>(string endpoint, object body, CancellationToken ct = default)
     {
         var content = new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
-        var response = await _client.PutAsync(endpoint, content, ct);
+        var response = await _client.PutAsync(NormalizeEndpoint(endpoint), content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -90,7 +90,7 @@ public class BitbucketClient : IDisposable
 
     public async Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
     {
-        var response = await _client.PutAsync(endpoint, content, ct);
+        var response = await _client.PutAsync(NormalizeEndpoint(endpoint), content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -98,7 +98,7 @@ public class BitbucketClient : IDisposable
 
     public async Task DeleteAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.DeleteAsync(endpoint, ct);
+        var response = await _client.DeleteAsync(NormalizeEndpoint(endpoint), ct);
         await EnsureSuccessAsync(response);
     }
 
@@ -154,6 +154,12 @@ public class BitbucketClient : IDisposable
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
+
+    private static string NormalizeEndpoint(string endpoint)
+    {
+        if (endpoint.StartsWith("http")) return endpoint;
+        return endpoint.TrimStart('/');
+    }
 
     public void Dispose() => _client.Dispose();
 }

@@ -7,10 +7,11 @@ namespace Bbx.Commands;
 
 public static class RepoCommand
 {
-    public static Command Create(Option<string?> workspaceOption)
+    public static Command Create()
     {
+        var workspaceOption = CommandOptions.CreateWorkspaceOption();
         var command = new Command("repo", "Manage repositories");
-        command.AddOption(workspaceOption);
+        command.AddGlobalOption(workspaceOption);
 
         // bbx repo list
         var listCommand = new Command("list", "List repositories");

@@ -15,22 +15,13 @@ public class Program
             Name = "bbx"
         };
 
-        // Global options
-        var workspaceOption = new Option<string?>(
-            aliases: ["--workspace", "-w"],
-            description: "Bitbucket workspace (defaults to configured workspace)");
-
-        var repoOption = new Option<string?>(
-            aliases: ["--repo", "-r"],
-            description: "Repository slug");
-
         // Add all command groups
         rootCommand.AddCommand(AuthCommand.Create());
-        rootCommand.AddCommand(RepoCommand.Create(workspaceOption));
-        rootCommand.AddCommand(PrCommand.Create(workspaceOption, repoOption));
-        rootCommand.AddCommand(BranchCommand.Create(workspaceOption, repoOption));
-        rootCommand.AddCommand(CommitCommand.Create(workspaceOption, repoOption));
-        rootCommand.AddCommand(IssueCommand.Create(workspaceOption, repoOption));
+        rootCommand.AddCommand(RepoCommand.Create());
+        rootCommand.AddCommand(PrCommand.Create());
+        rootCommand.AddCommand(BranchCommand.Create());
+        rootCommand.AddCommand(CommitCommand.Create());
+        rootCommand.AddCommand(IssueCommand.Create());
         rootCommand.AddCommand(PipelineCommand.Create());
         rootCommand.AddCommand(SnippetCommand.Create());
         rootCommand.AddCommand(WorkspaceCommand.Create());

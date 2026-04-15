@@ -7,11 +7,13 @@ namespace Bbx.Commands;
 
 public static class IssueCommand
 {
-    public static Command Create(Option<string?> workspaceOption, Option<string?> repoOption)
+    public static Command Create()
     {
+        var workspaceOption = CommandOptions.CreateWorkspaceOption();
+        var repoOption = CommandOptions.CreateRepoOption();
         var command = new Command("issue", "Manage issues");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        command.AddGlobalOption(workspaceOption);
+        command.AddGlobalOption(repoOption);
 
         // bbx issue list
         var listCommand = new Command("list", "List issues");

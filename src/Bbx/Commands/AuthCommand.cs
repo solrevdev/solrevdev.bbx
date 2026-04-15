@@ -13,11 +13,48 @@ public static class AuthCommand
 
         // bbx auth login
         var loginCommand = new Command("login", "Authenticate with Bitbucket");
-        var appPasswordOption = new Option<bool>("--app-password", "Use app password authentication");
+        var appPasswordOption = new Option<bool>("--app-password", "Use app password authentication (deprecated, use --api-token)");
+        var apiTokenOption = new Option<bool>("--api-token", "Use API token authentication");
         loginCommand.AddOption(appPasswordOption);
-        loginCommand.SetHandler(async (bool useAppPassword) =>
+        loginCommand.AddOption(apiTokenOption);
+        loginCommand.SetHandler(async (bool useAppPassword, bool useApiToken) =>
         {
-            if (useAppPassword)
+            if (useApiToken)
+            {
+                Console.Write("Email (Atlassian account): ");
+                var email = Console.ReadLine()?.Trim();
+                Console.Write("API Token: ");
+                var token = ReadPassword();
+
+                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
+                {
+                    Console.Error.WriteLine("Error: Email and API token required");
+                    return;
+                }
+
+                // Atlassian API tokens use Basic auth (email:token)
+                using var client = new BitbucketClient(appPassword: token, username: email);
+                try
+                {
+                    var user = await client.GetAsync<JsonElement>("/user");
+                    var displayName = user.TryGetProperty("display_name", out var dn) ? dn.GetString() : "Unknown";
+                    var username = user.TryGetProperty("username", out var un) ? un.GetString() : null;
+
+                    var config = new BbxConfig
+                    {
+                        Username = email,
+                        AppPassword = token,
+                        DefaultWorkspace = username
+                    };
+                    CredentialManager.Save(config);
+                    Console.WriteLine($"✓ Authenticated as {displayName}");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error: Authentication failed - {ex.Message}");
+                }
+            }
+            else if (useAppPassword)
             {
                 Console.Write("Username: ");
                 var username = Console.ReadLine()?.Trim();
@@ -54,14 +91,17 @@ public static class AuthCommand
             }
             else
             {
-                Console.WriteLine("OAuth2 authentication coming soon. Use --app-password for now.");
+                Console.WriteLine("Use --api-token to authenticate with a Bitbucket API token.");
                 Console.WriteLine();
-                Console.WriteLine("To create an App Password:");
-                Console.WriteLine("1. Go to https://bitbucket.org/account/settings/app-passwords/");
-                Console.WriteLine("2. Create new app password with required permissions");
-                Console.WriteLine("3. Run: bbx auth login --app-password");
+                Console.WriteLine("To create an API Token:");
+                Console.WriteLine("1. Go to https://bitbucket.org/account/settings/api-tokens/");
+                Console.WriteLine("2. Create a new API token with required scopes");
+                Console.WriteLine("3. Run: bbx auth login --api-token");
+                Console.WriteLine("4. Enter your Atlassian account email and the API token");
+                Console.WriteLine();
+                Console.WriteLine("Note: App passwords were deprecated Sept 2025. Use --api-token instead.");
             }
-        }, appPasswordOption);
+        }, appPasswordOption, apiTokenOption);
         command.AddCommand(loginCommand);
 
         // bbx auth status
@@ -71,7 +111,7 @@ public static class AuthCommand
             var config = CredentialManager.Load();
             if (!CredentialManager.IsAuthenticated())
             {
-                Console.WriteLine("Not authenticated. Run: bbx auth login --app-password");
+                Console.WriteLine("Not authenticated. Run: bbx auth login --api-token");
                 return;
             }
 
@@ -84,7 +124,7 @@ public static class AuthCommand
 
                 Console.WriteLine($"✓ Authenticated as: {displayName}");
                 Console.WriteLine($"  Username: {username}");
-                Console.WriteLine($"  Auth method: {(config.AppPassword != null ? "App Password" : "OAuth2")}");
+                Console.WriteLine($"  Auth method: {(config.AppPassword != null ? "API Token / App Password" : "OAuth2")}");
                 if (config.DefaultWorkspace != null)
                     Console.WriteLine($"  Default workspace: {config.DefaultWorkspace}");
             }
@@ -144,6 +184,11 @@ public static class AuthCommand
 
     private static string ReadPassword()
     {
+        if (Console.IsInputRedirected)
+        {
+            return Console.ReadLine()?.TrimEnd('\r', '\n') ?? string.Empty;
+        }
+
         var password = new System.Text.StringBuilder();
         while (true)
         {

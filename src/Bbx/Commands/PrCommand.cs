@@ -7,11 +7,13 @@ namespace Bbx.Commands;
 
 public static class PrCommand
 {
-    public static Command Create(Option<string?> workspaceOption, Option<string?> repoOption)
+    public static Command Create()
     {
+        var workspaceOption = CommandOptions.CreateWorkspaceOption();
+        var repoOption = CommandOptions.CreateRepoOption();
         var command = new Command("pr", "Manage pull requests");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        command.AddGlobalOption(workspaceOption);
+        command.AddGlobalOption(repoOption);
 
         // bbx pr list
         var listCommand = new Command("list", "List pull requests");
