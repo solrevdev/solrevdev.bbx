@@ -12,7 +12,7 @@ internal static class CommandRunner
         {
             await AuthGate.EnsureAuthenticatedAsync(Program.Services, CancellationToken.None);
             var result = await handler();
-            Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions.Indented));
+            Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions.Current));
         }
         catch (BbxUserException ex)
         {

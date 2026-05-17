@@ -13,12 +13,28 @@ public class Program
     {
         Console.OutputEncoding = Encoding.UTF8;
 
+        // `--json-compact` is a global formatting toggle. It's stripped here
+        // before System.CommandLine sees the args so every group inherits
+        // it transparently — same effect as setting BBX_JSON_COMPACT=1.
+        var compactEnv = Environment.GetEnvironmentVariable("BBX_JSON_COMPACT");
+        var compactFromEnv = !string.IsNullOrEmpty(compactEnv)
+            && (compactEnv == "1" || string.Equals(compactEnv, "true", StringComparison.OrdinalIgnoreCase));
+        var compactFromArg = args.Any(a => a == "--json-compact");
+        JsonOptions.UseCompact = compactFromArg || compactFromEnv;
+        if (compactFromArg)
+            args = args.Where(a => a != "--json-compact").ToArray();
+
         Services = ServiceRegistration.Build();
 
         var rootCommand = new RootCommand("Bitbucket Cloud CLI for LLM integration")
         {
             Name = "bbx",
         };
+        // Registered for --help discoverability only; the option is already
+        // consumed above before InvokeAsync runs.
+        rootCommand.AddGlobalOption(new Option<bool>(
+            "--json-compact",
+            "Print JSON on a single line (no whitespace). Default: pretty-printed. Env: BBX_JSON_COMPACT=1."));
 
         rootCommand.AddCommand(AuthCommand.Create(Services));
         rootCommand.AddCommand(RepoCommand.Create(Services));

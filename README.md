@@ -559,6 +559,7 @@ global options and appear directly in subcommand help.
 |--------|-------|-------------|----------|
 | `--workspace` | `-w` | Bitbucket workspace (uses default if set) | repo, pr, branch, commit, issue |
 | `--repo` | `-r` | Repository slug | pr, branch, commit, issue |
+| `--json-compact` | — | Print JSON on a single line (no whitespace). Default: pretty-printed. Set `BBX_JSON_COMPACT=1` to enable globally. | all JSON-emitting commands |
 
 Other common options on subcommands:
 
@@ -567,6 +568,23 @@ Other common options on subcommands:
 | `--limit` | Maximum results to return (default: 25) |
 | `--state` | Filter by state (e.g., OPEN, MERGED, DECLINED) |
 | `--yes` | Skip confirmation prompts on destructive operations |
+
+### JSON output mode
+
+All commands that return data emit JSON to stdout (pretty-printed by default).
+Use `--json-compact` to switch to a single-line form, ideal for piping into
+`jq -c` or shell scripts:
+
+```bash
+# Default (pretty-printed)
+bbx repo list -w myworkspace --limit 1
+
+# One-line form
+bbx repo list -w myworkspace --limit 1 --json-compact | jq -c .repositories
+
+# Same effect via env var (useful in CI)
+BBX_JSON_COMPACT=1 bbx repo list -w myworkspace --limit 1
+```
 
 ## Configuration
 
