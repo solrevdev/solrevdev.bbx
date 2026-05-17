@@ -12,6 +12,9 @@ This file provides context for Claude Code when working with the solrevdev.bbx p
 # Build the project
 dotnet build src/Bbx/Bbx.csproj
 
+# Run tests (xUnit, net10.0 single-target)
+dotnet test tests/Bbx.Tests/Bbx.Tests.csproj
+
 # Run directly (use -f to target a specific framework)
 dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- <command>
 
@@ -31,27 +34,62 @@ dotnet tool uninstall -g solrevdev.bbx
 solrevdev.bbx/
 ├── src/Bbx/
 │   ├── Bbx.csproj              # Multi-target: net8.0;net9.0;net10.0 (LTS: 8, 10)
-│   ├── Program.cs              # Entry point, command routing, global -w/-r options
+│   ├── Program.cs              # Entry point + static Services provider (built once in Main)
+│   ├── BbxUserException.cs     # User-facing error type (caught by CommandRunner)
 │   ├── Api/
 │   │   └── BitbucketClient.cs  # HTTP client with pagination, endpoint normalization
 │   ├── Auth/
-│   │   └── CredentialManager.cs # Secure credential storage (~/.config/bbx/config.json)
-│   └── Commands/
-│       ├── AuthCommand.cs      # login (--api-token, --app-password), logout, status, token, set-workspace
-│       ├── RepoCommand.cs      # list, view, create, delete, fork, clone, permissions
-│       ├── PrCommand.cs        # list, view, create, merge, approve, unapprove, decline, comments, comment, diff, activity, statuses
-│       ├── BranchCommand.cs    # list, view, create, delete, restrictions
-│       ├── CommitCommand.cs    # list, view, diff, patch, comments, statuses, pullrequests
-│       ├── IssueCommand.cs     # list, view, create, update, delete, comments, comment
-│       ├── PipelineCommand.cs  # list, view, trigger, stop, logs, steps, variables, schedules, caches, deployments
-│       ├── SnippetCommand.cs   # list, view, create, update, delete, files, watch, comments
-│       └── WorkspaceCommand.cs # list, view, members, projects, permissions, hooks
+│   │   ├── CredentialManager.cs # ~/.config/bbx/config.json + legacy AppPassword migration
+│   │   ├── ICredentialStore.cs  # Seam for tests (FileCredentialStore in prod)
+│   │   ├── FileCredentialStore.cs
+│   │   ├── IAuthProvider.cs     # Per-request auth header stamping
+│   │   ├── BasicAuthProvider.cs # email:api-token (or username:app-password)
+│   │   └── NullAuthProvider.cs  # public endpoints / pre-login
+│   ├── Composition/
+│   │   ├── ServiceRegistration.cs # DI container build (singleton HttpClient + handler graph)
+│   │   └── JsonOptions.cs       # Shared System.Text.Json options (snake_case, indented)
+│   ├── Features/                # Per-verb feature slices — request + handler co-located
+│   │   ├── Auth/{LoginApiToken,LoginAppPassword,LoginGuide,Status,Logout,Token,SetWorkspace}/
+│   │   ├── Repos/{ListRepos,ViewRepo,CreateRepo,DeleteRepo,ForkRepo,CloneRepo,RepoPermissions}/
+│   │   ├── PullRequests/{ListPullRequests,...,PullRequestStatuses}/
+│   │   ├── Branches/{ListBranches,...,DeleteBranchRestriction}/
+│   │   ├── Commits/{ListCommits,...,ListCommitPullRequests}/
+│   │   ├── Issues/{ListIssues,...,AddIssueComment}/
+│   │   ├── Pipelines/{ListPipelines,...,ViewDeploymentEnvironment}/
+│   │   ├── Snippets/{ListSnippets,...,SnippetComments}/
+│   │   ├── Workspaces/{ListWorkspaces,...,WorkspaceHooks}/
+│   │   └── Common/Resolve.cs    # workspace/repo defaulting helpers
+│   └── Commands/                # System.CommandLine wiring only — NO business logic
+│       ├── CommandRunner.cs     # try/catch helper around handler invocation
+│       ├── CommandOptions.cs    # Shared workspace/repo options
+│       ├── AuthCommand.cs       # login (--api-token, --app-password), logout, status, token, set-workspace
+│       ├── RepoCommand.cs       # list, view, create, delete, fork, clone, permissions
+│       ├── PrCommand.cs         # list, view, create, merge, approve, unapprove, decline, comments, comment, diff, activity, statuses
+│       ├── BranchCommand.cs     # list, view, create, delete, restrictions
+│       ├── CommitCommand.cs     # list, view, diff, patch, comments, statuses, pullrequests
+│       ├── IssueCommand.cs      # list, view, create, update, delete, comments, comment
+│       ├── PipelineCommand.cs   # list, view, trigger, stop, logs, steps, variables, schedules, caches, deployments
+│       ├── SnippetCommand.cs    # list, view, create, update, delete, files, watch, comments
+│       └── WorkspaceCommand.cs  # list, view, members, projects, permissions, hooks
+├── tests/Bbx.Tests/             # xUnit + FluentAssertions + NSubstitute (net10.0)
+│   ├── Bbx.Tests.csproj
+│   ├── TestKit/                 # FakeHttpMessageHandler, InMemoryCredentialStore
+│   ├── Api/BitbucketClientTests.cs
+│   ├── Auth/{CredentialManagerTests,BasicAuthProviderTests,NullAuthProviderTests}.cs
+│   └── Features/Repos/ListReposHandlerTests.cs  # template for per-handler tests
 ├── .github/workflows/
-│   └── publish.yml             # CI/CD with auto version bumping
+│   └── publish.yml              # dotnet test runs before pack
 ├── README.md
 ├── CLAUDE.md
 └── LICENSE
 ```
+
+Handlers resolve from `Program.Services` (a `static IServiceProvider` built once
+in `Main` via `Composition.ServiceRegistration.Build()`). Each `Commands/*.cs`
+`SetHandler` does only: parse options → `services.GetRequiredService<Handler>()`
+→ `handler.HandleAsync(new Request(...), CancellationToken.None)` → serialise
+via `CommandRunner.RunJsonAsync` / `RunRawAsync` / `RunActionAsync`. Anything
+that calls Bitbucket or shapes JSON lives in `Features/<Group>/<Verb>/`.
 
 ## Command Syntax
 
@@ -84,57 +122,67 @@ the binary's `--help` output.
 
 ## Common Patterns
 
-### Adding a new subcommand
+### Adding a new subcommand (Phase 0.5+ shape)
+
+Three files per verb, no exceptions:
+
+1. `src/Bbx/Features/<Group>/<Verb>/<Verb>Request.cs` — `public sealed record` of inputs.
+2. `src/Bbx/Features/<Group>/<Verb>/<Verb>Handler.cs` — `public sealed class` with a
+   primary constructor taking `BitbucketClient` (plus `CredentialManager` when it
+   needs `DefaultWorkspace` or persistence). Single `HandleAsync` per handler.
+3. `src/Bbx/Commands/<Group>Command.cs` — wiring only: parse System.CommandLine
+   options, resolve the handler from `Program.Services`, await it through
+   `CommandRunner`.
+
+Then add one `services.AddTransient<TheNewHandler>();` line in
+`Composition/ServiceRegistration.cs`. No reflection scanning — explicit registrations.
 
 ```csharp
-private static Command CreateNewCommand()
+// src/Bbx/Features/Repos/ListRepos/ListReposRequest.cs
+public sealed record ListReposRequest(string? Workspace, int Limit, string? Query);
+
+// src/Bbx/Features/Repos/ListRepos/ListReposHandler.cs
+public sealed class ListReposHandler(BitbucketClient client, CredentialManager credentials)
 {
-    var command = new Command("name", "Description");
-
-    // Add options
-    var someOption = new Option<string>(["--opt", "-o"], "Description");
-    command.AddOption(someOption);
-
-    command.SetHandler(async (optValue) =>
+    public async Task<object> HandleAsync(ListReposRequest request, CancellationToken ct)
     {
-        var credentials = CredentialManager.Load();
-        if (credentials?.AccessToken is null && credentials?.AppPassword is null)
+        var workspace = Resolve.Workspace(credentials, request.Workspace,
+            "Error: Workspace required. Use --workspace or run: bbx auth set-workspace <workspace>");
+        // Endpoints may begin with or without "/"; BitbucketClient.NormalizeEndpoint handles it.
+        var endpoint = $"/repositories/{workspace}";
+        var repos = new List<object>();
+        await foreach (var repo in client.GetPaginatedAsync<JsonElement>(endpoint, ct))
         {
-            Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login --api-token' first.");
-            Environment.ExitCode = 1;
-            return;
+            repos.Add(new { /* shape data */ });
+            if (repos.Count >= request.Limit) break;
         }
-
-        var client = new BitbucketClient(credentials);
-
-        try
-        {
-            // Endpoints should NOT have a leading slash
-            var result = await client.GetAsync<JsonElement>("repositories/workspace/repo");
-            Console.WriteLine(JsonSerializer.Serialize(result,
-                new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch (HttpRequestException ex)
-        {
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            Environment.ExitCode = 1;
-        }
-    }, someOption);
-
-    return command;
+        return new { workspace, count = repos.Count, repositories = repos };
+    }
 }
+
+// src/Bbx/Commands/RepoCommand.cs
+listCommand.SetHandler((string? workspace, int limit, string? query) =>
+    CommandRunner.RunJsonAsync(() =>
+        services.GetRequiredService<ListReposHandler>()
+            .HandleAsync(new ListReposRequest(workspace, limit, query), CancellationToken.None)),
+    workspaceOption, limitOption, queryOption);
 ```
+
+Handlers throw `BbxUserException` for user-facing errors (missing workspace,
+"not authenticated", etc.) — `CommandRunner.Run*Async` catches it, writes the
+verbatim message to stderr, and sets `Environment.ExitCode = 1`. Unhandled
+`HttpRequestException` from Bitbucket comes through prefixed with `"Error: "`.
 
 ### Paginated responses
 
 ```csharp
 var items = new List<object>();
-await foreach (var item in client.GetPaginatedAsync<JsonElement>("repositories/workspace/repo/pullrequests"))
+await foreach (var item in client.GetPaginatedAsync<JsonElement>("repositories/workspace/repo/pullrequests", ct))
 {
     items.Add(new { /* shape data */ });
     if (items.Count >= limit) break;
 }
-Console.WriteLine(JsonSerializer.Serialize(new { items, count = items.Count }));
+return new { items, count = items.Count };
 ```
 
 ## API Reference
@@ -185,8 +233,12 @@ The GitHub Actions workflow handles publishing:
 
 ## Dependencies
 
-- System.CommandLine (CLI framework)
-- No other external dependencies - uses built-in System.Text.Json
+- `System.CommandLine` — CLI framework
+- `Microsoft.Extensions.DependencyInjection` — sole composition root for the
+  `BitbucketClient` + `CredentialManager` + handler graph
+- Otherwise built-in `System.Text.Json` for serialisation
+- Test project adds: `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`,
+  `FluentAssertions`, `NSubstitute`
 
 ## .NET Version Support
 

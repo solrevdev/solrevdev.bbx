@@ -73,6 +73,9 @@ jobs:
       - name: Build
         run: dotnet build $PROJECT_DIR -c Release --no-restore
 
+      - name: Test
+        run: dotnet test tests/Bbx.Tests/Bbx.Tests.csproj -c Release
+
       - name: Pack
         run: dotnet pack $PROJECT_DIR -c Release --no-build
 
