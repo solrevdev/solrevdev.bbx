@@ -6,6 +6,10 @@ using Bbx.Features.Branches.DeleteBranchRestriction;
 using Bbx.Features.Branches.ListBranchRestrictions;
 using Bbx.Features.Branches.ListBranches;
 using Bbx.Features.Branches.ViewBranch;
+using Bbx.Features.Tags.CreateTag;
+using Bbx.Features.Tags.DeleteTag;
+using Bbx.Features.Tags.ListTags;
+using Bbx.Features.Tags.ViewTag;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
@@ -112,6 +116,68 @@ public static class BranchCommand
 
         command.AddCommand(restrictionsCommand);
 
+        command.AddCommand(CreateTagCommand(services, workspaceOption, repoOption));
+
         return command;
+    }
+
+    private static Command CreateTagCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string?> repoOption)
+    {
+        var tagCommand = new Command("tag", "Manage tags");
+
+        var listCommand = new Command("list", "List tags");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum tags to list");
+        var listSortOption = new Option<string?>("--sort", "Sort by field (e.g., -name for descending)");
+        var listQueryOption = new Option<string?>("--query", "BBQL query filter");
+        listCommand.AddOption(listLimitOption);
+        listCommand.AddOption(listSortOption);
+        listCommand.AddOption(listQueryOption);
+        listCommand.SetHandler((string? workspace, string? repo, int limit, string? sort, string? query) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListTagsHandler>()
+                    .HandleAsync(new ListTagsRequest(workspace, repo, limit, sort, query), CancellationToken.None)),
+            workspaceOption, repoOption, listLimitOption, listSortOption, listQueryOption);
+        tagCommand.AddCommand(listCommand);
+
+        var viewCommand = new Command("view", "View tag details");
+        var viewNameArg = new Argument<string>("name", "Tag name");
+        viewCommand.AddArgument(viewNameArg);
+        viewCommand.SetHandler((string? workspace, string? repo, string name) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewTagHandler>()
+                    .HandleAsync(new ViewTagRequest(workspace, repo, name), CancellationToken.None)),
+            workspaceOption, repoOption, viewNameArg);
+        tagCommand.AddCommand(viewCommand);
+
+        var createCommand = new Command("create", "Create a new tag");
+        var createNameArg = new Argument<string>("name", "Tag name");
+        var createTargetOption = new Option<string>("--target", "Target commit hash or branch name") { IsRequired = true };
+        var createMessageOption = new Option<string?>("--message", "Annotation message (creates an annotated tag)");
+        createCommand.AddArgument(createNameArg);
+        createCommand.AddOption(createTargetOption);
+        createCommand.AddOption(createMessageOption);
+        createCommand.SetHandler((string? workspace, string? repo, string name, string target, string? message) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateTagHandler>()
+                    .HandleAsync(new CreateTagRequest(workspace, repo, name, target, message), CancellationToken.None)),
+            workspaceOption, repoOption, createNameArg, createTargetOption, createMessageOption);
+        tagCommand.AddCommand(createCommand);
+
+        var deleteCommand = new Command("delete", "Delete a tag");
+        var deleteNameArg = new Argument<string>("name", "Tag name to delete");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteNameArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string? repo, string name, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete tag '{name}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteTagHandler>()
+                    .HandleAsync(new DeleteTagRequest(workspace, repo, name), CancellationToken.None));
+        }, workspaceOption, repoOption, deleteNameArg, yesOption);
+        tagCommand.AddCommand(deleteCommand);
+
+        return tagCommand;
     }
 }

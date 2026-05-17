@@ -82,6 +82,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Source.CatSource.CatSourceHandler>();
         services.AddTransient<Features.Source.WriteSource.WriteSourceHandler>();
 
+        services.AddTransient<Features.Tags.ListTags.ListTagsHandler>();
+        services.AddTransient<Features.Tags.ViewTag.ViewTagHandler>();
+        services.AddTransient<Features.Tags.CreateTag.CreateTagHandler>();
+        services.AddTransient<Features.Tags.DeleteTag.DeleteTagHandler>();
+
         services.AddTransient<Features.PullRequests.ListPullRequests.ListPullRequestsHandler>();
         services.AddTransient<Features.PullRequests.ViewPullRequest.ViewPullRequestHandler>();
         services.AddTransient<Features.PullRequests.CreatePullRequest.CreatePullRequestHandler>();
