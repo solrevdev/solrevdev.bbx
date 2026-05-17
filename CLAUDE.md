@@ -43,13 +43,20 @@ solrevdev.bbx/
 │   │   ├── ICredentialStore.cs  # Seam for tests (FileCredentialStore in prod)
 │   │   ├── FileCredentialStore.cs
 │   │   ├── IAuthProvider.cs     # Per-request auth header stamping
-│   │   ├── BasicAuthProvider.cs # email:api-token (or username:app-password)
-│   │   └── NullAuthProvider.cs  # public endpoints / pre-login
+│   │   ├── BasicAuthProvider.cs # email:api-token (legacy: username:app-password)
+│   │   ├── NullAuthProvider.cs  # public endpoints / pre-login
+│   │   ├── OAuthAuthProvider.cs # Bearer + refresh-and-rotate (60s safety margin, SemaphoreSlim guard)
+│   │   ├── ConfigAuthProvider.cs # IAuthProvider selector — re-resolves after AuthGate login
+│   │   ├── OAuthFlow.cs         # Loopback HttpListener + authorization-code exchange
+│   │   ├── IBrowserLauncher.cs / DefaultBrowserLauncher.cs # Open default browser
+│   │   ├── AuthGate.cs          # First-run auto-launch + BBX_NO_INTERACTIVE opt-out
+│   │   ├── SecretInput.cs       # Masked stdin reader (with redirected-stdin fallback)
+│   │   └── RelativeTime.cs      # "in 2h" / "in 5m" helper for status output
 │   ├── Composition/
 │   │   ├── ServiceRegistration.cs # DI container build (singleton HttpClient + handler graph)
 │   │   └── JsonOptions.cs       # Shared System.Text.Json options (snake_case, indented)
 │   ├── Features/                # Per-verb feature slices — request + handler co-located
-│   │   ├── Auth/{LoginApiToken,LoginAppPassword,LoginGuide,Status,Logout,Token,SetWorkspace}/
+│   │   ├── Auth/{LoginOAuth,LoginApiToken,LoginGuide,SetupOAuth,Refresh,Status,Logout,Token,SetWorkspace}/
 │   │   ├── Repos/{ListRepos,ViewRepo,CreateRepo,DeleteRepo,ForkRepo,CloneRepo,RepoPermissions}/
 │   │   ├── PullRequests/{ListPullRequests,...,PullRequestStatuses}/
 │   │   ├── Branches/{ListBranches,...,DeleteBranchRestriction}/
@@ -62,7 +69,7 @@ solrevdev.bbx/
 │   └── Commands/                # System.CommandLine wiring only — NO business logic
 │       ├── CommandRunner.cs     # try/catch helper around handler invocation
 │       ├── CommandOptions.cs    # Shared workspace/repo options
-│       ├── AuthCommand.cs       # login (--api-token, --app-password), logout, status, token, set-workspace
+│       ├── AuthCommand.cs       # login (--oauth, --api-token), setup-oauth, refresh, logout, status, token, set-workspace
 │       ├── RepoCommand.cs       # list, view, create, delete, fork, clone, permissions
 │       ├── PrCommand.cs         # list, view, create, merge, approve, unapprove, decline, comments, comment, diff, activity, statuses
 │       ├── BranchCommand.cs     # list, view, create, delete, restrictions
@@ -113,12 +120,27 @@ the binary's `--help` output.
 
 1. **JSON-only output** - All commands output JSON for LLM consumption
 2. **Error handling** - Errors go to stderr, data to stdout
-3. **Authentication** - API tokens (or legacy app passwords) stored in `~/.config/bbx/config.json`
-4. **API token auth** - Uses Basic auth (email:token), same mechanism as app passwords. Atlassian API tokens are NOT Bearer tokens.
-5. **Non-interactive auth** - `ReadPassword()` falls back to `Console.ReadLine()` when stdin is redirected so scripted login works
-6. **Pagination** - Transparent pagination via IAsyncEnumerable
-7. **Confirmation prompts** - Destructive operations require `--yes` to skip
-8. **Endpoint normalization** - `BitbucketClient.NormalizeEndpoint()` strips leading `/` from endpoints to prevent HttpClient BaseAddress resolution bugs
+3. **Authentication** - OAuth 2.0 (loopback authorization-code) is the primary auth method; Atlassian API tokens are the documented fallback. Both stored in `~/.config/bbx/config.json` (mode 600). `--app-password` is gone — Bitbucket retires app passwords on 2026-06-09.
+4. **API token auth** - Uses Basic auth (email:token), same Basic-auth wire shape app passwords used. Atlassian API tokens are NOT Bearer tokens.
+5. **OAuth flow** - `OAuthFlow` runs the loopback `HttpListener` flow on `http://localhost:53682/callback` (fixed — BYO consumer). `OAuthAuthProvider` handles refresh-and-rotate (60s safety margin, SemaphoreSlim guard, rotated refresh tokens persisted via `CredentialManager.SaveConfig`).
+6. **First-run auto-launch** - `AuthGate.EnsureAuthenticatedAsync` runs from `CommandRunner.Run*Async` (everything except auth subcommands). When no credentials are stored, it prints the consumer-setup walkthrough (if needed), prompts for client_id/secret, runs the OAuth flow, then the original command continues. Set `BBX_NO_INTERACTIVE=1` (or run with stdin redirected) to opt out and get the existing "not authenticated" error instead.
+7. **Auth-method selection** - `ConfigAuthProvider` is the singleton `IAuthProvider`. It picks `OAuthAuthProvider` / `BasicAuthProvider` / `NullAuthProvider` from the current on-disk config and caches the choice; `AuthGate` invalidates the cache after login so the same-process command sees the new tokens.
+8. **Non-interactive auth** - `SecretInput.ReadSecret()` falls back to `Console.ReadLine()` when stdin is redirected so scripted login still works.
+9. **Pagination** - Transparent pagination via `IAsyncEnumerable`. Absolute `next` URLs are passed through unchanged; the previous double-prefix bug is fixed.
+10. **Confirmation prompts** - Destructive operations require `--yes` to skip
+11. **Endpoint normalization** - `BitbucketClient.NormalizeEndpoint()` strips leading `/` from endpoints to prevent HttpClient BaseAddress resolution bugs; absolute URLs pass through unchanged.
+
+### `bbx auth` subcommands
+
+- `bbx auth login --oauth [--client-id <id>] [--client-secret <secret>] [--port <n>] [--no-browser] [--scopes <list>]` — OAuth 2.0 login (recommended).
+- `bbx auth login --api-token` — Atlassian API token fallback for CI / scripted setups.
+- `bbx auth login` (no flag) — prints a chooser pointing at `--oauth` / `--api-token`.
+- `bbx auth setup-oauth [--open]` — print (and optionally open) the OAuth consumer setup walkthrough.
+- `bbx auth refresh` — force a token refresh and print the new expiry.
+- `bbx auth status` — show authenticated user, auth method (`oauth` | `api-token`), token expiry (OAuth).
+- `bbx auth token` — print the current access token (refreshing first if needed for OAuth); api-token returns `username:api_token`.
+- `bbx auth logout` — clear stored credentials (including consumer secret + refresh tokens).
+- `bbx auth set-workspace <slug>` — set the default workspace used when `-w` is omitted.
 
 ## Common Patterns
 
@@ -205,12 +227,19 @@ Common endpoints (no leading slash):
 To test commands against live Bitbucket API:
 
 ```bash
-# Set up auth first (API token, not app password)
+# OAuth setup (one-time, BYO consumer)
+bbx auth setup-oauth                # prints the walkthrough
+bbx auth login --oauth              # opens browser, captures callback
+bbx auth set-workspace yourworkspace
+
+# Or use an API token for CI / scripted setups
 bbx auth login --api-token
 bbx auth set-workspace yourworkspace
 
-# Test individual commands
+# Or just run any command — first-run auto-launch will start OAuth
 bbx repo list -w yourworkspace --limit 5
+
+# Test individual commands
 bbx pr list -w yourworkspace -r yourrepo --state OPEN --limit 5
 bbx workspace list
 ```
@@ -218,10 +247,15 @@ bbx workspace list
 When running from source without installing:
 
 ```bash
-dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- auth login --api-token
+dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- auth setup-oauth
+dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- auth login --oauth
 dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- auth set-workspace foremost-group
 dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- pr list -w foremost-group -r myrepo --state OPEN
 ```
+
+Set `BBX_NO_INTERACTIVE=1` (or redirect stdin) to opt out of the first-run
+OAuth auto-launch — useful for CI jobs that must fail fast on missing
+credentials rather than hanging on a prompt.
 
 ## Publishing
 

@@ -13,33 +13,63 @@ dotnet tool install -g solrevdev.bbx
 
 ## Authentication
 
-Before using `bbx`, authenticate with your Bitbucket account using an [API token](https://bitbucket.org/account/settings/api-tokens/):
+`bbx` supports two authentication methods:
+
+- **OAuth 2.0 (recommended)** — interactive browser-based login, refreshes
+  automatically. Bitbucket retires app passwords on 2026-06-09, so OAuth
+  (or an API token) is the path forward.
+- **Atlassian API token** — fallback for CI / scripted setups where there
+  is no browser.
+
+### First-time setup with OAuth
+
+OAuth requires a one-time consumer registration in your workspace. Run:
 
 ```bash
-# Login with API token (recommended)
-bbx auth login --api-token
-
-# Set default workspace
-bbx auth set-workspace myworkspace
-
-# Check authentication status
-bbx auth status
-
-# View stored token (for debugging)
-bbx auth token
-
-# Logout and clear credentials
-bbx auth logout
+bbx auth setup-oauth          # prints the walkthrough
+bbx auth setup-oauth --open   # also opens the workspace API settings page
 ```
 
-> **Note:** App passwords were deprecated by Atlassian in September 2025 and will be
-> disabled June 2026. Use `--api-token` instead. The `--app-password` flag still works
-> for existing credentials but should not be used for new setups.
+The walkthrough tells you to create a private OAuth consumer with the
+callback URL `http://localhost:53682/callback` (this is fixed — match it
+exactly). Then run:
 
-### Creating an API Token
+```bash
+bbx auth login --oauth
+# or pass credentials non-interactively:
+bbx auth login --oauth --client-id <key> --client-secret <secret>
+```
 
-1. Go to **Bitbucket Settings > API tokens** (<https://bitbucket.org/account/settings/api-tokens/>)
-2. Create a new token with the scopes you need:
+`bbx auth login --oauth` opens your browser, captures the authorization
+code on the loopback listener, exchanges it for an access + refresh token,
+and stores both in `~/.config/bbx/config.json` (mode 600).
+
+You don't actually have to run `bbx auth login --oauth` explicitly the
+first time — any `bbx` command (e.g. `bbx repo list -w myworkspace`)
+auto-launches the OAuth flow if no credentials are stored, then continues
+with the original command. Set `BBX_NO_INTERACTIVE=1` (or run with stdin
+redirected) to opt out and get the existing not-authenticated error
+instead — useful for CI.
+
+Other OAuth subcommands:
+
+```bash
+bbx auth refresh    # force a refresh, print new expires_at
+bbx auth token      # print current access token (refreshing first if needed)
+```
+
+### Fallback: API token
+
+For CI / scripted environments without a browser, use an
+[Atlassian API token](https://bitbucket.org/account/settings/api-tokens/):
+
+```bash
+bbx auth login --api-token
+# Enter your Atlassian account email and the API token
+```
+
+Create the token at <https://bitbucket.org/account/settings/api-tokens/>
+with the scopes you need:
 
 | Scope | Permission | For |
 |-------|------------|-----|
@@ -50,7 +80,14 @@ bbx auth logout
 | Pipelines | Read, Write | CI/CD |
 | Snippets | Read, Write | Code snippets |
 
-3. Run `bbx auth login --api-token`, enter your Atlassian account email and paste the token
+### Common auth commands
+
+```bash
+bbx auth set-workspace myworkspace   # default workspace for -w
+bbx auth status                       # show auth method, expiry (OAuth), user
+bbx auth token                        # access token / username:api_token
+bbx auth logout                       # clear credentials and consumer secret
+```
 
 ## Command Syntax
 
