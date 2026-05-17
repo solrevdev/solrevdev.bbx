@@ -73,12 +73,6 @@ public class BitbucketClientTests
     [Fact]
     public async Task GetPaginatedAsync_follows_next_link_until_exhausted()
     {
-        // Pin pagination only by follow-count + values. Real Bitbucket returns an
-        // absolute URL in `next`; the existing code reduces it to PathAndQuery
-        // and then NormalizeEndpoint strips the leading "/", which double-prefixes
-        // the BaseAddress path. Tracked as a Phase 0 carryover bug in
-        // docs/oauth-and-api-coverage.md; do not pin the exact URI of the
-        // second call until that's fixed.
         var handler = new FakeHttpMessageHandler();
         handler.Enqueue(HttpStatusCode.OK,
             """{"values":[{"name":"a"},{"name":"b"}],"next":"https://api.bitbucket.org/2.0/repositories/ws?page=2"}""");
@@ -95,6 +89,8 @@ public class BitbucketClientTests
 
         names.Should().Equal("a", "b", "c");
         handler.Calls.Should().HaveCount(2);
+        handler.Calls[0].RequestUri.Should().Be(new Uri("https://api.bitbucket.org/2.0/repositories/ws"));
+        handler.Calls[1].RequestUri.Should().Be(new Uri("https://api.bitbucket.org/2.0/repositories/ws?page=2"));
     }
 
     [Fact]

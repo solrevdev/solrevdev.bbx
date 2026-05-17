@@ -106,10 +106,6 @@ public class BitbucketClient : IDisposable
             }
 
             url = response.Next;
-            if (!string.IsNullOrEmpty(url) && url.StartsWith("http"))
-            {
-                url = new Uri(url).PathAndQuery;
-            }
         }
     }
 
