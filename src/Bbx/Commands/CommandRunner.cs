@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Bbx.Auth;
 using Bbx.Composition;
 
 namespace Bbx.Commands;
@@ -9,6 +10,7 @@ internal static class CommandRunner
     {
         try
         {
+            await AuthGate.EnsureAuthenticatedAsync(Program.Services, CancellationToken.None);
             var result = await handler();
             Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions.Indented));
         }
@@ -28,6 +30,7 @@ internal static class CommandRunner
     {
         try
         {
+            await AuthGate.EnsureAuthenticatedAsync(Program.Services, CancellationToken.None);
             var output = await handler();
             Console.WriteLine(output);
         }
@@ -44,6 +47,29 @@ internal static class CommandRunner
     }
 
     public static async Task RunActionAsync(Func<Task<string>> handler)
+    {
+        try
+        {
+            await AuthGate.EnsureAuthenticatedAsync(Program.Services, CancellationToken.None);
+            var message = await handler();
+            Console.WriteLine(message);
+        }
+        catch (BbxUserException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Environment.ExitCode = 1;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Environment.ExitCode = 1;
+        }
+    }
+
+    // Auth subcommands (login, logout, status, token, refresh, set-workspace,
+    // setup-oauth) opt out of the gate: triggering OAuth login while the user
+    // is mid-`bbx auth …` would be circular and surprising.
+    public static async Task RunActionNoGateAsync(Func<Task<string>> handler)
     {
         try
         {

@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Bbx.Auth;
 using Bbx.Features.Auth.LoginApiToken;
 using Bbx.Features.Auth.LoginGuide;
 using Bbx.Features.Auth.LoginOAuth;
@@ -61,7 +62,7 @@ public static class AuthCommand
 
             if (useOauth)
             {
-                await CommandRunner.RunActionAsync(() =>
+                await CommandRunner.RunActionNoGateAsync(() =>
                     services.GetRequiredService<LoginOAuthHandler>()
                         .HandleAsync(new LoginOAuthRequest(clientId, clientSecret, port, noBrowser, scopes), CancellationToken.None));
                 return;
@@ -72,7 +73,7 @@ public static class AuthCommand
                 Console.Write("Email (Atlassian account): ");
                 var email = Console.ReadLine()?.Trim();
                 Console.Write("API Token: ");
-                var token = ReadPassword();
+                var token = SecretInput.ReadSecret();
 
                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
                 {
@@ -80,7 +81,7 @@ public static class AuthCommand
                     return;
                 }
 
-                await CommandRunner.RunActionAsync(() =>
+                await CommandRunner.RunActionNoGateAsync(() =>
                     services.GetRequiredService<LoginApiTokenHandler>()
                         .HandleAsync(new LoginApiTokenRequest(email, token), CancellationToken.None));
                 return;
@@ -111,7 +112,7 @@ public static class AuthCommand
         var refreshCommand = new Command("refresh", "Force an OAuth token refresh and print the new expiry");
         refreshCommand.SetHandler(async () =>
         {
-            await CommandRunner.RunActionAsync(() =>
+            await CommandRunner.RunActionNoGateAsync(() =>
                 services.GetRequiredService<RefreshHandler>()
                     .HandleAsync(new RefreshRequest(), CancellationToken.None));
         });
@@ -134,7 +135,7 @@ public static class AuthCommand
         var logoutCommand = new Command("logout", "Clear stored credentials");
         logoutCommand.SetHandler(async () =>
         {
-            await CommandRunner.RunActionAsync(() =>
+            await CommandRunner.RunActionNoGateAsync(() =>
                 services.GetRequiredService<LogoutHandler>()
                     .HandleAsync(new LogoutRequest(), CancellationToken.None));
         });
@@ -159,35 +160,11 @@ public static class AuthCommand
         setWorkspaceCommand.AddArgument(workspaceArg);
         setWorkspaceCommand.SetHandler(async (string workspace) =>
         {
-            await CommandRunner.RunActionAsync(() =>
+            await CommandRunner.RunActionNoGateAsync(() =>
                 services.GetRequiredService<SetWorkspaceHandler>()
                     .HandleAsync(new SetWorkspaceRequest(workspace), CancellationToken.None));
         }, workspaceArg);
         return setWorkspaceCommand;
     }
 
-    private static string ReadPassword()
-    {
-        if (Console.IsInputRedirected)
-        {
-            return Console.ReadLine()?.TrimEnd('\r', '\n') ?? string.Empty;
-        }
-
-        var password = new System.Text.StringBuilder();
-        while (true)
-        {
-            var key = Console.ReadKey(intercept: true);
-            if (key.Key == ConsoleKey.Enter) break;
-            if (key.Key == ConsoleKey.Backspace && password.Length > 0)
-            {
-                password.Length--;
-            }
-            else if (!char.IsControl(key.KeyChar))
-            {
-                password.Append(key.KeyChar);
-            }
-        }
-        Console.WriteLine();
-        return password.ToString();
-    }
 }

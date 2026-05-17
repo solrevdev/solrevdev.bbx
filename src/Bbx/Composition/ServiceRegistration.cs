@@ -41,20 +41,8 @@ public static class ServiceRegistration
             sp.GetRequiredService<CredentialManager>(),
             sp.GetRequiredService<HttpClient>()));
 
-        services.AddSingleton<IAuthProvider>(sp =>
-        {
-            var creds = sp.GetRequiredService<CredentialManager>();
-            var config = creds.LoadConfig();
-            if (config.AuthMethod == "oauth" && !string.IsNullOrEmpty(config.RefreshToken))
-            {
-                return sp.GetRequiredService<OAuthAuthProvider>();
-            }
-            if (!string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.ApiToken))
-            {
-                return new BasicAuthProvider(config.Username, config.ApiToken);
-            }
-            return new NullAuthProvider();
-        });
+        services.AddSingleton<ConfigAuthProvider>();
+        services.AddSingleton<IAuthProvider>(sp => sp.GetRequiredService<ConfigAuthProvider>());
 
         services.AddSingleton(sp => new BitbucketClient(
             sp.GetRequiredService<HttpClient>(),
