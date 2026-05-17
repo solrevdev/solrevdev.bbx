@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -8,24 +7,13 @@ namespace Bbx.Api;
 
 public class BitbucketClient : IDisposable
 {
-    private const string BaseUrl = "https://api.bitbucket.org/2.0/";
-
     private readonly HttpClient _client;
     private readonly IAuthProvider _auth;
-    private readonly bool _ownsClient;
 
     public BitbucketClient(HttpClient client, IAuthProvider auth)
     {
         _client = client;
         _auth = auth;
-        _ownsClient = false;
-    }
-
-    public BitbucketClient(string? accessToken = null, string? appPassword = null, string? username = null)
-    {
-        _client = CreateDefaultHttpClient();
-        _auth = ResolveAuth(accessToken, appPassword, username);
-        _ownsClient = true;
     }
 
     public async Task<T?> GetAsync<T>(string endpoint, CancellationToken ct = default)
@@ -159,33 +147,10 @@ public class BitbucketClient : IDisposable
         return endpoint.TrimStart('/');
     }
 
-    private static HttpClient CreateDefaultHttpClient()
-    {
-        var client = new HttpClient
-        {
-            BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(30),
-        };
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");
-        return client;
-    }
-
-    private static IAuthProvider ResolveAuth(string? accessToken, string? appPassword, string? username)
-    {
-        // Bearer access tokens land in Phase 1 with OAuthAuthProvider; no
-        // CLI flow today produces a config with AccessToken set, so the
-        // accessToken parameter is preserved for ABI compatibility only.
-        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(appPassword))
-        {
-            return new BasicAuthProvider(username, appPassword);
-        }
-        return new NullAuthProvider();
-    }
-
     public void Dispose()
     {
-        if (_ownsClient) _client.Dispose();
+        // The HttpClient is owned by the DI container (singleton); do not
+        // dispose it here.
     }
 }
 

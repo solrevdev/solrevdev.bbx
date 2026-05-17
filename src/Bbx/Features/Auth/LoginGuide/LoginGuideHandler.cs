@@ -4,15 +4,17 @@ public sealed class LoginGuideHandler
 {
     public Task HandleAsync(LoginGuideRequest request, CancellationToken ct)
     {
-        Console.WriteLine("Use --api-token to authenticate with a Bitbucket API token.");
+        Console.WriteLine("Choose an authentication method:");
         Console.WriteLine();
-        Console.WriteLine("To create an API Token:");
-        Console.WriteLine("1. Go to https://bitbucket.org/account/settings/api-tokens/");
-        Console.WriteLine("2. Create a new API token with required scopes");
-        Console.WriteLine("3. Run: bbx auth login --api-token");
-        Console.WriteLine("4. Enter your Atlassian account email and the API token");
+        Console.WriteLine("  --oauth       OAuth 2.0 via browser (recommended)");
+        Console.WriteLine("                bbx auth login --oauth");
+        Console.WriteLine("                First time? Run: bbx auth setup-oauth");
         Console.WriteLine();
-        Console.WriteLine("Note: App passwords were deprecated Sept 2025. Use --api-token instead.");
+        Console.WriteLine("  --api-token   Atlassian API token (fallback; good for CI / scripts)");
+        Console.WriteLine("                bbx auth login --api-token");
+        Console.WriteLine("                Create one at: https://bitbucket.org/account/settings/api-tokens/");
+        Console.WriteLine();
+        Console.WriteLine("App passwords are no longer supported (Bitbucket retires them 2026-06-09).");
         return Task.CompletedTask;
     }
 }

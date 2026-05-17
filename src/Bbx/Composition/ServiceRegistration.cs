@@ -9,22 +9,6 @@ public static class ServiceRegistration
 {
     private const string BaseUrl = "https://api.bitbucket.org/2.0/";
 
-    public static BitbucketClient CreateLoginClient(string username, string secret)
-    {
-        // Login runs before any DI-resolved auth provider is valid: the user is
-        // still typing the credentials. Phase 1 (OAuth) collapses this into the
-        // shared singleton via OAuthAuthProvider; for now we build a one-shot
-        // client around a fresh BasicAuthProvider.
-        var http = new HttpClient
-        {
-            BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(30),
-        };
-        http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");
-        return new BitbucketClient(http, new BasicAuthProvider(username, secret));
-    }
-
     public static IServiceProvider Build()
     {
         var services = new ServiceCollection();
@@ -84,7 +68,6 @@ public static class ServiceRegistration
     private static void RegisterHandlers(IServiceCollection services)
     {
         services.AddTransient<Features.Auth.LoginApiToken.LoginApiTokenHandler>();
-        services.AddTransient<Features.Auth.LoginAppPassword.LoginAppPasswordHandler>();
         services.AddTransient<Features.Auth.LoginOAuth.LoginOAuthHandler>();
         services.AddTransient<Features.Auth.LoginGuide.LoginGuideHandler>();
         services.AddTransient<Features.Auth.SetupOAuth.SetupOAuthHandler>();
