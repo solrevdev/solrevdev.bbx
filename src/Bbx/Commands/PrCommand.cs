@@ -3,13 +3,21 @@ using Bbx.Features.PullRequests.AddPullRequestComment;
 using Bbx.Features.PullRequests.ApprovePullRequest;
 using Bbx.Features.PullRequests.CreatePullRequest;
 using Bbx.Features.PullRequests.DeclinePullRequest;
+using Bbx.Features.PullRequests.ListPullRequestCommits;
 using Bbx.Features.PullRequests.ListPullRequestComments;
 using Bbx.Features.PullRequests.ListPullRequests;
 using Bbx.Features.PullRequests.MergePullRequest;
 using Bbx.Features.PullRequests.PullRequestActivity;
 using Bbx.Features.PullRequests.PullRequestDiff;
+using Bbx.Features.PullRequests.PullRequestPatch;
 using Bbx.Features.PullRequests.PullRequestStatuses;
+using Bbx.Features.PullRequests.RequestChanges;
+using Bbx.Features.PullRequests.Tasks.AddPullRequestTask;
+using Bbx.Features.PullRequests.Tasks.DeletePullRequestTask;
+using Bbx.Features.PullRequests.Tasks.ListPullRequestTasks;
+using Bbx.Features.PullRequests.Tasks.UpdatePullRequestTask;
 using Bbx.Features.PullRequests.UnapprovePullRequest;
+using Bbx.Features.PullRequests.UnrequestChanges;
 using Bbx.Features.PullRequests.ViewPullRequest;
 using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
 using Microsoft.Extensions.DependencyInjection;
@@ -185,6 +193,126 @@ public static class PrCommand
             workspaceOption, repoOption, drLimitOption);
         command.AddCommand(defaultReviewersCommand);
 
+        command.AddCommand(CreateTasksCommand(services, workspaceOption, repoOption));
+
+        var requestChangesCommand = new Command("request-changes", "Mark PR as needing changes");
+        var rcIdArg = new Argument<int>("id", "Pull request ID");
+        requestChangesCommand.AddArgument(rcIdArg);
+        requestChangesCommand.SetHandler((string? workspace, string? repo, int id) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RequestChangesHandler>()
+                    .HandleAsync(new RequestChangesRequest(workspace, repo, id), CancellationToken.None)),
+            workspaceOption, repoOption, rcIdArg);
+        command.AddCommand(requestChangesCommand);
+
+        var unrequestChangesCommand = new Command("unrequest-changes", "Remove a previous request-changes review");
+        var urcIdArg = new Argument<int>("id", "Pull request ID");
+        unrequestChangesCommand.AddArgument(urcIdArg);
+        unrequestChangesCommand.SetHandler((string? workspace, string? repo, int id) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<UnrequestChangesHandler>()
+                    .HandleAsync(new UnrequestChangesRequest(workspace, repo, id), CancellationToken.None)),
+            workspaceOption, repoOption, urcIdArg);
+        command.AddCommand(unrequestChangesCommand);
+
+        var commitsCommand = new Command("commits", "List commits in a pull request");
+        var commitsIdArg = new Argument<int>("id", "Pull request ID");
+        var commitsLimitOption = new Option<int>("--limit", () => 50, "Maximum commits to list");
+        commitsCommand.AddArgument(commitsIdArg);
+        commitsCommand.AddOption(commitsLimitOption);
+        commitsCommand.SetHandler((string? workspace, string? repo, int id, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListPullRequestCommitsHandler>()
+                    .HandleAsync(new ListPullRequestCommitsRequest(workspace, repo, id, limit), CancellationToken.None)),
+            workspaceOption, repoOption, commitsIdArg, commitsLimitOption);
+        command.AddCommand(commitsCommand);
+
+        var patchCommand = new Command("patch", "Show PR as a git-format patch");
+        var patchIdArg = new Argument<int>("id", "Pull request ID");
+        patchCommand.AddArgument(patchIdArg);
+        patchCommand.SetHandler((string? workspace, string? repo, int id) =>
+            CommandRunner.RunRawAsync(() =>
+                services.GetRequiredService<PullRequestPatchHandler>()
+                    .HandleAsync(new PullRequestPatchRequest(workspace, repo, id), CancellationToken.None)),
+            workspaceOption, repoOption, patchIdArg);
+        command.AddCommand(patchCommand);
+
         return command;
+    }
+
+    private static Command CreateTasksCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string?> repoOption)
+    {
+        var tasksCommand = new Command("tasks", "Manage PR tasks");
+
+        var listCommand = new Command("list", "List tasks on a PR");
+        var listIdArg = new Argument<int>("id", "Pull request ID");
+        var listLimitOption = new Option<int>("--limit", () => 50, "Maximum tasks to list");
+        listCommand.AddArgument(listIdArg);
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string? repo, int id, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListPullRequestTasksHandler>()
+                    .HandleAsync(new ListPullRequestTasksRequest(workspace, repo, id, limit), CancellationToken.None)),
+            workspaceOption, repoOption, listIdArg, listLimitOption);
+        tasksCommand.AddCommand(listCommand);
+
+        var addCommand = new Command("add", "Add a task to a PR");
+        var addIdArg = new Argument<int>("id", "Pull request ID");
+        var addContentOption = new Option<string>("--content", "Task body (markdown)") { IsRequired = true };
+        addCommand.AddArgument(addIdArg);
+        addCommand.AddOption(addContentOption);
+        addCommand.SetHandler((string? workspace, string? repo, int id, string content) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddPullRequestTaskHandler>()
+                    .HandleAsync(new AddPullRequestTaskRequest(workspace, repo, id, content), CancellationToken.None)),
+            workspaceOption, repoOption, addIdArg, addContentOption);
+        tasksCommand.AddCommand(addCommand);
+
+        var updateCommand = new Command("update", "Update a PR task (content and/or state)");
+        var updateIdArg = new Argument<int>("id", "Pull request ID");
+        var updateTaskIdOption = new Option<int>("--task-id", "Task ID") { IsRequired = true };
+        var updateContentOption = new Option<string?>("--content", "New task body");
+        var updateStateOption = new Option<string?>("--state", "Task state (RESOLVED or UNRESOLVED)");
+        updateCommand.AddArgument(updateIdArg);
+        updateCommand.AddOption(updateTaskIdOption);
+        updateCommand.AddOption(updateContentOption);
+        updateCommand.AddOption(updateStateOption);
+        updateCommand.SetHandler((string? workspace, string? repo, int id, int taskId, string? content, string? state) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdatePullRequestTaskHandler>()
+                    .HandleAsync(new UpdatePullRequestTaskRequest(workspace, repo, id, taskId, content, state), CancellationToken.None)),
+            workspaceOption, repoOption, updateIdArg, updateTaskIdOption, updateContentOption, updateStateOption);
+        tasksCommand.AddCommand(updateCommand);
+
+        var completeCommand = new Command("complete", "Mark a PR task as RESOLVED");
+        var completeIdArg = new Argument<int>("id", "Pull request ID");
+        var completeTaskIdOption = new Option<int>("--task-id", "Task ID") { IsRequired = true };
+        completeCommand.AddArgument(completeIdArg);
+        completeCommand.AddOption(completeTaskIdOption);
+        completeCommand.SetHandler((string? workspace, string? repo, int id, int taskId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdatePullRequestTaskHandler>()
+                    .HandleAsync(new UpdatePullRequestTaskRequest(workspace, repo, id, taskId, null, "RESOLVED"), CancellationToken.None)),
+            workspaceOption, repoOption, completeIdArg, completeTaskIdOption);
+        tasksCommand.AddCommand(completeCommand);
+
+        var deleteCommand = new Command("delete", "Delete a PR task");
+        var deleteIdArg = new Argument<int>("id", "Pull request ID");
+        var deleteTaskIdOption = new Option<int>("--task-id", "Task ID") { IsRequired = true };
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteIdArg);
+        deleteCommand.AddOption(deleteTaskIdOption);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string? repo, int id, int taskId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete task #{taskId} on PR #{id}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeletePullRequestTaskHandler>()
+                    .HandleAsync(new DeletePullRequestTaskRequest(workspace, repo, id, taskId), CancellationToken.None));
+        }, workspaceOption, repoOption, deleteIdArg, deleteTaskIdOption, yesOption);
+        tasksCommand.AddCommand(deleteCommand);
+
+        return tasksCommand;
     }
 }

@@ -103,6 +103,14 @@ public static class ServiceRegistration
         services.AddTransient<Features.PullRequests.PullRequestDiff.PullRequestDiffHandler>();
         services.AddTransient<Features.PullRequests.PullRequestActivity.PullRequestActivityHandler>();
         services.AddTransient<Features.PullRequests.PullRequestStatuses.PullRequestStatusesHandler>();
+        services.AddTransient<Features.PullRequests.Tasks.ListPullRequestTasks.ListPullRequestTasksHandler>();
+        services.AddTransient<Features.PullRequests.Tasks.AddPullRequestTask.AddPullRequestTaskHandler>();
+        services.AddTransient<Features.PullRequests.Tasks.UpdatePullRequestTask.UpdatePullRequestTaskHandler>();
+        services.AddTransient<Features.PullRequests.Tasks.DeletePullRequestTask.DeletePullRequestTaskHandler>();
+        services.AddTransient<Features.PullRequests.RequestChanges.RequestChangesHandler>();
+        services.AddTransient<Features.PullRequests.UnrequestChanges.UnrequestChangesHandler>();
+        services.AddTransient<Features.PullRequests.ListPullRequestCommits.ListPullRequestCommitsHandler>();
+        services.AddTransient<Features.PullRequests.PullRequestPatch.PullRequestPatchHandler>();
 
         services.AddTransient<Features.Branches.ListBranches.ListBranchesHandler>();
         services.AddTransient<Features.Branches.ViewBranch.ViewBranchHandler>();
