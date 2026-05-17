@@ -545,9 +545,19 @@ All commands output JSON to stdout, errors to stderr. This makes them ideal for 
 # Pipe to jq for pretty-printing
 bbx pr view 123 -w myworkspace -r myrepo | jq .
 
+# Compact mode for piping through jq -c or shell scripts
+bbx pr list -w myworkspace -r myrepo --state OPEN --json-compact \
+    | jq -c '.pull_requests[] | {id, title, author: .author.account_id}'
+
 # List commits for code review
 bbx commit list -w myworkspace -r myrepo --branch feature-x --limit 5
 ```
+
+**Agents driving `bbx` programmatically should read
+[`docs/llm-guide.md`](docs/llm-guide.md)** — a pattern-based reference
+documenting every command group, subcommand, common flag pattern,
+auth expectations, JSON shapes, and end-to-end composition recipes
+tuned for code agents.
 
 ## Global Options
 
