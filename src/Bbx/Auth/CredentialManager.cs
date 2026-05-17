@@ -34,21 +34,12 @@ public sealed class CredentialManager
     {
         var config = LoadConfig();
         return !string.IsNullOrEmpty(config.AccessToken) ||
-               (!string.IsNullOrEmpty(config.Username)
-                   && !string.IsNullOrEmpty(config.ApiToken ?? config.AppPassword));
+               (!string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.ApiToken));
     }
 
     private static bool TryMigrate(BbxConfig config)
     {
         if (!string.IsNullOrEmpty(config.AuthMethod)) return false;
-
-        if (!string.IsNullOrEmpty(config.AppPassword))
-        {
-            config.AuthMethod = "api-token";
-            config.ApiToken = config.AppPassword;
-            config.AppPassword = null;
-            return true;
-        }
 
         if (!string.IsNullOrEmpty(config.AccessToken) && !string.IsNullOrEmpty(config.RefreshToken))
         {
@@ -71,6 +62,4 @@ public class BbxConfig
     public string? Username { get; set; }
     public string? ApiToken { get; set; }
     public string? DefaultWorkspace { get; set; }
-
-    public string? AppPassword { get; set; }
 }

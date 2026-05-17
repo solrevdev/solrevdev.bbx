@@ -42,36 +42,12 @@ public class CredentialManagerTests
     }
 
     [Fact]
-    public void LoadConfig_migrates_legacy_AppPassword_into_ApiToken_and_writes_back()
-    {
-        var store = new InMemoryCredentialStore(new BbxConfig
-        {
-            Username = "jane@example.com",
-            AppPassword = "ATATT3xFfGF0",
-            DefaultWorkspace = "ws",
-        });
-        var creds = new CredentialManager(store);
-
-        var config = creds.LoadConfig();
-
-        config.AuthMethod.Should().Be("api-token");
-        config.ApiToken.Should().Be("ATATT3xFfGF0");
-        config.AppPassword.Should().BeNull();
-
-        store.SaveCount.Should().Be(1);
-        var snapshot = store.Snapshot();
-        snapshot!.AuthMethod.Should().Be("api-token");
-        snapshot.ApiToken.Should().Be("ATATT3xFfGF0");
-        snapshot.AppPassword.Should().BeNull();
-    }
-
-    [Fact]
     public void LoadConfig_migration_is_one_shot_and_does_not_resave_on_subsequent_loads()
     {
         var store = new InMemoryCredentialStore(new BbxConfig
         {
-            Username = "jane@example.com",
-            AppPassword = "ATATT3xFfGF0",
+            AccessToken = "ya29.x",
+            RefreshToken = "1//09Q.x",
         });
         var creds = new CredentialManager(store);
 

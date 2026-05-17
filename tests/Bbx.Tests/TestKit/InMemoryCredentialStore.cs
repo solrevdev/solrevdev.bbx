@@ -38,6 +38,5 @@ internal sealed class InMemoryCredentialStore : ICredentialStore
         Username = source.Username,
         ApiToken = source.ApiToken,
         DefaultWorkspace = source.DefaultWorkspace,
-        AppPassword = source.AppPassword,
     };
 }
