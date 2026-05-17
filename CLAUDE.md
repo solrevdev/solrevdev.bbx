@@ -37,7 +37,7 @@ solrevdev.bbx/
 │   ├── Program.cs              # Entry point + static Services provider (built once in Main)
 │   ├── BbxUserException.cs     # User-facing error type (caught by CommandRunner)
 │   ├── Api/
-│   │   └── BitbucketClient.cs  # HTTP client with pagination, endpoint normalization
+│   │   └── BitbucketClient.cs  # HTTP client: pagination + endpoint normalization + GetByteArrayAsync (for binary downloads)
 │   ├── Auth/
 │   │   ├── CredentialManager.cs # ~/.config/bbx/config.json + legacy AppPassword migration
 │   │   ├── ICredentialStore.cs  # Seam for tests (FileCredentialStore in prod)
@@ -57,23 +57,37 @@ solrevdev.bbx/
 │   │   └── JsonOptions.cs       # Shared System.Text.Json options (snake_case, indented)
 │   ├── Features/                # Per-verb feature slices — request + handler co-located
 │   │   ├── Auth/{LoginOAuth,LoginApiToken,LoginGuide,SetupOAuth,Refresh,Status,Logout,Token,SetWorkspace}/
-│   │   ├── Repos/{ListRepos,ViewRepo,CreateRepo,DeleteRepo,ForkRepo,CloneRepo,RepoPermissions}/
-│   │   ├── PullRequests/{ListPullRequests,...,PullRequestStatuses}/
+│   │   ├── Repos/
+│   │   │   ├── {ListRepos,ViewRepo,CreateRepo,DeleteRepo,ForkRepo,CloneRepo,RepoPermissions}/
+│   │   │   ├── Hooks/{ListRepoHooks,ViewRepoHook,CreateRepoHook,UpdateRepoHook,DeleteRepoHook}/  # Phase 2
+│   │   │   └── DefaultReviewers/{ListDefaultReviewers,AddDefaultReviewer,RemoveDefaultReviewer,EffectiveDefaultReviewers}/  # Phase 2
+│   │   ├── PullRequests/
+│   │   │   ├── {ListPullRequests,...,PullRequestStatuses}/
+│   │   │   ├── Tasks/{ListPullRequestTasks,AddPullRequestTask,UpdatePullRequestTask,DeletePullRequestTask}/  # Phase 2
+│   │   │   ├── RequestChanges/, UnrequestChanges/                                                            # Phase 2
+│   │   │   ├── ListPullRequestCommits/, PullRequestPatch/                                                    # Phase 2
 │   │   ├── Branches/{ListBranches,...,DeleteBranchRestriction}/
-│   │   ├── Commits/{ListCommits,...,ListCommitPullRequests}/
+│   │   ├── Tags/{ListTags,ViewTag,CreateTag,DeleteTag}/                                          # Phase 2 — under `bbx branch tag`
+│   │   ├── Commits/
+│   │   │   ├── {ListCommits,...,ListCommitPullRequests}/
+│   │   │   └── {CreateCommitStatus,UpdateCommitStatus}/                                          # Phase 2 — under `bbx commit status`
+│   │   ├── Source/{LsSource,CatSource,WriteSource}/                                              # Phase 2 — `bbx src`
+│   │   ├── Downloads/{ListDownloads,UploadDownload,GetDownload,DeleteDownload}/                  # Phase 2 — `bbx download`
 │   │   ├── Issues/{ListIssues,...,AddIssueComment}/
 │   │   ├── Pipelines/{ListPipelines,...,ViewDeploymentEnvironment}/
 │   │   ├── Snippets/{ListSnippets,...,SnippetComments}/
 │   │   ├── Workspaces/{ListWorkspaces,...,WorkspaceHooks}/
 │   │   └── Common/Resolve.cs    # workspace/repo defaulting helpers
 │   └── Commands/                # System.CommandLine wiring only — NO business logic
-│       ├── CommandRunner.cs     # try/catch helper around handler invocation
+│       ├── CommandRunner.cs     # try/catch helper around handler invocation (Json/Raw/Action/Binary)
 │       ├── CommandOptions.cs    # Shared workspace/repo options
 │       ├── AuthCommand.cs       # login (--oauth, --api-token), setup-oauth, refresh, logout, status, token, set-workspace
-│       ├── RepoCommand.cs       # list, view, create, delete, fork, clone, permissions
-│       ├── PrCommand.cs         # list, view, create, merge, approve, unapprove, decline, comments, comment, diff, activity, statuses
-│       ├── BranchCommand.cs     # list, view, create, delete, restrictions
-│       ├── CommitCommand.cs     # list, view, diff, patch, comments, statuses, pullrequests
+│       ├── RepoCommand.cs       # list, view, create, delete, fork, clone, permissions, hooks {list,view,create,update,delete}, default-reviewers {list,add,remove,effective}
+│       ├── PrCommand.cs         # list, view, create, merge, approve, unapprove, decline, comments, comment, diff, activity, statuses, default-reviewers, tasks {list,add,update,complete,delete}, request-changes, unrequest-changes, commits, patch
+│       ├── BranchCommand.cs     # list, view, create, delete, restrictions, tag {list,view,create,delete}
+│       ├── CommitCommand.cs     # list, view, diff, patch, comments, statuses, pullrequests, status {create,update}
+│       ├── SrcCommand.cs        # ls, cat, write
+│       ├── DownloadCommand.cs   # list, upload, get, delete
 │       ├── IssueCommand.cs      # list, view, create, update, delete, comments, comment
 │       ├── PipelineCommand.cs   # list, view, trigger, stop, logs, steps, variables, schedules, caches, deployments
 │       ├── SnippetCommand.cs    # list, view, create, update, delete, files, watch, comments
@@ -95,8 +109,9 @@ Handlers resolve from `Program.Services` (a `static IServiceProvider` built once
 in `Main` via `Composition.ServiceRegistration.Build()`). Each `Commands/*.cs`
 `SetHandler` does only: parse options → `services.GetRequiredService<Handler>()`
 → `handler.HandleAsync(new Request(...), CancellationToken.None)` → serialise
-via `CommandRunner.RunJsonAsync` / `RunRawAsync` / `RunActionAsync`. Anything
-that calls Bitbucket or shapes JSON lives in `Features/<Group>/<Verb>/`.
+via `CommandRunner.RunJsonAsync` / `RunRawAsync` / `RunActionAsync` /
+`RunBinaryAsync`. Anything that calls Bitbucket or shapes JSON lives in
+`Features/<Group>/<Verb>/`.
 
 ## Command Syntax
 

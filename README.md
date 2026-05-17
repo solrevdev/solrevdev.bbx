@@ -136,6 +136,19 @@ bbx repo delete myrepo --yes -w myworkspace
 
 # View repository permissions
 bbx repo permissions myrepo -w myworkspace
+
+# Manage webhooks on a repo
+bbx repo hooks list -w myworkspace -r myrepo
+bbx repo hooks create -w myworkspace -r myrepo --url https://example.com/hook --events repo:push --events pullrequest:created
+bbx repo hooks view {uuid} -w myworkspace -r myrepo
+bbx repo hooks update {uuid} -w myworkspace -r myrepo --active false
+bbx repo hooks delete {uuid} -w myworkspace -r myrepo --yes
+
+# Manage default reviewers
+bbx repo default-reviewers list -w myworkspace -r myrepo
+bbx repo default-reviewers add -w myworkspace -r myrepo --target {account-id-or-uuid}
+bbx repo default-reviewers remove -w myworkspace -r myrepo --target {account-id-or-uuid} --yes
+bbx repo default-reviewers effective -w myworkspace -r myrepo
 ```
 
 ### Pull Requests
@@ -179,6 +192,24 @@ bbx pr activity 123 -w myworkspace -r myrepo
 
 # View PR commit statuses (CI/CD)
 bbx pr statuses 123 -w myworkspace -r myrepo
+
+# Show effective default reviewers (repo + project, inherited)
+bbx pr default-reviewers -w myworkspace -r myrepo
+
+# Manage PR tasks (review checklist items)
+bbx pr tasks list 123 -w myworkspace -r myrepo
+bbx pr tasks add 123 -w myworkspace -r myrepo --content "Please add a test"
+bbx pr tasks update 123 -w myworkspace -r myrepo --task-id 7 --content "Updated wording"
+bbx pr tasks complete 123 -w myworkspace -r myrepo --task-id 7
+bbx pr tasks delete 123 -w myworkspace -r myrepo --task-id 7 --yes
+
+# Request / unrequest changes
+bbx pr request-changes 123 -w myworkspace -r myrepo
+bbx pr unrequest-changes 123 -w myworkspace -r myrepo
+
+# List PR commits, fetch raw patch
+bbx pr commits 123 -w myworkspace -r myrepo
+bbx pr patch 123 -w myworkspace -r myrepo
 ```
 
 ### Branch Management
@@ -204,6 +235,12 @@ bbx branch restrictions list -w myworkspace -r myrepo
 
 # Add a branch restriction
 bbx branch restrictions add -w myworkspace -r myrepo --kind push --pattern main
+
+# Manage tags (refs/tags)
+bbx branch tag list -w myworkspace -r myrepo
+bbx branch tag view v1.0.0 -w myworkspace -r myrepo
+bbx branch tag create v1.0.0 -w myworkspace -r myrepo --target main --message "Release 1.0.0"
+bbx branch tag delete v1.0.0 -w myworkspace -r myrepo --yes
 ```
 
 ### Commits
@@ -230,8 +267,49 @@ bbx commit comments abc123 -w myworkspace -r myrepo
 # View commit build statuses
 bbx commit statuses abc123 -w myworkspace -r myrepo
 
+# Create / update a build status on a commit (CI integrations)
+bbx commit status create abc123 -w myworkspace -r myrepo \
+    --key my-ci --state INPROGRESS --url https://ci.example/run/42 \
+    --name "Build #42" --description "Running unit tests"
+bbx commit status update abc123 -w myworkspace -r myrepo \
+    --key my-ci --state SUCCESSFUL
+
 # List pull requests for a commit
 bbx commit pullrequests abc123 -w myworkspace -r myrepo
+```
+
+### Source / files
+
+```bash
+# List a directory at a ref
+bbx src ls -w myworkspace -r myrepo --ref main src/
+
+# Print a file at a ref
+bbx src cat -w myworkspace -r myrepo --ref main src/Program.cs
+
+# Commit one or more files in a single multipart request
+bbx src write -w myworkspace -r myrepo \
+    --branch feature-x --message "tweak config" \
+    --file ./local/path.json=config/path.json \
+    --file ./README.md=README.md \
+    --author "Jane Doe <jane@example.com>"
+```
+
+### Downloads
+
+```bash
+# List repo download artifacts
+bbx download list -w myworkspace -r myrepo
+
+# Upload (multipart)
+bbx download upload -w myworkspace -r myrepo --file ./dist/release.tar.gz
+
+# Get raw bytes to stdout, or save to a file
+bbx download get release.tar.gz -w myworkspace -r myrepo --output ./release.tar.gz
+bbx download get release.tar.gz -w myworkspace -r myrepo > release.tar.gz
+
+# Delete
+bbx download delete release.tar.gz -w myworkspace -r myrepo --yes
 ```
 
 ### Issues
