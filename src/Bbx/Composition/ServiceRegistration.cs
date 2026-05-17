@@ -91,6 +91,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Tags.CreateTag.CreateTagHandler>();
         services.AddTransient<Features.Tags.DeleteTag.DeleteTagHandler>();
 
+        services.AddTransient<Features.Downloads.ListDownloads.ListDownloadsHandler>();
+        services.AddTransient<Features.Downloads.UploadDownload.UploadDownloadHandler>();
+        services.AddTransient<Features.Downloads.GetDownload.GetDownloadHandler>();
+        services.AddTransient<Features.Downloads.DeleteDownload.DeleteDownloadHandler>();
+
         services.AddTransient<Features.PullRequests.ListPullRequests.ListPullRequestsHandler>();
         services.AddTransient<Features.PullRequests.ViewPullRequest.ViewPullRequestHandler>();
         services.AddTransient<Features.PullRequests.CreatePullRequest.CreatePullRequestHandler>();

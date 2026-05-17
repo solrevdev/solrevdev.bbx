@@ -26,6 +26,7 @@ public class Program
         rootCommand.AddCommand(BranchCommand.Create(Services));
         rootCommand.AddCommand(CommitCommand.Create(Services));
         rootCommand.AddCommand(SrcCommand.Create(Services));
+        rootCommand.AddCommand(DownloadCommand.Create(Services));
         rootCommand.AddCommand(IssueCommand.Create(Services));
         rootCommand.AddCommand(PipelineCommand.Create(Services));
         rootCommand.AddCommand(SnippetCommand.Create(Services));

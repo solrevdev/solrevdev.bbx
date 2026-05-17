@@ -46,6 +46,28 @@ internal static class CommandRunner
         }
     }
 
+    public static async Task RunBinaryAsync(Func<Task<byte[]>> handler)
+    {
+        try
+        {
+            await AuthGate.EnsureAuthenticatedAsync(Program.Services, CancellationToken.None);
+            var bytes = await handler();
+            await using var stdout = Console.OpenStandardOutput();
+            await stdout.WriteAsync(bytes, CancellationToken.None);
+            await stdout.FlushAsync(CancellationToken.None);
+        }
+        catch (BbxUserException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Environment.ExitCode = 1;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Environment.ExitCode = 1;
+        }
+    }
+
     public static async Task RunActionAsync(Func<Task<string>> handler)
     {
         try

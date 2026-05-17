@@ -38,6 +38,13 @@ public class BitbucketClient : IDisposable
         return await response.Content.ReadAsStringAsync(ct);
     }
 
+    public async Task<byte[]> GetByteArrayAsync(string endpoint, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
     public async Task<T?> PostAsync<T>(string endpoint, object? body = null, CancellationToken ct = default)
     {
         var content = body != null
