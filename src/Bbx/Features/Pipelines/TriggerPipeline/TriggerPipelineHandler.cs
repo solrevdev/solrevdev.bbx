@@ -12,18 +12,34 @@ public sealed class TriggerPipelineHandler(BitbucketClient client, CredentialMan
         var (ws, repository) = Resolve.WorkspaceAndRepoFlexible(credentials, request.Workspace, request.Repository,
             "Workspace and repository are required.");
 
-        var target = new Dictionary<string, object>
+        Dictionary<string, object> target;
+        if (!string.IsNullOrEmpty(request.PullRequestId))
         {
-            ["type"] = "pipeline_ref_target",
-            ["ref_type"] = "branch",
-            ["ref_name"] = request.Branch,
-        };
-
-        if (!string.IsNullOrEmpty(request.Commit))
-            target["commit"] = new { hash = request.Commit };
-
-        if (!string.IsNullOrEmpty(request.Pattern))
-            target["selector"] = new { type = "custom", pattern = request.Pattern };
+            // pipeline_pullrequest_target — runs the pull-request pipeline for
+            // the named PR. `source` is the source branch of the PR; Bitbucket
+            // fills in destination/destination_commit from the PR itself.
+            target = new Dictionary<string, object>
+            {
+                ["type"] = "pipeline_pullrequest_target",
+                ["source"] = request.Branch,
+                ["pullrequest"] = new { id = request.PullRequestId },
+            };
+            if (!string.IsNullOrEmpty(request.Pattern))
+                target["selector"] = new { type = "pull-requests", pattern = request.Pattern };
+        }
+        else
+        {
+            target = new Dictionary<string, object>
+            {
+                ["type"] = "pipeline_ref_target",
+                ["ref_type"] = "branch",
+                ["ref_name"] = request.Branch,
+            };
+            if (!string.IsNullOrEmpty(request.Commit))
+                target["commit"] = new { hash = request.Commit };
+            if (!string.IsNullOrEmpty(request.Pattern))
+                target["selector"] = new { type = "custom", pattern = request.Pattern };
+        }
 
         var body = new Dictionary<string, object> { ["target"] = target };
 

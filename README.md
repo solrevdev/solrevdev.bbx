@@ -381,8 +381,22 @@ bbx pipeline list -w myworkspace -r myrepo
 # View pipeline details
 bbx pipeline view {uuid} -w myworkspace -r myrepo
 
-# Trigger a pipeline
+# Trigger a pipeline on a branch
 bbx pipeline trigger -w myworkspace -r myrepo --branch main
+
+# Trigger a pipeline on a specific commit
+bbx pipeline trigger -w myworkspace -r myrepo --branch main --commit abc123
+
+# Trigger a custom pipeline (selector by pattern)
+bbx pipeline trigger -w myworkspace -r myrepo --branch main --pattern nightly
+
+# Pass variables in key=value form
+bbx pipeline trigger -w myworkspace -r myrepo --branch main \
+    --variable KEY1=value1 --variable KEY2=value2
+
+# Trigger the pull-request pipeline for an open PR
+# `--branch` here is the PR's source branch; Bitbucket fills in destination from the PR
+bbx pipeline trigger -w myworkspace -r myrepo --pull-request 123 --branch feature-x
 
 # Stop a running pipeline
 bbx pipeline stop {uuid} -w myworkspace -r myrepo

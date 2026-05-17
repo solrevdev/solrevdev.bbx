@@ -217,9 +217,10 @@ public static class PipelineCommand
         var command = new Command("trigger", "Trigger a new pipeline run");
         var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
         var repoOption = new Option<string?>("--repo", "Repository slug");
-        var branchOption = new Option<string>("--branch", () => "main", "Branch to run pipeline on");
-        var commitOption = new Option<string?>("--commit", "Specific commit hash to run on");
-        var patternOption = new Option<string?>("--pattern", "Custom pipeline pattern to run");
+        var branchOption = new Option<string>("--branch", () => "main", "Branch to run pipeline on (also used as the PR source branch when --pull-request is set)");
+        var commitOption = new Option<string?>("--commit", "Specific commit hash to run on (branch trigger only)");
+        var patternOption = new Option<string?>("--pattern", "Custom pipeline pattern (selector) to run");
+        var pullRequestOption = new Option<string?>("--pull-request", "Trigger the pull-request pipeline for this PR id (uses --branch as the PR's source branch)");
         var variablesOption = new Option<string[]>("--variable", "Pipeline variables in key=value format") { AllowMultipleArgumentsPerToken = true };
 
         command.AddOption(workspaceOption);
@@ -227,13 +228,14 @@ public static class PipelineCommand
         command.AddOption(branchOption);
         command.AddOption(commitOption);
         command.AddOption(patternOption);
+        command.AddOption(pullRequestOption);
         command.AddOption(variablesOption);
 
-        command.SetHandler((string? workspace, string? repo, string branch, string? commit, string? pattern, string[] variables) =>
+        command.SetHandler((string? workspace, string? repo, string branch, string? commit, string? pattern, string? pullRequest, string[] variables) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<TriggerPipelineHandler>()
-                    .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, variables), CancellationToken.None)),
-            workspaceOption, repoOption, branchOption, commitOption, patternOption, variablesOption);
+                    .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, pullRequest, variables), CancellationToken.None)),
+            workspaceOption, repoOption, branchOption, commitOption, patternOption, pullRequestOption, variablesOption);
         return command;
     }
 

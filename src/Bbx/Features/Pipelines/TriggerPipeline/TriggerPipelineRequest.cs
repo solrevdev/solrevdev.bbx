@@ -6,4 +6,5 @@ public sealed record TriggerPipelineRequest(
     string Branch,
     string? Commit,
     string? Pattern,
+    string? PullRequestId,
     string[] Variables);
