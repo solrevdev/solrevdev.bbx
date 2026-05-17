@@ -39,7 +39,7 @@ solrevdev.bbx/
 │   ├── Api/
 │   │   └── BitbucketClient.cs  # HTTP client: pagination + endpoint normalization + GetByteArrayAsync (for binary downloads)
 │   ├── Auth/
-│   │   ├── CredentialManager.cs # ~/.config/bbx/config.json + legacy AppPassword migration
+│   │   ├── CredentialManager.cs # ~/.config/bbx/config.json (mode 600); migrates pre-v2 OAuth-shape configs into AuthMethod="oauth"
 │   │   ├── ICredentialStore.cs  # Seam for tests (FileCredentialStore in prod)
 │   │   ├── FileCredentialStore.cs
 │   │   ├── IAuthProvider.cs     # Per-request auth header stamping
