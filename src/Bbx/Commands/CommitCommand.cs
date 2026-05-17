@@ -1,10 +1,12 @@
 using System.CommandLine;
 using Bbx.Features.Commits.CommitDiff;
 using Bbx.Features.Commits.CommitPatch;
+using Bbx.Features.Commits.CreateCommitStatus;
 using Bbx.Features.Commits.ListCommitComments;
 using Bbx.Features.Commits.ListCommitPullRequests;
 using Bbx.Features.Commits.ListCommitStatuses;
 using Bbx.Features.Commits.ListCommits;
+using Bbx.Features.Commits.UpdateCommitStatus;
 using Bbx.Features.Commits.ViewCommit;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -84,6 +86,8 @@ public static class CommitCommand
             workspaceOption, repoOption, statusesHashArg);
         command.AddCommand(statusesCommand);
 
+        command.AddCommand(CreateStatusCommand(services, workspaceOption, repoOption));
+
         var prsCommand = new Command("pullrequests", "List pull requests for a commit");
         var prsHashArg = new Argument<string>("hash", "Commit hash");
         prsCommand.AddArgument(prsHashArg);
@@ -95,5 +99,54 @@ public static class CommitCommand
         command.AddCommand(prsCommand);
 
         return command;
+    }
+
+    private static Command CreateStatusCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string?> repoOption)
+    {
+        var statusCommand = new Command("status", "Create or update commit build statuses");
+
+        var createCommand = new Command("create", "Create a build status on a commit");
+        var createHashArg = new Argument<string>("hash", "Commit hash");
+        var createKeyOption = new Option<string>("--key", "Build status key") { IsRequired = true };
+        var createStateOption = new Option<string>("--state",
+            "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)") { IsRequired = true };
+        var createUrlOption = new Option<string>("--url", "URL to the build (e.g., CI run)") { IsRequired = true };
+        var createNameOption = new Option<string?>("--name", "Human-readable name");
+        var createDescriptionOption = new Option<string?>("--description", "Description");
+        createCommand.AddArgument(createHashArg);
+        createCommand.AddOption(createKeyOption);
+        createCommand.AddOption(createStateOption);
+        createCommand.AddOption(createUrlOption);
+        createCommand.AddOption(createNameOption);
+        createCommand.AddOption(createDescriptionOption);
+        createCommand.SetHandler((string? workspace, string? repo, string hash, string key, string state, string url, string? name, string? description) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateCommitStatusHandler>()
+                    .HandleAsync(new CreateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CancellationToken.None)),
+            workspaceOption, repoOption, createHashArg, createKeyOption, createStateOption, createUrlOption, createNameOption, createDescriptionOption);
+        statusCommand.AddCommand(createCommand);
+
+        var updateCommand = new Command("update", "Update an existing build status on a commit");
+        var updateHashArg = new Argument<string>("hash", "Commit hash");
+        var updateKeyOption = new Option<string>("--key", "Build status key") { IsRequired = true };
+        var updateStateOption = new Option<string?>("--state",
+            "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)");
+        var updateUrlOption = new Option<string?>("--url", "URL to the build");
+        var updateNameOption = new Option<string?>("--name", "Human-readable name");
+        var updateDescriptionOption = new Option<string?>("--description", "Description");
+        updateCommand.AddArgument(updateHashArg);
+        updateCommand.AddOption(updateKeyOption);
+        updateCommand.AddOption(updateStateOption);
+        updateCommand.AddOption(updateUrlOption);
+        updateCommand.AddOption(updateNameOption);
+        updateCommand.AddOption(updateDescriptionOption);
+        updateCommand.SetHandler((string? workspace, string? repo, string hash, string key, string? state, string? url, string? name, string? description) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateCommitStatusHandler>()
+                    .HandleAsync(new UpdateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CancellationToken.None)),
+            workspaceOption, repoOption, updateHashArg, updateKeyOption, updateStateOption, updateUrlOption, updateNameOption, updateDescriptionOption);
+        statusCommand.AddCommand(updateCommand);
+
+        return statusCommand;
     }
 }
