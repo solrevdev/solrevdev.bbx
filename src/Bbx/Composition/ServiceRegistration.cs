@@ -72,6 +72,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.ForkRepo.ForkRepoHandler>();
         services.AddTransient<Features.Repos.CloneRepo.CloneRepoHandler>();
         services.AddTransient<Features.Repos.RepoPermissions.RepoPermissionsHandler>();
+        services.AddTransient<Features.Repos.Hooks.ListRepoHooks.ListRepoHooksHandler>();
+        services.AddTransient<Features.Repos.Hooks.ViewRepoHook.ViewRepoHookHandler>();
+        services.AddTransient<Features.Repos.Hooks.CreateRepoHook.CreateRepoHookHandler>();
+        services.AddTransient<Features.Repos.Hooks.UpdateRepoHook.UpdateRepoHookHandler>();
+        services.AddTransient<Features.Repos.Hooks.DeleteRepoHook.DeleteRepoHookHandler>();
 
         services.AddTransient<Features.PullRequests.ListPullRequests.ListPullRequestsHandler>();
         services.AddTransient<Features.PullRequests.ViewPullRequest.ViewPullRequestHandler>();

@@ -3,6 +3,11 @@ using Bbx.Features.Repos.CloneRepo;
 using Bbx.Features.Repos.CreateRepo;
 using Bbx.Features.Repos.DeleteRepo;
 using Bbx.Features.Repos.ForkRepo;
+using Bbx.Features.Repos.Hooks.CreateRepoHook;
+using Bbx.Features.Repos.Hooks.DeleteRepoHook;
+using Bbx.Features.Repos.Hooks.ListRepoHooks;
+using Bbx.Features.Repos.Hooks.UpdateRepoHook;
+using Bbx.Features.Repos.Hooks.ViewRepoHook;
 using Bbx.Features.Repos.ListRepos;
 using Bbx.Features.Repos.RepoPermissions;
 using Bbx.Features.Repos.ViewRepo;
@@ -117,7 +122,87 @@ public static class RepoCommand
             workspaceOption, permRepoArg);
         command.AddCommand(permissionsCommand);
 
+        command.AddCommand(CreateHooksCommand(services, workspaceOption));
+
         return command;
+    }
+
+    private static Command CreateHooksCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var hooksCommand = new Command("hooks", "Manage repository webhooks");
+        var repoOption = CommandOptions.CreateRepoOption();
+        hooksCommand.AddGlobalOption(repoOption);
+
+        var listCommand = new Command("list", "List repository webhooks");
+        var limitOption = new Option<int>("--limit", () => 25, "Maximum webhooks to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListRepoHooksHandler>()
+                    .HandleAsync(new ListRepoHooksRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, limitOption);
+        hooksCommand.AddCommand(listCommand);
+
+        var viewCommand = new Command("view", "View a repository webhook");
+        var viewUidArg = new Argument<string>("uid", "Webhook UUID");
+        viewCommand.AddArgument(viewUidArg);
+        viewCommand.SetHandler((string? workspace, string? repo, string uid) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewRepoHookHandler>()
+                    .HandleAsync(new ViewRepoHookRequest(workspace, repo, uid), CancellationToken.None)),
+            workspaceOption, repoOption, viewUidArg);
+        hooksCommand.AddCommand(viewCommand);
+
+        var createCommand = new Command("create", "Create a repository webhook");
+        var urlOption = new Option<string>("--url", "Webhook target URL") { IsRequired = true };
+        var descriptionOption = new Option<string?>("--description", "Webhook description");
+        var eventsOption = new Option<string[]?>("--events", "Events to trigger webhook (default: repo:push)");
+        var activeOption = new Option<bool>("--active", () => true, "Whether the webhook is active");
+        createCommand.AddOption(urlOption);
+        createCommand.AddOption(descriptionOption);
+        createCommand.AddOption(eventsOption);
+        createCommand.AddOption(activeOption);
+        createCommand.SetHandler((string? workspace, string? repo, string url, string? description, string[]? events, bool active) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateRepoHookHandler>()
+                    .HandleAsync(new CreateRepoHookRequest(workspace, repo, url, description, events, active), CancellationToken.None)),
+            workspaceOption, repoOption, urlOption, descriptionOption, eventsOption, activeOption);
+        hooksCommand.AddCommand(createCommand);
+
+        var updateCommand = new Command("update", "Update a repository webhook");
+        var updateUidArg = new Argument<string>("uid", "Webhook UUID");
+        var updateUrlOption = new Option<string?>("--url", "Webhook target URL");
+        var updateDescriptionOption = new Option<string?>("--description", "Webhook description");
+        var updateEventsOption = new Option<string[]?>("--events", "Events to trigger webhook");
+        var updateActiveOption = new Option<bool?>("--active", "Whether the webhook is active");
+        updateCommand.AddArgument(updateUidArg);
+        updateCommand.AddOption(updateUrlOption);
+        updateCommand.AddOption(updateDescriptionOption);
+        updateCommand.AddOption(updateEventsOption);
+        updateCommand.AddOption(updateActiveOption);
+        updateCommand.SetHandler((string? workspace, string? repo, string uid, string? url, string? description, string[]? events, bool? active) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateRepoHookHandler>()
+                    .HandleAsync(new UpdateRepoHookRequest(workspace, repo, uid, url, description, events, active), CancellationToken.None)),
+            workspaceOption, repoOption, updateUidArg, updateUrlOption, updateDescriptionOption, updateEventsOption, updateActiveOption);
+        hooksCommand.AddCommand(updateCommand);
+
+        var deleteCommand = new Command("delete", "Delete a repository webhook");
+        var deleteUidArg = new Argument<string>("uid", "Webhook UUID");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteUidArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string? repo, string uid, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete webhook '{uid}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteRepoHookHandler>()
+                    .HandleAsync(new DeleteRepoHookRequest(workspace, repo, uid), CancellationToken.None));
+        }, workspaceOption, repoOption, deleteUidArg, yesOption);
+        hooksCommand.AddCommand(deleteCommand);
+
+        return hooksCommand;
     }
 
     private static (string ws, string repo) ParseRepoPath(string? workspace, string path)
