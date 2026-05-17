@@ -263,7 +263,7 @@ public static class CommitCommand
     {
         return new BitbucketClient(
             accessToken: config.AccessToken,
-            appPassword: config.AppPassword,
+            appPassword: config.ApiToken ?? config.AppPassword,
             username: config.Username);
     }
 

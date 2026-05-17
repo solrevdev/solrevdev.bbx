@@ -8,39 +8,36 @@ namespace Bbx.Api;
 
 public class BitbucketClient : IDisposable
 {
-    private readonly HttpClient _client;
     private const string BaseUrl = "https://api.bitbucket.org/2.0/";
+
+    private readonly HttpClient _client;
+    private readonly IAuthProvider _auth;
+    private readonly bool _ownsClient;
+
+    public BitbucketClient(HttpClient client, IAuthProvider auth)
+    {
+        _client = client;
+        _auth = auth;
+        _ownsClient = false;
+    }
+
+    public BitbucketClient(BbxConfig config)
+    {
+        _client = CreateDefaultHttpClient();
+        _auth = ResolveAuth(config);
+        _ownsClient = true;
+    }
 
     public BitbucketClient(string? accessToken = null, string? appPassword = null, string? username = null)
     {
-        _client = new HttpClient
-        {
-            BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-
-        _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _client.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");
-
-        if (!string.IsNullOrEmpty(accessToken))
-        {
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        }
-        else if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(appPassword))
-        {
-            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{appPassword}"));
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-        }
-    }
-
-    public BitbucketClient(BbxConfig config) : this(config.AccessToken, config.AppPassword, config.Username)
-    {
+        _client = CreateDefaultHttpClient();
+        _auth = ResolveAuth(accessToken, appPassword, username);
+        _ownsClient = true;
     }
 
     public async Task<T?> GetAsync<T>(string endpoint, CancellationToken ct = default)
     {
-        var url = NormalizeEndpoint(endpoint);
-        var response = await _client.GetAsync(url, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -48,14 +45,14 @@ public class BitbucketClient : IDisposable
 
     public async Task<string> GetStringAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.GetAsync(NormalizeEndpoint(endpoint), ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetRawAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.GetAsync(NormalizeEndpoint(endpoint), ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -65,7 +62,7 @@ public class BitbucketClient : IDisposable
         var content = body != null
             ? new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json")
             : null;
-        var response = await _client.PostAsync(NormalizeEndpoint(endpoint), content, ct);
+        using var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -73,7 +70,7 @@ public class BitbucketClient : IDisposable
 
     public async Task<T?> PostMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
     {
-        var response = await _client.PostAsync(NormalizeEndpoint(endpoint), content, ct);
+        using var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -82,7 +79,7 @@ public class BitbucketClient : IDisposable
     public async Task<T?> PutAsync<T>(string endpoint, object body, CancellationToken ct = default)
     {
         var content = new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
-        var response = await _client.PutAsync(NormalizeEndpoint(endpoint), content, ct);
+        using var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -90,7 +87,7 @@ public class BitbucketClient : IDisposable
 
     public async Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
     {
-        var response = await _client.PutAsync(NormalizeEndpoint(endpoint), content, ct);
+        using var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -98,7 +95,7 @@ public class BitbucketClient : IDisposable
 
     public async Task DeleteAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.DeleteAsync(NormalizeEndpoint(endpoint), ct);
+        using var response = await SendAsync(HttpMethod.Delete, endpoint, null, ct);
         await EnsureSuccessAsync(response);
     }
 
@@ -118,10 +115,23 @@ public class BitbucketClient : IDisposable
             url = response.Next;
             if (!string.IsNullOrEmpty(url) && url.StartsWith("http"))
             {
-                // Extract relative path for subsequent requests
                 url = new Uri(url).PathAndQuery;
             }
         }
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpMethod method,
+        string endpoint,
+        HttpContent? content,
+        CancellationToken ct)
+    {
+        var request = new HttpRequestMessage(method, NormalizeEndpoint(endpoint))
+        {
+            Content = content,
+        };
+        await _auth.ApplyAsync(request, ct);
+        return await _client.SendAsync(request, ct);
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
@@ -141,7 +151,6 @@ public class BitbucketClient : IDisposable
             }
             catch
             {
-                // Ignore JSON parse errors
             }
 
             throw new HttpRequestException(errorMessage);
@@ -161,7 +170,47 @@ public class BitbucketClient : IDisposable
         return endpoint.TrimStart('/');
     }
 
-    public void Dispose() => _client.Dispose();
+    private static HttpClient CreateDefaultHttpClient()
+    {
+        var client = new HttpClient
+        {
+            BaseAddress = new Uri(BaseUrl),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");
+        return client;
+    }
+
+    private static IAuthProvider ResolveAuth(BbxConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.Username))
+        {
+            var secret = config.ApiToken ?? config.AppPassword;
+            if (!string.IsNullOrEmpty(secret))
+            {
+                return new BasicAuthProvider(config.Username, secret);
+            }
+        }
+        return new NullAuthProvider();
+    }
+
+    private static IAuthProvider ResolveAuth(string? accessToken, string? appPassword, string? username)
+    {
+        // Bearer access tokens land in Phase 1 with OAuthAuthProvider; no
+        // CLI flow today produces a config with AccessToken set, so the
+        // accessToken parameter is preserved for ABI compatibility only.
+        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(appPassword))
+        {
+            return new BasicAuthProvider(username, appPassword);
+        }
+        return new NullAuthProvider();
+    }
+
+    public void Dispose()
+    {
+        if (_ownsClient) _client.Dispose();
+    }
 }
 
 public class PaginatedResponse<T>

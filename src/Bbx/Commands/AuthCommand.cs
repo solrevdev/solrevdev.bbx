@@ -124,7 +124,7 @@ public static class AuthCommand
 
                 Console.WriteLine($"✓ Authenticated as: {displayName}");
                 Console.WriteLine($"  Username: {username}");
-                Console.WriteLine($"  Auth method: {(config.AppPassword != null ? "API Token / App Password" : "OAuth2")}");
+                Console.WriteLine($"  Auth method: {((config.ApiToken ?? config.AppPassword) != null ? "API Token / App Password" : "OAuth2")}");
                 if (config.DefaultWorkspace != null)
                     Console.WriteLine($"  Default workspace: {config.DefaultWorkspace}");
             }
@@ -149,10 +149,11 @@ public static class AuthCommand
         tokenCommand.SetHandler(() =>
         {
             var config = CredentialManager.Load();
+            var basicSecret = config.ApiToken ?? config.AppPassword;
             if (config.AccessToken != null)
                 Console.WriteLine(config.AccessToken);
-            else if (config.AppPassword != null)
-                Console.WriteLine($"{config.Username}:{config.AppPassword}");
+            else if (basicSecret != null)
+                Console.WriteLine($"{config.Username}:{basicSecret}");
             else
                 Console.Error.WriteLine("Not authenticated");
         });
@@ -178,7 +179,7 @@ public static class AuthCommand
     {
         return new BitbucketClient(
             accessToken: config.AccessToken,
-            appPassword: config.AppPassword,
+            appPassword: config.ApiToken ?? config.AppPassword,
             username: config.Username);
     }
 
