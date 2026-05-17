@@ -11,6 +11,7 @@ using Bbx.Features.PullRequests.PullRequestDiff;
 using Bbx.Features.PullRequests.PullRequestStatuses;
 using Bbx.Features.PullRequests.UnapprovePullRequest;
 using Bbx.Features.PullRequests.ViewPullRequest;
+using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
@@ -168,6 +169,21 @@ public static class PrCommand
                     .HandleAsync(new PullRequestStatusesRequest(workspace, repo, id), CancellationToken.None)),
             workspaceOption, repoOption, statusesIdArg);
         command.AddCommand(statusesCommand);
+
+        // The "effective default reviewers" endpoint is repo-scoped (not
+        // PR-scoped), so we don't take a PR id here. Surfacing it under `pr`
+        // matches reviewer-workflow muscle memory while pointing at the
+        // repo-level endpoint that actually returns the data.
+        var defaultReviewersCommand = new Command("default-reviewers",
+            "Show effective default reviewers for the repository (inherited from project + repo)");
+        var drLimitOption = new Option<int>("--limit", () => 25, "Maximum reviewers to list");
+        defaultReviewersCommand.AddOption(drLimitOption);
+        defaultReviewersCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<EffectiveDefaultReviewersHandler>()
+                    .HandleAsync(new EffectiveDefaultReviewersRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, drLimitOption);
+        command.AddCommand(defaultReviewersCommand);
 
         return command;
     }

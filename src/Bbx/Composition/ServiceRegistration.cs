@@ -77,6 +77,10 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.Hooks.CreateRepoHook.CreateRepoHookHandler>();
         services.AddTransient<Features.Repos.Hooks.UpdateRepoHook.UpdateRepoHookHandler>();
         services.AddTransient<Features.Repos.Hooks.DeleteRepoHook.DeleteRepoHookHandler>();
+        services.AddTransient<Features.Repos.DefaultReviewers.ListDefaultReviewers.ListDefaultReviewersHandler>();
+        services.AddTransient<Features.Repos.DefaultReviewers.AddDefaultReviewer.AddDefaultReviewerHandler>();
+        services.AddTransient<Features.Repos.DefaultReviewers.RemoveDefaultReviewer.RemoveDefaultReviewerHandler>();
+        services.AddTransient<Features.Repos.DefaultReviewers.EffectiveDefaultReviewers.EffectiveDefaultReviewersHandler>();
 
         services.AddTransient<Features.Source.LsSource.LsSourceHandler>();
         services.AddTransient<Features.Source.CatSource.CatSourceHandler>();

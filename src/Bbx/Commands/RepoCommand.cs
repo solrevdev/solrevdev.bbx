@@ -1,6 +1,10 @@
 using System.CommandLine;
 using Bbx.Features.Repos.CloneRepo;
 using Bbx.Features.Repos.CreateRepo;
+using Bbx.Features.Repos.DefaultReviewers.AddDefaultReviewer;
+using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
+using Bbx.Features.Repos.DefaultReviewers.ListDefaultReviewers;
+using Bbx.Features.Repos.DefaultReviewers.RemoveDefaultReviewer;
 using Bbx.Features.Repos.DeleteRepo;
 using Bbx.Features.Repos.ForkRepo;
 using Bbx.Features.Repos.Hooks.CreateRepoHook;
@@ -124,7 +128,64 @@ public static class RepoCommand
 
         command.AddCommand(CreateHooksCommand(services, workspaceOption));
 
+        command.AddCommand(CreateDefaultReviewersCommand(services, workspaceOption));
+
         return command;
+    }
+
+    private static Command CreateDefaultReviewersCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var drCommand = new Command("default-reviewers", "Manage default reviewers");
+        var repoOption = CommandOptions.CreateRepoOption();
+        drCommand.AddGlobalOption(repoOption);
+
+        var listCommand = new Command("list", "List configured default reviewers");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum reviewers to list");
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListDefaultReviewersHandler>()
+                    .HandleAsync(new ListDefaultReviewersRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, listLimitOption);
+        drCommand.AddCommand(listCommand);
+
+        var addCommand = new Command("add", "Add a default reviewer");
+        var addTargetOption = new Option<string>("--target", "Account ID or UUID of the user") { IsRequired = true };
+        addCommand.AddOption(addTargetOption);
+        addCommand.SetHandler((string? workspace, string? repo, string target) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddDefaultReviewerHandler>()
+                    .HandleAsync(new AddDefaultReviewerRequest(workspace, repo, target), CancellationToken.None)),
+            workspaceOption, repoOption, addTargetOption);
+        drCommand.AddCommand(addCommand);
+
+        var removeCommand = new Command("remove", "Remove a default reviewer");
+        var removeTargetOption = new Option<string>("--target", "Account ID or UUID of the user") { IsRequired = true };
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        removeCommand.AddOption(removeTargetOption);
+        removeCommand.AddOption(yesOption);
+        removeCommand.SetHandler(async (string? workspace, string? repo, string target, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Remove default reviewer '{target}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveDefaultReviewerHandler>()
+                    .HandleAsync(new RemoveDefaultReviewerRequest(workspace, repo, target), CancellationToken.None));
+        }, workspaceOption, repoOption, removeTargetOption, yesOption);
+        drCommand.AddCommand(removeCommand);
+
+        var effectiveCommand = new Command("effective",
+            "List effective default reviewers (includes inherited from project)");
+        var effectiveLimitOption = new Option<int>("--limit", () => 25, "Maximum reviewers to list");
+        effectiveCommand.AddOption(effectiveLimitOption);
+        effectiveCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<EffectiveDefaultReviewersHandler>()
+                    .HandleAsync(new EffectiveDefaultReviewersRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, effectiveLimitOption);
+        drCommand.AddCommand(effectiveCommand);
+
+        return drCommand;
     }
 
     private static Command CreateHooksCommand(IServiceProvider services, Option<string?> workspaceOption)
