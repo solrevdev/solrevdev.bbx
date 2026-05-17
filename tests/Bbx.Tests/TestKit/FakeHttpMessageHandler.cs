@@ -6,6 +6,7 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
 {
     private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> _responders = new();
     public List<HttpRequestMessage> Calls { get; } = new();
+    public List<string?> CallBodies { get; } = new();
 
     public void Enqueue(HttpStatusCode status, string body, string contentType = "application/json")
     {
@@ -20,11 +21,17 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
         _responders.Enqueue(responder);
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Calls.Add(request);
+        string? body = null;
+        if (request.Content is not null)
+        {
+            body = await request.Content.ReadAsStringAsync(cancellationToken);
+        }
+        CallBodies.Add(body);
         if (_responders.Count == 0)
             throw new InvalidOperationException($"No scripted response for {request.Method} {request.RequestUri}");
-        return Task.FromResult(_responders.Dequeue()(request));
+        return _responders.Dequeue()(request);
     }
 }

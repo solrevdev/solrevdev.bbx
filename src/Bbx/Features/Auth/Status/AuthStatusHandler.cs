@@ -11,9 +11,11 @@ public sealed class AuthStatusHandler(BitbucketClient client, CredentialManager 
         var config = credentials.LoadConfig();
         if (!credentials.HasCredentials())
         {
-            Console.WriteLine("Not authenticated. Run: bbx auth login --api-token");
+            Console.WriteLine("Not authenticated. Run: bbx auth login");
             return;
         }
+
+        var method = ResolveMethod(config);
 
         try
         {
@@ -23,7 +25,12 @@ public sealed class AuthStatusHandler(BitbucketClient client, CredentialManager 
 
             Console.WriteLine($"✓ Authenticated as: {displayName}");
             Console.WriteLine($"  Username: {username}");
-            Console.WriteLine($"  Auth method: {(config.ApiToken != null ? "API Token / App Password" : "OAuth2")}");
+            Console.WriteLine($"  Auth method: {method}");
+            if (method == "oauth" && config.TokenExpiry.HasValue)
+            {
+                var rel = RelativeTime.DescribeFuture(config.TokenExpiry.Value);
+                Console.WriteLine($"  Expires at: {config.TokenExpiry.Value:O} ({rel})");
+            }
             if (config.DefaultWorkspace != null)
                 Console.WriteLine($"  Default workspace: {config.DefaultWorkspace}");
         }
@@ -31,5 +38,12 @@ public sealed class AuthStatusHandler(BitbucketClient client, CredentialManager 
         {
             Console.Error.WriteLine($"Error checking status: {ex.Message}");
         }
+    }
+
+    private static string ResolveMethod(BbxConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.AuthMethod)) return config.AuthMethod;
+        if (!string.IsNullOrEmpty(config.AccessToken)) return "oauth";
+        return "api-token";
     }
 }
