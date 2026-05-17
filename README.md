@@ -149,6 +149,22 @@ bbx repo default-reviewers list -w myworkspace -r myrepo
 bbx repo default-reviewers add -w myworkspace -r myrepo --target {account-id-or-uuid}
 bbx repo default-reviewers remove -w myworkspace -r myrepo --target {account-id-or-uuid} --yes
 bbx repo default-reviewers effective -w myworkspace -r myrepo
+
+# List forks and watchers
+bbx repo forks list -w myworkspace -r myrepo
+bbx repo watchers -w myworkspace -r myrepo
+
+# Inspect / update branching model
+bbx repo branching-model view -w myworkspace -r myrepo
+bbx repo branching-model settings -w myworkspace -r myrepo
+bbx repo branching-model update -w myworkspace -r myrepo \
+    --settings '{"development":{"name":"main","use_mainbranch":true}}'
+
+# Manage deploy keys
+bbx repo deploy-keys list -w myworkspace -r myrepo
+bbx repo deploy-keys add -w myworkspace -r myrepo --key "ssh-ed25519 AAAA..." --label prod
+bbx repo deploy-keys view 42 -w myworkspace -r myrepo
+bbx repo deploy-keys delete 42 -w myworkspace -r myrepo --yes
 ```
 
 ### Pull Requests
@@ -276,6 +292,20 @@ bbx commit status update abc123 -w myworkspace -r myrepo \
 
 # List pull requests for a commit
 bbx commit pullrequests abc123 -w myworkspace -r myrepo
+
+# Approve / unapprove a commit
+bbx commit approve abc123 -w myworkspace -r myrepo
+bbx commit unapprove abc123 -w myworkspace -r myrepo
+
+# Per-file diffstat for a commit, branch, or range
+bbx commit diffstat abc123 -w myworkspace -r myrepo
+bbx commit diffstat feature..main -w myworkspace -r myrepo
+
+# File history starting at a commit
+bbx commit filehistory abc123 src/Program.cs -w myworkspace -r myrepo
+
+# Merge-base for a range spec
+bbx commit merge-base feature..main -w myworkspace -r myrepo
 ```
 
 ### Source / files
@@ -374,6 +404,19 @@ bbx pipeline caches list --workspace myworkspace --repo myrepo
 
 # Manage deployment environments
 bbx pipeline deployments list --workspace myworkspace --repo myrepo
+
+# Inspect pipeline reports attached to a commit
+bbx pipeline reports list abc123 -w myworkspace -r myrepo
+bbx pipeline reports view abc123 {report-id} -w myworkspace -r myrepo
+bbx pipeline reports annotations abc123 {report-id} -w myworkspace -r myrepo
+
+# Test reports and test cases for a pipeline step
+bbx pipeline test-reports {pipeline-uuid} {step-uuid} -w myworkspace -r myrepo
+bbx pipeline test-cases {pipeline-uuid} {step-uuid} -w myworkspace -r myrepo
+
+# Pipelines OIDC discovery / JWKS (for federated CI authentication)
+bbx pipeline oidc config -w myworkspace -r myrepo
+bbx pipeline oidc keys -w myworkspace -r myrepo
 ```
 
 ### Snippets
@@ -425,6 +468,35 @@ bbx workspace permissions -w myworkspace
 
 # Manage webhooks
 bbx workspace hooks -w myworkspace
+
+# Per-project settings (default reviewers, branching model, deploy keys)
+bbx workspace project default-reviewers list -w myworkspace --project-key PROJ
+bbx workspace project default-reviewers add  -w myworkspace --project-key PROJ --target {account-id-or-uuid}
+bbx workspace project branching-model view   -w myworkspace --project-key PROJ
+bbx workspace project branching-model update -w myworkspace --project-key PROJ --settings '{"development":{"name":"main"}}'
+bbx workspace project deploy-keys list       -w myworkspace --project-key PROJ
+bbx workspace project deploy-keys add        -w myworkspace --project-key PROJ --key "ssh-ed25519 AAAA..." --label prod
+bbx workspace project deploy-keys delete 7   -w myworkspace --project-key PROJ --yes
+```
+
+### User account, permissions, SSH keys
+
+```bash
+# List your account email addresses
+bbx user emails
+
+# Show your workspace and repository permissions
+bbx user permissions workspaces
+bbx user permissions repositories
+
+# View any user's public profile (by UUID, account ID, or username)
+bbx user view {uuid-or-account-id-or-username}
+
+# Manage your account SSH keys (defaults to the current user; use --user to target someone else)
+bbx user ssh-keys list
+bbx user ssh-keys add --key "ssh-ed25519 AAAA..." --label laptop
+bbx user ssh-keys view {uuid}
+bbx user ssh-keys delete {uuid} --yes
 ```
 
 ## LLM Integration

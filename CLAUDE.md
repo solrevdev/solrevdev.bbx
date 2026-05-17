@@ -60,7 +60,10 @@ solrevdev.bbx/
 │   │   ├── Repos/
 │   │   │   ├── {ListRepos,ViewRepo,CreateRepo,DeleteRepo,ForkRepo,CloneRepo,RepoPermissions}/
 │   │   │   ├── Hooks/{ListRepoHooks,ViewRepoHook,CreateRepoHook,UpdateRepoHook,DeleteRepoHook}/  # Phase 2
-│   │   │   └── DefaultReviewers/{ListDefaultReviewers,AddDefaultReviewer,RemoveDefaultReviewer,EffectiveDefaultReviewers}/  # Phase 2
+│   │   │   ├── DefaultReviewers/{ListDefaultReviewers,AddDefaultReviewer,RemoveDefaultReviewer,EffectiveDefaultReviewers}/  # Phase 2
+│   │   │   ├── ListForks/, ListWatchers/                                                                                  # Phase 3
+│   │   │   ├── BranchingModel/{ViewBranchingModel,ViewBranchingModelSettings,UpdateBranchingModelSettings}/               # Phase 3
+│   │   │   └── DeployKeys/{ListRepoDeployKeys,ViewRepoDeployKey,AddRepoDeployKey,DeleteRepoDeployKey}/                    # Phase 3
 │   │   ├── PullRequests/
 │   │   │   ├── {ListPullRequests,...,PullRequestStatuses}/
 │   │   │   ├── Tasks/{ListPullRequestTasks,AddPullRequestTask,UpdatePullRequestTask,DeletePullRequestTask}/  # Phase 2
@@ -70,28 +73,42 @@ solrevdev.bbx/
 │   │   ├── Tags/{ListTags,ViewTag,CreateTag,DeleteTag}/                                          # Phase 2 — under `bbx branch tag`
 │   │   ├── Commits/
 │   │   │   ├── {ListCommits,...,ListCommitPullRequests}/
-│   │   │   └── {CreateCommitStatus,UpdateCommitStatus}/                                          # Phase 2 — under `bbx commit status`
+│   │   │   ├── {CreateCommitStatus,UpdateCommitStatus}/                                          # Phase 2 — under `bbx commit status`
+│   │   │   └── {FileHistory,MergeBase,ApproveCommit,UnapproveCommit,CommitDiffstat}/             # Phase 3
 │   │   ├── Source/{LsSource,CatSource,WriteSource}/                                              # Phase 2 — `bbx src`
 │   │   ├── Downloads/{ListDownloads,UploadDownload,GetDownload,DeleteDownload}/                  # Phase 2 — `bbx download`
 │   │   ├── Issues/{ListIssues,...,AddIssueComment}/
-│   │   ├── Pipelines/{ListPipelines,...,ViewDeploymentEnvironment}/
+│   │   ├── Pipelines/
+│   │   │   ├── {ListPipelines,...,ViewDeploymentEnvironment}/
+│   │   │   ├── {ListPipelineReports,ViewPipelineReport,ListReportAnnotations}/                   # Phase 3
+│   │   │   ├── {ListTestReports,ListTestCases}/                                                  # Phase 3
+│   │   │   └── {OidcConfig,OidcKeys}/                                                            # Phase 3
 │   │   ├── Snippets/{ListSnippets,...,SnippetComments}/
-│   │   ├── Workspaces/{ListWorkspaces,...,WorkspaceHooks}/
+│   │   ├── Users/                                                                                # Phase 3
+│   │   │   ├── {ListUserEmails,ListUserWorkspacePermissions,ListUserRepositoryPermissions,ViewUser}/
+│   │   │   └── SshKeys/{ListSshKeys,ViewSshKey,AddSshKey,DeleteSshKey}/
+│   │   ├── Workspaces/
+│   │   │   ├── {ListWorkspaces,ViewWorkspace,ListWorkspaceMembers,WorkspaceProjects,ListWorkspacePermissions,WorkspaceHooks}/
+│   │   │   └── Projects/                                                                         # Phase 3 — `bbx workspace project …`
+│   │   │       ├── DefaultReviewers/{ListProjectDefaultReviewers,AddProjectDefaultReviewer,RemoveProjectDefaultReviewer}/
+│   │   │       ├── BranchingModel/{ViewProjectBranchingModel,UpdateProjectBranchingModelSettings}/
+│   │   │       └── DeployKeys/{ListProjectDeployKeys,ViewProjectDeployKey,AddProjectDeployKey,DeleteProjectDeployKey}/
 │   │   └── Common/Resolve.cs    # workspace/repo defaulting helpers
 │   └── Commands/                # System.CommandLine wiring only — NO business logic
 │       ├── CommandRunner.cs     # try/catch helper around handler invocation (Json/Raw/Action/Binary)
 │       ├── CommandOptions.cs    # Shared workspace/repo options
 │       ├── AuthCommand.cs       # login (--oauth, --api-token), setup-oauth, refresh, logout, status, token, set-workspace
-│       ├── RepoCommand.cs       # list, view, create, delete, fork, clone, permissions, hooks {list,view,create,update,delete}, default-reviewers {list,add,remove,effective}
+│       ├── RepoCommand.cs       # list, view, create, delete, fork, clone, permissions, hooks {…}, default-reviewers {…}, forks list, watchers, branching-model {view,settings,update}, deploy-keys {list,view,add,delete}
 │       ├── PrCommand.cs         # list, view, create, merge, approve, unapprove, decline, comments, comment, diff, activity, statuses, default-reviewers, tasks {list,add,update,complete,delete}, request-changes, unrequest-changes, commits, patch
 │       ├── BranchCommand.cs     # list, view, create, delete, restrictions, tag {list,view,create,delete}
-│       ├── CommitCommand.cs     # list, view, diff, patch, comments, statuses, pullrequests, status {create,update}
+│       ├── CommitCommand.cs     # list, view, diff, patch, comments, statuses, pullrequests, status {create,update}, filehistory, merge-base, approve, unapprove, diffstat
 │       ├── SrcCommand.cs        # ls, cat, write
 │       ├── DownloadCommand.cs   # list, upload, get, delete
+│       ├── UserCommand.cs       # emails, permissions {workspaces,repositories}, view, ssh-keys {list,view,add,delete}                                  # Phase 3
 │       ├── IssueCommand.cs      # list, view, create, update, delete, comments, comment
-│       ├── PipelineCommand.cs   # list, view, trigger, stop, logs, steps, variables, schedules, caches, deployments
+│       ├── PipelineCommand.cs   # list, view, trigger, stop, logs, steps, variables, schedules, caches, deployments, reports {list,view,annotations}, test-reports, test-cases, oidc {config,keys}
 │       ├── SnippetCommand.cs    # list, view, create, update, delete, files, watch, comments
-│       └── WorkspaceCommand.cs  # list, view, members, projects, permissions, hooks
+│       └── WorkspaceCommand.cs  # list, view, members, projects, permissions, hooks, project {default-reviewers,branching-model,deploy-keys}        # `project` (singular) added Phase 3
 ├── tests/Bbx.Tests/             # xUnit + FluentAssertions + NSubstitute (net10.0)
 │   ├── Bbx.Tests.csproj
 │   ├── TestKit/                 # FakeHttpMessageHandler, InMemoryCredentialStore
