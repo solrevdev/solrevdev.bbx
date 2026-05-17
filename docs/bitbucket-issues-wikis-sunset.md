@@ -47,6 +47,10 @@ All other bbx commands are unaffected: `repo`, `pr`, `branch`, `commit`, `pipeli
 
 1. Deprecation warnings have been added to all `bbx issue *` subcommands (as of March 2026)
 2. The `IssueCommand` should be removed or replaced after August 20, 2026
+3. See [`oauth-and-api-coverage.md`](./oauth-and-api-coverage.md) §5.3 for
+   the policy decision: no new investment in `bbx issue *` endpoints; the
+   API surface budget goes to webhooks, source/files, default reviewers,
+   build statuses, and the rest of §5.1.
 
 ## Official Atlassian Resources
 
