@@ -195,7 +195,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Workspaces.ListWorkspaceMembers.ListWorkspaceMembersHandler>();
         services.AddTransient<Features.Workspaces.WorkspaceProjects.WorkspaceProjectsHandler>();
         services.AddTransient<Features.Workspaces.ListWorkspacePermissions.ListWorkspacePermissionsHandler>();
-        services.AddTransient<Features.Workspaces.WorkspaceHooks.WorkspaceHooksHandler>();
+        services.AddTransient<Features.Workspaces.Hooks.ListWorkspaceHooks.ListWorkspaceHooksHandler>();
+        services.AddTransient<Features.Workspaces.Hooks.ViewWorkspaceHook.ViewWorkspaceHookHandler>();
+        services.AddTransient<Features.Workspaces.Hooks.CreateWorkspaceHook.CreateWorkspaceHookHandler>();
+        services.AddTransient<Features.Workspaces.Hooks.UpdateWorkspaceHook.UpdateWorkspaceHookHandler>();
+        services.AddTransient<Features.Workspaces.Hooks.DeleteWorkspaceHook.DeleteWorkspaceHookHandler>();
         services.AddTransient<Features.Workspaces.Projects.DefaultReviewers.ListProjectDefaultReviewers.ListProjectDefaultReviewersHandler>();
         services.AddTransient<Features.Workspaces.Projects.DefaultReviewers.AddProjectDefaultReviewer.AddProjectDefaultReviewerHandler>();
         services.AddTransient<Features.Workspaces.Projects.DefaultReviewers.RemoveProjectDefaultReviewer.RemoveProjectDefaultReviewerHandler>();

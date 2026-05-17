@@ -467,7 +467,11 @@ bbx workspace projects -w myworkspace
 bbx workspace permissions -w myworkspace
 
 # Manage webhooks
-bbx workspace hooks -w myworkspace
+bbx workspace hooks list -w myworkspace
+bbx workspace hooks view {uuid} -w myworkspace
+bbx workspace hooks create -w myworkspace --url https://example.com/hook --events repo:push --events pullrequest:created
+bbx workspace hooks update {uuid} -w myworkspace --active false
+bbx workspace hooks delete {uuid} -w myworkspace --yes
 
 # Per-project settings (default reviewers, branching model, deploy keys)
 bbx workspace project default-reviewers list -w myworkspace --project-key PROJ

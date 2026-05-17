@@ -11,8 +11,12 @@ using Bbx.Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.DeployKeys.ListProjectDeployKeys;
 using Bbx.Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey;
+using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
+using Bbx.Features.Workspaces.Hooks.UpdateWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.ViewWorkspaceHook;
 using Bbx.Features.Workspaces.ViewWorkspace;
-using Bbx.Features.Workspaces.WorkspaceHooks;
 using Bbx.Features.Workspaces.WorkspaceProjects;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -290,46 +294,79 @@ public static class WorkspaceCommand
 
     private static Command CreateHooksCommand(IServiceProvider services)
     {
-        var command = new Command("hooks", "Manage workspace webhooks");
+        var hooksCommand = new Command("hooks", "Manage workspace webhooks");
         var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
-        var viewOption = new Option<string?>(["--view", "-v"], "View specific webhook by UUID");
-        var createOption = new Option<string?>(["--create", "-c"], "Create webhook with this URL");
-        var descriptionOption = new Option<string?>(["--description", "-d"], "Webhook description");
-        var eventsOption = new Option<string[]?>(["--events", "-e"], "Events to trigger webhook (e.g., repo:push, pullrequest:created)");
-        var activeOption = new Option<bool?>(["--active", "-a"], "Whether webhook is active");
-        var deleteOption = new Option<string?>(["--delete"], "Delete webhook by UUID");
-        var yesOption = new Option<bool>(["--yes", "-y"], () => false, "Skip confirmation prompt for delete");
-        var limitOption = new Option<int>(["--limit", "-l"], () => 25, "Maximum number of webhooks to return");
+        hooksCommand.AddGlobalOption(workspaceOption);
 
-        command.AddOption(workspaceOption);
-        command.AddOption(viewOption);
-        command.AddOption(createOption);
-        command.AddOption(descriptionOption);
-        command.AddOption(eventsOption);
-        command.AddOption(activeOption);
-        command.AddOption(deleteOption);
-        command.AddOption(yesOption);
-        command.AddOption(limitOption);
+        var listCommand = new Command("list", "List workspace webhooks");
+        var limitOption = new Option<int>("--limit", () => 25, "Maximum webhooks to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspaceHooksHandler>()
+                    .HandleAsync(new ListWorkspaceHooksRequest(workspace, limit), CancellationToken.None)),
+            workspaceOption, limitOption);
+        hooksCommand.AddCommand(listCommand);
 
-        command.SetHandler(async (context) =>
+        var viewCommand = new Command("view", "View a workspace webhook");
+        var viewUidArg = new Argument<string>("uid", "Webhook UUID");
+        viewCommand.AddArgument(viewUidArg);
+        viewCommand.SetHandler((string? workspace, string uid) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceHookHandler>()
+                    .HandleAsync(new ViewWorkspaceHookRequest(workspace, uid), CancellationToken.None)),
+            workspaceOption, viewUidArg);
+        hooksCommand.AddCommand(viewCommand);
+
+        var createCommand = new Command("create", "Create a workspace webhook");
+        var urlOption = new Option<string>("--url", "Webhook target URL") { IsRequired = true };
+        var descriptionOption = new Option<string?>("--description", "Webhook description");
+        var eventsOption = new Option<string[]?>("--events", "Events to trigger webhook (default: repo:push)");
+        var activeOption = new Option<bool>("--active", () => true, "Whether the webhook is active");
+        createCommand.AddOption(urlOption);
+        createCommand.AddOption(descriptionOption);
+        createCommand.AddOption(eventsOption);
+        createCommand.AddOption(activeOption);
+        createCommand.SetHandler((string? workspace, string url, string? description, string[]? events, bool active) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateWorkspaceHookHandler>()
+                    .HandleAsync(new CreateWorkspaceHookRequest(workspace, url, description, events, active), CancellationToken.None)),
+            workspaceOption, urlOption, descriptionOption, eventsOption, activeOption);
+        hooksCommand.AddCommand(createCommand);
+
+        var updateCommand = new Command("update", "Update a workspace webhook");
+        var updateUidArg = new Argument<string>("uid", "Webhook UUID");
+        var updateUrlOption = new Option<string?>("--url", "Webhook target URL");
+        var updateDescriptionOption = new Option<string?>("--description", "Webhook description");
+        var updateEventsOption = new Option<string[]?>("--events", "Events to trigger webhook");
+        var updateActiveOption = new Option<bool?>("--active", "Whether the webhook is active");
+        updateCommand.AddArgument(updateUidArg);
+        updateCommand.AddOption(updateUrlOption);
+        updateCommand.AddOption(updateDescriptionOption);
+        updateCommand.AddOption(updateEventsOption);
+        updateCommand.AddOption(updateActiveOption);
+        updateCommand.SetHandler((string? workspace, string uid, string? url, string? description, string[]? events, bool? active) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateWorkspaceHookHandler>()
+                    .HandleAsync(new UpdateWorkspaceHookRequest(workspace, uid, url, description, events, active), CancellationToken.None)),
+            workspaceOption, updateUidArg, updateUrlOption, updateDescriptionOption, updateEventsOption, updateActiveOption);
+        hooksCommand.AddCommand(updateCommand);
+
+        var deleteCommand = new Command("delete", "Delete a workspace webhook");
+        var deleteUidArg = new Argument<string>("uid", "Webhook UUID");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteUidArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string uid, bool yes) =>
         {
-            var workspace = context.ParseResult.GetValueForOption(workspaceOption);
-            var view = context.ParseResult.GetValueForOption(viewOption);
-            var create = context.ParseResult.GetValueForOption(createOption);
-            var description = context.ParseResult.GetValueForOption(descriptionOption);
-            var events = context.ParseResult.GetValueForOption(eventsOption);
-            var active = context.ParseResult.GetValueForOption(activeOption);
-            var deleteUuid = context.ParseResult.GetValueForOption(deleteOption);
-            var yes = context.ParseResult.GetValueForOption(yesOption);
-            var limit = context.ParseResult.GetValueForOption(limitOption);
-
-            if (!string.IsNullOrEmpty(deleteUuid) && !yes && !CommandRunner.ConfirmOrCancelStderr($"Delete webhook '{deleteUuid}'? [y/N]: "))
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete webhook '{uid}'? [y/N]: "))
                 return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteWorkspaceHookHandler>()
+                    .HandleAsync(new DeleteWorkspaceHookRequest(workspace, uid), CancellationToken.None));
+        }, workspaceOption, deleteUidArg, yesOption);
+        hooksCommand.AddCommand(deleteCommand);
 
-            await CommandRunner.RunJsonAsync(() =>
-                services.GetRequiredService<WorkspaceHooksHandler>()
-                    .HandleAsync(new WorkspaceHooksRequest(workspace, view, create, description, events, active, deleteUuid, limit), CancellationToken.None));
-        });
-        return command;
+        return hooksCommand;
     }
 }
