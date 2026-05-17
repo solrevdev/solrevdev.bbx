@@ -574,6 +574,29 @@ dotnet pack src/Bbx/Bbx.csproj -c Release
 dotnet tool install -g --add-source ./src/Bbx/bin/Release solrevdev.bbx
 ```
 
+## Running the smoke script
+
+`scripts/smoke.sh` is a read-only integration smoke that exercises the
+auth, repo, pr, src, and hooks happy paths against a real sandbox
+workspace. It's intended as a hand-run sanity check before tagging a
+release — it's NOT wired into CI because it needs live OAuth or
+API-token credentials.
+
+```bash
+# One-time auth setup (skip if already authenticated)
+bbx auth login --oauth
+bbx auth set-workspace myworkspace
+
+# Run the smoke
+export BBX_SMOKE_WORKSPACE=myworkspace
+export BBX_SMOKE_REPO=myrepo
+./scripts/smoke.sh
+```
+
+Requires `jq` for output sanity checks. Each step uses
+`set -euo pipefail`, so the script exits non-zero on the first failure.
+No mutations are performed; running it against any sandbox is safe.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
