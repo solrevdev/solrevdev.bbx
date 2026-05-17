@@ -4,20 +4,23 @@ using Bbx.Features.Workspaces.ListWorkspacePermissions;
 using Bbx.Features.Workspaces.ListWorkspaces;
 using Bbx.Features.Workspaces.Projects.BranchingModel.UpdateProjectBranchingModelSettings;
 using Bbx.Features.Workspaces.Projects.BranchingModel.ViewProjectBranchingModel;
+using Bbx.Features.Workspaces.Projects.CreateProject;
 using Bbx.Features.Workspaces.Projects.DefaultReviewers.AddProjectDefaultReviewer;
 using Bbx.Features.Workspaces.Projects.DefaultReviewers.ListProjectDefaultReviewers;
 using Bbx.Features.Workspaces.Projects.DefaultReviewers.RemoveProjectDefaultReviewer;
+using Bbx.Features.Workspaces.Projects.DeleteProject;
 using Bbx.Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.DeployKeys.ListProjectDeployKeys;
 using Bbx.Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey;
+using Bbx.Features.Workspaces.Projects.ListProjects;
+using Bbx.Features.Workspaces.Projects.ViewProject;
 using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
 using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
 using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
 using Bbx.Features.Workspaces.Hooks.UpdateWorkspaceHook;
 using Bbx.Features.Workspaces.Hooks.ViewWorkspaceHook;
 using Bbx.Features.Workspaces.ViewWorkspace;
-using Bbx.Features.Workspaces.WorkspaceProjects;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
@@ -31,7 +34,6 @@ public static class WorkspaceCommand
         command.AddCommand(CreateListCommand(services));
         command.AddCommand(CreateViewCommand(services));
         command.AddCommand(CreateMembersCommand(services));
-        command.AddCommand(CreateProjectsCommand(services));
         command.AddCommand(CreatePermissionsCommand(services));
         command.AddCommand(CreateHooksCommand(services));
         command.AddCommand(CreateProjectCommand(services));
@@ -41,22 +43,94 @@ public static class WorkspaceCommand
 
     private static Command CreateProjectCommand(IServiceProvider services)
     {
-        // `project` (singular) is the per-verb shape for the Phase 3 projects
-        // sub-API (default reviewers, branching model, deploy keys). The
-        // existing `projects` (plural) command keeps its flat-flag shape so
-        // we don't drift the read/CRUD path users already use.
+        // Phase 4 consolidation: `project` is canonical. The flat-flag
+        // `projects` (plural) group from Phase 0.5 and the per-verb `project`
+        // (singular) group added in Phase 3 are now one subcommand graph
+        // covering both the project CRUD (list/view/create/delete) and the
+        // per-project sub-APIs (default-reviewers, branching-model,
+        // deploy-keys). `projects` (plural) is kept as a soft-deprecated
+        // alias so existing scripts that wrote `bbx workspace projects …`
+        // continue to work; new docs use the singular.
         var projectCommand = new Command("project",
-            "Per-project settings (default reviewers, branching model, deploy keys)");
+            "Manage workspace projects (CRUD + per-project sub-APIs)");
+        projectCommand.AddAlias("projects");
         var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (defaults to configured)");
-        var projectKeyOption = new Option<string>("--project-key", "Project key") { IsRequired = true };
         projectCommand.AddGlobalOption(workspaceOption);
-        projectCommand.AddGlobalOption(projectKeyOption);
 
+        projectCommand.AddCommand(CreateProjectListCommand(services, workspaceOption));
+        projectCommand.AddCommand(CreateProjectViewCommand(services, workspaceOption));
+        projectCommand.AddCommand(CreateProjectCreateCommand(services, workspaceOption));
+        projectCommand.AddCommand(CreateProjectDeleteCommand(services, workspaceOption));
+
+        var projectKeyOption = new Option<string>("--project-key", "Project key") { IsRequired = true };
         projectCommand.AddCommand(CreateProjectDefaultReviewersCommand(services, workspaceOption, projectKeyOption));
         projectCommand.AddCommand(CreateProjectBranchingModelCommand(services, workspaceOption, projectKeyOption));
         projectCommand.AddCommand(CreateProjectDeployKeysCommand(services, workspaceOption, projectKeyOption));
 
         return projectCommand;
+    }
+
+    private static Command CreateProjectListCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var listCommand = new Command("list", "List workspace projects");
+        var limitOption = new Option<int>(["--limit", "-l"], () => 25, "Maximum projects to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectsHandler>()
+                    .HandleAsync(new ListProjectsRequest(workspace, limit), CancellationToken.None)),
+            workspaceOption, limitOption);
+        return listCommand;
+    }
+
+    private static Command CreateProjectViewCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var viewCommand = new Command("view", "View a workspace project");
+        var keyArg = new Argument<string>("project-key", "Project key");
+        viewCommand.AddArgument(keyArg);
+        viewCommand.SetHandler((string? workspace, string key) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectHandler>()
+                    .HandleAsync(new ViewProjectRequest(workspace, key), CancellationToken.None)),
+            workspaceOption, keyArg);
+        return viewCommand;
+    }
+
+    private static Command CreateProjectCreateCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var createCommand = new Command("create", "Create a workspace project");
+        var keyOption = new Option<string>(["--key", "-k"], "Project key") { IsRequired = true };
+        var nameOption = new Option<string>(["--name", "-n"], "Project name") { IsRequired = true };
+        var descriptionOption = new Option<string?>(["--description", "-d"], "Project description");
+        var privateOption = new Option<bool>(["--private", "-p"], () => true, "Make project private");
+        createCommand.AddOption(keyOption);
+        createCommand.AddOption(nameOption);
+        createCommand.AddOption(descriptionOption);
+        createCommand.AddOption(privateOption);
+        createCommand.SetHandler((string? workspace, string key, string name, string? description, bool isPrivate) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateProjectHandler>()
+                    .HandleAsync(new CreateProjectRequest(workspace, key, name, description, isPrivate), CancellationToken.None)),
+            workspaceOption, keyOption, nameOption, descriptionOption, privateOption);
+        return createCommand;
+    }
+
+    private static Command CreateProjectDeleteCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var deleteCommand = new Command("delete", "Delete a workspace project");
+        var keyArg = new Argument<string>("project-key", "Project key");
+        var yesOption = new Option<bool>(["--yes", "-y"], () => false, "Skip confirmation");
+        deleteCommand.AddArgument(keyArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string key, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete project '{key}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteProjectHandler>()
+                    .HandleAsync(new DeleteProjectRequest(workspace, key), CancellationToken.None));
+        }, workspaceOption, keyArg, yesOption);
+        return deleteCommand;
     }
 
     private static Command CreateProjectDefaultReviewersCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
@@ -227,51 +301,6 @@ public static class WorkspaceCommand
                 services.GetRequiredService<ListWorkspaceMembersHandler>()
                     .HandleAsync(new ListWorkspaceMembersRequest(workspace, limit), CancellationToken.None)),
             workspaceOption, limitOption);
-        return command;
-    }
-
-    private static Command CreateProjectsCommand(IServiceProvider services)
-    {
-        var command = new Command("projects", "Manage workspace projects");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
-        var viewOption = new Option<string?>(["--view", "-v"], "View specific project by key");
-        var createOption = new Option<string?>(["--create", "-c"], "Create new project with this name");
-        var keyOption = new Option<string?>(["--key", "-k"], "Project key (required for create, used for operations)");
-        var descriptionOption = new Option<string?>(["--description", "-d"], "Project description (for create)");
-        var privateOption = new Option<bool?>(["--private", "-p"], "Make project private (for create)");
-        var deleteOption = new Option<bool>(["--delete"], () => false, "Delete the project specified by --key");
-        var yesOption = new Option<bool>(["--yes", "-y"], () => false, "Skip confirmation prompt for delete");
-        var limitOption = new Option<int>(["--limit", "-l"], () => 25, "Maximum number of projects to return");
-
-        command.AddOption(workspaceOption);
-        command.AddOption(viewOption);
-        command.AddOption(createOption);
-        command.AddOption(keyOption);
-        command.AddOption(descriptionOption);
-        command.AddOption(privateOption);
-        command.AddOption(deleteOption);
-        command.AddOption(yesOption);
-        command.AddOption(limitOption);
-
-        command.SetHandler(async (context) =>
-        {
-            var workspace = context.ParseResult.GetValueForOption(workspaceOption);
-            var view = context.ParseResult.GetValueForOption(viewOption);
-            var create = context.ParseResult.GetValueForOption(createOption);
-            var key = context.ParseResult.GetValueForOption(keyOption);
-            var description = context.ParseResult.GetValueForOption(descriptionOption);
-            var isPrivate = context.ParseResult.GetValueForOption(privateOption);
-            var delete = context.ParseResult.GetValueForOption(deleteOption);
-            var yes = context.ParseResult.GetValueForOption(yesOption);
-            var limit = context.ParseResult.GetValueForOption(limitOption);
-
-            if (delete && !yes && !string.IsNullOrEmpty(key) && !CommandRunner.ConfirmOrCancelStderr($"Delete project '{key}'? [y/N]: "))
-                return;
-
-            await CommandRunner.RunJsonAsync(() =>
-                services.GetRequiredService<WorkspaceProjectsHandler>()
-                    .HandleAsync(new WorkspaceProjectsRequest(workspace, view, create, key, description, isPrivate, delete, limit), CancellationToken.None));
-        });
         return command;
     }
 

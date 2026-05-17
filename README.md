@@ -460,8 +460,12 @@ bbx workspace view myworkspace
 # List workspace members
 bbx workspace members -w myworkspace
 
-# Manage projects (list, view, create, delete)
-bbx workspace projects -w myworkspace
+# Manage projects (CRUD)
+# `project` is canonical; `projects` (plural) is a soft-deprecated alias of the same group
+bbx workspace project list -w myworkspace
+bbx workspace project view PROJ -w myworkspace
+bbx workspace project create -w myworkspace --key PROJ --name "Project Name" --description "..." --private
+bbx workspace project delete PROJ -w myworkspace --yes
 
 # View workspace permissions
 bbx workspace permissions -w myworkspace
@@ -473,7 +477,7 @@ bbx workspace hooks create -w myworkspace --url https://example.com/hook --event
 bbx workspace hooks update {uuid} -w myworkspace --active false
 bbx workspace hooks delete {uuid} -w myworkspace --yes
 
-# Per-project settings (default reviewers, branching model, deploy keys)
+# Per-project sub-APIs (default reviewers, branching model, deploy keys)
 bbx workspace project default-reviewers list -w myworkspace --project-key PROJ
 bbx workspace project default-reviewers add  -w myworkspace --project-key PROJ --target {account-id-or-uuid}
 bbx workspace project branching-model view   -w myworkspace --project-key PROJ

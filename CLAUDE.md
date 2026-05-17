@@ -88,8 +88,9 @@ solrevdev.bbx/
 │   │   │   ├── {ListUserEmails,ListUserWorkspacePermissions,ListUserRepositoryPermissions,ViewUser}/
 │   │   │   └── SshKeys/{ListSshKeys,ViewSshKey,AddSshKey,DeleteSshKey}/
 │   │   ├── Workspaces/
-│   │   │   ├── {ListWorkspaces,ViewWorkspace,ListWorkspaceMembers,WorkspaceProjects,ListWorkspacePermissions}/
+│   │   │   ├── {ListWorkspaces,ViewWorkspace,ListWorkspaceMembers,ListWorkspacePermissions}/
 │   │   │   ├── Hooks/{ListWorkspaceHooks,ViewWorkspaceHook,CreateWorkspaceHook,UpdateWorkspaceHook,DeleteWorkspaceHook}/  # Phase 4
+│   │   │   └── Projects/{ListProjects,ViewProject,CreateProject,DeleteProject}/                                           # Phase 4 — per-verb CRUD
 │   │   │   └── Projects/                                                                         # Phase 3 — `bbx workspace project …`
 │   │   │       ├── DefaultReviewers/{ListProjectDefaultReviewers,AddProjectDefaultReviewer,RemoveProjectDefaultReviewer}/
 │   │   │       ├── BranchingModel/{ViewProjectBranchingModel,UpdateProjectBranchingModelSettings}/
@@ -109,7 +110,7 @@ solrevdev.bbx/
 │       ├── IssueCommand.cs      # list, view, create, update, delete, comments, comment
 │       ├── PipelineCommand.cs   # list, view, trigger, stop, logs, steps, variables, schedules, caches, deployments, reports {list,view,annotations}, test-reports, test-cases, oidc {config,keys}
 │       ├── SnippetCommand.cs    # list, view, create, update, delete, files, watch, comments
-│       └── WorkspaceCommand.cs  # list, view, members, projects, permissions, hooks {list,view,create,update,delete} (per-verb since Phase 4), project {default-reviewers,branching-model,deploy-keys}        # `project` (singular) added Phase 3
+│       └── WorkspaceCommand.cs  # list, view, members, permissions, hooks {list,view,create,update,delete}, project[s] {list,view,create,delete,default-reviewers,branching-model,deploy-keys} (Phase 4: `project` canonical, `projects` is an alias for the same graph)
 ├── tests/Bbx.Tests/             # xUnit + FluentAssertions + NSubstitute (net10.0)
 │   ├── Bbx.Tests.csproj
 │   ├── TestKit/                 # FakeHttpMessageHandler, InMemoryCredentialStore

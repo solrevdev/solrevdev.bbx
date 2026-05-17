@@ -193,7 +193,10 @@ public static class ServiceRegistration
         services.AddTransient<Features.Workspaces.ListWorkspaces.ListWorkspacesHandler>();
         services.AddTransient<Features.Workspaces.ViewWorkspace.ViewWorkspaceHandler>();
         services.AddTransient<Features.Workspaces.ListWorkspaceMembers.ListWorkspaceMembersHandler>();
-        services.AddTransient<Features.Workspaces.WorkspaceProjects.WorkspaceProjectsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.ListProjects.ListProjectsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.ViewProject.ViewProjectHandler>();
+        services.AddTransient<Features.Workspaces.Projects.CreateProject.CreateProjectHandler>();
+        services.AddTransient<Features.Workspaces.Projects.DeleteProject.DeleteProjectHandler>();
         services.AddTransient<Features.Workspaces.ListWorkspacePermissions.ListWorkspacePermissionsHandler>();
         services.AddTransient<Features.Workspaces.Hooks.ListWorkspaceHooks.ListWorkspaceHooksHandler>();
         services.AddTransient<Features.Workspaces.Hooks.ViewWorkspaceHook.ViewWorkspaceHookHandler>();
