@@ -252,6 +252,9 @@ bbx branch restrictions list -w myworkspace -r myrepo
 # Add a branch restriction
 bbx branch restrictions add -w myworkspace -r myrepo --kind push --pattern main
 
+# Delete a branch restriction
+bbx branch restrictions delete 42 -w myworkspace -r myrepo --yes
+
 # Manage tags (refs/tags)
 bbx branch tag list -w myworkspace -r myrepo
 bbx branch tag view v1.0.0 -w myworkspace -r myrepo
@@ -407,17 +410,25 @@ bbx pipeline logs {pipeline-uuid} {step-uuid} -w myworkspace -r myrepo
 # List pipeline steps
 bbx pipeline steps {uuid} -w myworkspace -r myrepo
 
-# Manage pipeline variables
-bbx pipeline variables list --workspace myworkspace --repo myrepo
+# Manage pipeline variables (repo-scoped key=value)
+bbx pipeline variables list -w myworkspace -r myrepo
+bbx pipeline variables add -w myworkspace -r myrepo --key DEPLOY_URL --value https://example.com
+bbx pipeline variables add -w myworkspace -r myrepo --key API_TOKEN --value sek --secured
+bbx pipeline variables delete {uuid} -w myworkspace -r myrepo --yes
 
-# Manage schedules
-bbx pipeline schedules list --workspace myworkspace --repo myrepo
+# Manage pipeline schedules
+bbx pipeline schedules list -w myworkspace -r myrepo
+bbx pipeline schedules create -w myworkspace -r myrepo \
+    --cron "0 0 * * *" --branch main --pattern "nightly"
+bbx pipeline schedules delete {uuid} -w myworkspace -r myrepo --yes
 
-# Manage caches
-bbx pipeline caches list --workspace myworkspace --repo myrepo
+# Manage pipeline caches
+bbx pipeline caches list -w myworkspace -r myrepo
+bbx pipeline caches clear node -w myworkspace -r myrepo --yes
 
 # Manage deployment environments
-bbx pipeline deployments list --workspace myworkspace --repo myrepo
+bbx pipeline deployments list -w myworkspace -r myrepo
+bbx pipeline deployments view production -w myworkspace -r myrepo
 
 # Inspect pipeline reports attached to a commit
 bbx pipeline reports list abc123 -w myworkspace -r myrepo
@@ -451,15 +462,20 @@ bbx snippet update abc123 --title "New title"
 # Delete snippet
 bbx snippet delete abc123
 
-# List or get files in a snippet
+# List or get files in a snippet (use --raw to stream raw bytes for a specific file)
 bbx snippet files abc123
 bbx snippet files abc123 script.sh
+bbx snippet files abc123 script.sh --raw
 
-# Watch/unwatch a snippet or list watchers
+# Watch a snippet (default), list watchers, or stop watching
 bbx snippet watch abc123
+bbx snippet watch abc123 --list
+bbx snippet watch abc123 --unwatch
 
-# Manage snippet comments
+# Comments — list, add, or delete (flat-flag command)
 bbx snippet comments abc123
+bbx snippet comments abc123 --add "LGTM"
+bbx snippet comments abc123 --delete 42
 ```
 
 ### Workspaces
