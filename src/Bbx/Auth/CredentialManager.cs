@@ -2,9 +2,6 @@ namespace Bbx.Auth;
 
 public sealed class CredentialManager
 {
-    private static readonly Lazy<CredentialManager> Default =
-        new(() => new CredentialManager(new FileCredentialStore()));
-
     private readonly ICredentialStore _store;
 
     public CredentialManager(ICredentialStore store) => _store = store;
@@ -61,11 +58,6 @@ public sealed class CredentialManager
 
         return false;
     }
-
-    public static BbxConfig Load() => Default.Value.LoadConfig();
-    public static void Save(BbxConfig config) => Default.Value.SaveConfig(config);
-    public static void Clear() => Default.Value.ClearConfig();
-    public static bool IsAuthenticated() => Default.Value.HasCredentials();
 }
 
 public class BbxConfig

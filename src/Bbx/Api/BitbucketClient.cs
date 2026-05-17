@@ -21,13 +21,6 @@ public class BitbucketClient : IDisposable
         _ownsClient = false;
     }
 
-    public BitbucketClient(BbxConfig config)
-    {
-        _client = CreateDefaultHttpClient();
-        _auth = ResolveAuth(config);
-        _ownsClient = true;
-    }
-
     public BitbucketClient(string? accessToken = null, string? appPassword = null, string? username = null)
     {
         _client = CreateDefaultHttpClient();
@@ -180,19 +173,6 @@ public class BitbucketClient : IDisposable
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         client.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");
         return client;
-    }
-
-    private static IAuthProvider ResolveAuth(BbxConfig config)
-    {
-        if (!string.IsNullOrEmpty(config.Username))
-        {
-            var secret = config.ApiToken ?? config.AppPassword;
-            if (!string.IsNullOrEmpty(secret))
-            {
-                return new BasicAuthProvider(config.Username, secret);
-            }
-        }
-        return new NullAuthProvider();
     }
 
     private static IAuthProvider ResolveAuth(string? accessToken, string? appPassword, string? username)

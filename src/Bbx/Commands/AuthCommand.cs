@@ -1,17 +1,21 @@
 using System.CommandLine;
-using System.Text.Json;
-using Bbx.Api;
-using Bbx.Auth;
+using Bbx.Features.Auth.LoginApiToken;
+using Bbx.Features.Auth.LoginAppPassword;
+using Bbx.Features.Auth.LoginGuide;
+using Bbx.Features.Auth.Logout;
+using Bbx.Features.Auth.SetWorkspace;
+using Bbx.Features.Auth.Status;
+using Bbx.Features.Auth.Token;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
 
 public static class AuthCommand
 {
-    public static Command Create()
+    public static Command Create(IServiceProvider services)
     {
         var command = new Command("auth", "Manage authentication");
 
-        // bbx auth login
         var loginCommand = new Command("login", "Authenticate with Bitbucket");
         var appPasswordOption = new Option<bool>("--app-password", "Use app password authentication (deprecated, use --api-token)");
         var apiTokenOption = new Option<bool>("--api-token", "Use API token authentication");
@@ -32,27 +36,9 @@ public static class AuthCommand
                     return;
                 }
 
-                // Atlassian API tokens use Basic auth (email:token)
-                using var client = new BitbucketClient(appPassword: token, username: email);
-                try
-                {
-                    var user = await client.GetAsync<JsonElement>("/user");
-                    var displayName = user.TryGetProperty("display_name", out var dn) ? dn.GetString() : "Unknown";
-                    var username = user.TryGetProperty("username", out var un) ? un.GetString() : null;
-
-                    var config = new BbxConfig
-                    {
-                        Username = email,
-                        AppPassword = token,
-                        DefaultWorkspace = username
-                    };
-                    CredentialManager.Save(config);
-                    Console.WriteLine($"✓ Authenticated as {displayName}");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error: Authentication failed - {ex.Message}");
-                }
+                await CommandRunner.RunActionAsync(() =>
+                    services.GetRequiredService<LoginApiTokenHandler>()
+                        .HandleAsync(new LoginApiTokenRequest(email, token), CancellationToken.None));
             }
             else if (useAppPassword)
             {
@@ -67,120 +53,55 @@ public static class AuthCommand
                     return;
                 }
 
-                // Verify credentials
-                using var client = new BitbucketClient(appPassword: password, username: username);
-                try
-                {
-                    var user = await client.GetAsync<JsonElement>("/user");
-                    var displayName = user.TryGetProperty("display_name", out var dn) ? dn.GetString() : username;
-                    var accountId = user.TryGetProperty("account_id", out var ai) ? ai.GetString() : null;
-
-                    var config = new BbxConfig
-                    {
-                        Username = username,
-                        AppPassword = password,
-                        DefaultWorkspace = user.TryGetProperty("username", out var un) ? un.GetString() : username
-                    };
-                    CredentialManager.Save(config);
-                    Console.WriteLine($"✓ Authenticated as {displayName}");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error: Authentication failed - {ex.Message}");
-                }
+                await CommandRunner.RunActionAsync(() =>
+                    services.GetRequiredService<LoginAppPasswordHandler>()
+                        .HandleAsync(new LoginAppPasswordRequest(username, password), CancellationToken.None));
             }
             else
             {
-                Console.WriteLine("Use --api-token to authenticate with a Bitbucket API token.");
-                Console.WriteLine();
-                Console.WriteLine("To create an API Token:");
-                Console.WriteLine("1. Go to https://bitbucket.org/account/settings/api-tokens/");
-                Console.WriteLine("2. Create a new API token with required scopes");
-                Console.WriteLine("3. Run: bbx auth login --api-token");
-                Console.WriteLine("4. Enter your Atlassian account email and the API token");
-                Console.WriteLine();
-                Console.WriteLine("Note: App passwords were deprecated Sept 2025. Use --api-token instead.");
+                await services.GetRequiredService<LoginGuideHandler>()
+                    .HandleAsync(new LoginGuideRequest(), CancellationToken.None);
             }
         }, appPasswordOption, apiTokenOption);
         command.AddCommand(loginCommand);
 
-        // bbx auth status
         var statusCommand = new Command("status", "Show authentication status");
         statusCommand.SetHandler(async () =>
         {
-            var config = CredentialManager.Load();
-            if (!CredentialManager.IsAuthenticated())
-            {
-                Console.WriteLine("Not authenticated. Run: bbx auth login --api-token");
-                return;
-            }
-
-            using var client = CreateClient(config);
-            try
-            {
-                var user = await client.GetAsync<JsonElement>("/user");
-                var displayName = user.TryGetProperty("display_name", out var dn) ? dn.GetString() : "Unknown";
-                var username = user.TryGetProperty("username", out var un) ? un.GetString() : config.Username;
-
-                Console.WriteLine($"✓ Authenticated as: {displayName}");
-                Console.WriteLine($"  Username: {username}");
-                Console.WriteLine($"  Auth method: {((config.ApiToken ?? config.AppPassword) != null ? "API Token / App Password" : "OAuth2")}");
-                if (config.DefaultWorkspace != null)
-                    Console.WriteLine($"  Default workspace: {config.DefaultWorkspace}");
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error checking status: {ex.Message}");
-            }
+            await services.GetRequiredService<AuthStatusHandler>()
+                .HandleAsync(new AuthStatusRequest(), CancellationToken.None);
         });
         command.AddCommand(statusCommand);
 
-        // bbx auth logout
         var logoutCommand = new Command("logout", "Clear stored credentials");
-        logoutCommand.SetHandler(() =>
+        logoutCommand.SetHandler(async () =>
         {
-            CredentialManager.Clear();
-            Console.WriteLine("✓ Logged out");
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<LogoutHandler>()
+                    .HandleAsync(new LogoutRequest(), CancellationToken.None));
         });
         command.AddCommand(logoutCommand);
 
-        // bbx auth token
         var tokenCommand = new Command("token", "Display current access token");
-        tokenCommand.SetHandler(() =>
+        tokenCommand.SetHandler(async () =>
         {
-            var config = CredentialManager.Load();
-            var basicSecret = config.ApiToken ?? config.AppPassword;
-            if (config.AccessToken != null)
-                Console.WriteLine(config.AccessToken);
-            else if (basicSecret != null)
-                Console.WriteLine($"{config.Username}:{basicSecret}");
-            else
-                Console.Error.WriteLine("Not authenticated");
+            await services.GetRequiredService<AuthTokenHandler>()
+                .HandleAsync(new AuthTokenRequest(), CancellationToken.None);
         });
         command.AddCommand(tokenCommand);
 
-        // bbx auth set-workspace
         var setWorkspaceCommand = new Command("set-workspace", "Set default workspace");
         var workspaceArg = new Argument<string>("workspace", "Workspace slug to set as default");
         setWorkspaceCommand.AddArgument(workspaceArg);
-        setWorkspaceCommand.SetHandler((string workspace) =>
+        setWorkspaceCommand.SetHandler(async (string workspace) =>
         {
-            var config = CredentialManager.Load();
-            config.DefaultWorkspace = workspace;
-            CredentialManager.Save(config);
-            Console.WriteLine($"✓ Default workspace set to: {workspace}");
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<SetWorkspaceHandler>()
+                    .HandleAsync(new SetWorkspaceRequest(workspace), CancellationToken.None));
         }, workspaceArg);
         command.AddCommand(setWorkspaceCommand);
 
         return command;
-    }
-
-    private static BitbucketClient CreateClient(BbxConfig config)
-    {
-        return new BitbucketClient(
-            accessToken: config.AccessToken,
-            appPassword: config.ApiToken ?? config.AppPassword,
-            username: config.Username);
     }
 
     private static string ReadPassword()
