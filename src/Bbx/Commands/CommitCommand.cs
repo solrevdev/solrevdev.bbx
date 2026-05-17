@@ -1,11 +1,16 @@
 using System.CommandLine;
+using Bbx.Features.Commits.ApproveCommit;
 using Bbx.Features.Commits.CommitDiff;
+using Bbx.Features.Commits.CommitDiffstat;
 using Bbx.Features.Commits.CommitPatch;
 using Bbx.Features.Commits.CreateCommitStatus;
+using Bbx.Features.Commits.FileHistory;
 using Bbx.Features.Commits.ListCommitComments;
 using Bbx.Features.Commits.ListCommitPullRequests;
 using Bbx.Features.Commits.ListCommitStatuses;
 using Bbx.Features.Commits.ListCommits;
+using Bbx.Features.Commits.MergeBase;
+using Bbx.Features.Commits.UnapproveCommit;
 using Bbx.Features.Commits.UpdateCommitStatus;
 using Bbx.Features.Commits.ViewCommit;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +92,65 @@ public static class CommitCommand
         command.AddCommand(statusesCommand);
 
         command.AddCommand(CreateStatusCommand(services, workspaceOption, repoOption));
+
+        var filehistoryCommand = new Command("filehistory",
+            "List commits that touched a file (the commit hash is the starting point)");
+        var fhHashArg = new Argument<string>("hash", "Starting commit hash");
+        var fhPathArg = new Argument<string>("path", "File path");
+        var fhLimitOption = new Option<int>("--limit", () => 25, "Maximum entries to list");
+        filehistoryCommand.AddArgument(fhHashArg);
+        filehistoryCommand.AddArgument(fhPathArg);
+        filehistoryCommand.AddOption(fhLimitOption);
+        filehistoryCommand.SetHandler((string? workspace, string? repo, string hash, string path, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<FileHistoryHandler>()
+                    .HandleAsync(new FileHistoryRequest(workspace, repo, hash, path, limit), CancellationToken.None)),
+            workspaceOption, repoOption, fhHashArg, fhPathArg, fhLimitOption);
+        command.AddCommand(filehistoryCommand);
+
+        var mergeBaseCommand = new Command("merge-base",
+            "Find the merge-base commit for a spec (e.g., 'feature..main')");
+        var mbSpecArg = new Argument<string>("spec", "Commit spec, e.g. 'feature..main' or 'abc..def'");
+        mergeBaseCommand.AddArgument(mbSpecArg);
+        mergeBaseCommand.SetHandler((string? workspace, string? repo, string spec) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<MergeBaseHandler>()
+                    .HandleAsync(new MergeBaseRequest(workspace, repo, spec), CancellationToken.None)),
+            workspaceOption, repoOption, mbSpecArg);
+        command.AddCommand(mergeBaseCommand);
+
+        var approveCommand = new Command("approve", "Approve a commit");
+        var approveHashArg = new Argument<string>("hash", "Commit hash");
+        approveCommand.AddArgument(approveHashArg);
+        approveCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<ApproveCommitHandler>()
+                    .HandleAsync(new ApproveCommitRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, approveHashArg);
+        command.AddCommand(approveCommand);
+
+        var unapproveCommand = new Command("unapprove", "Remove approval from a commit");
+        var unapproveHashArg = new Argument<string>("hash", "Commit hash");
+        unapproveCommand.AddArgument(unapproveHashArg);
+        unapproveCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<UnapproveCommitHandler>()
+                    .HandleAsync(new UnapproveCommitRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, unapproveHashArg);
+        command.AddCommand(unapproveCommand);
+
+        var diffstatCommand = new Command("diffstat",
+            "Show per-file added/removed line counts for a spec (commit, branch, or 'src..dst')");
+        var dsSpecArg = new Argument<string>("spec", "Commit hash, branch, or 'src..dst' range");
+        var dsLimitOption = new Option<int>("--limit", () => 100, "Maximum file entries to list");
+        diffstatCommand.AddArgument(dsSpecArg);
+        diffstatCommand.AddOption(dsLimitOption);
+        diffstatCommand.SetHandler((string? workspace, string? repo, string spec, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CommitDiffstatHandler>()
+                    .HandleAsync(new CommitDiffstatRequest(workspace, repo, spec, limit), CancellationToken.None)),
+            workspaceOption, repoOption, dsSpecArg, dsLimitOption);
+        command.AddCommand(diffstatCommand);
 
         var prsCommand = new Command("pullrequests", "List pull requests for a commit");
         var prsHashArg = new Argument<string>("hash", "Commit hash");

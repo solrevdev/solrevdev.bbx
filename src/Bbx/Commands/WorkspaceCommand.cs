@@ -2,6 +2,15 @@ using System.CommandLine;
 using Bbx.Features.Workspaces.ListWorkspaceMembers;
 using Bbx.Features.Workspaces.ListWorkspacePermissions;
 using Bbx.Features.Workspaces.ListWorkspaces;
+using Bbx.Features.Workspaces.Projects.BranchingModel.UpdateProjectBranchingModelSettings;
+using Bbx.Features.Workspaces.Projects.BranchingModel.ViewProjectBranchingModel;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.AddProjectDefaultReviewer;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.ListProjectDefaultReviewers;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.RemoveProjectDefaultReviewer;
+using Bbx.Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey;
+using Bbx.Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey;
+using Bbx.Features.Workspaces.Projects.DeployKeys.ListProjectDeployKeys;
+using Bbx.Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey;
 using Bbx.Features.Workspaces.ViewWorkspace;
 using Bbx.Features.Workspaces.WorkspaceHooks;
 using Bbx.Features.Workspaces.WorkspaceProjects;
@@ -21,8 +30,152 @@ public static class WorkspaceCommand
         command.AddCommand(CreateProjectsCommand(services));
         command.AddCommand(CreatePermissionsCommand(services));
         command.AddCommand(CreateHooksCommand(services));
+        command.AddCommand(CreateProjectCommand(services));
 
         return command;
+    }
+
+    private static Command CreateProjectCommand(IServiceProvider services)
+    {
+        // `project` (singular) is the per-verb shape for the Phase 3 projects
+        // sub-API (default reviewers, branching model, deploy keys). The
+        // existing `projects` (plural) command keeps its flat-flag shape so
+        // we don't drift the read/CRUD path users already use.
+        var projectCommand = new Command("project",
+            "Per-project settings (default reviewers, branching model, deploy keys)");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (defaults to configured)");
+        var projectKeyOption = new Option<string>("--project-key", "Project key") { IsRequired = true };
+        projectCommand.AddGlobalOption(workspaceOption);
+        projectCommand.AddGlobalOption(projectKeyOption);
+
+        projectCommand.AddCommand(CreateProjectDefaultReviewersCommand(services, workspaceOption, projectKeyOption));
+        projectCommand.AddCommand(CreateProjectBranchingModelCommand(services, workspaceOption, projectKeyOption));
+        projectCommand.AddCommand(CreateProjectDeployKeysCommand(services, workspaceOption, projectKeyOption));
+
+        return projectCommand;
+    }
+
+    private static Command CreateProjectDefaultReviewersCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var drCommand = new Command("default-reviewers", "Manage project-level default reviewers");
+
+        var listCommand = new Command("list", "List project default reviewers");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum reviewers to list");
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string projectKey, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectDefaultReviewersHandler>()
+                    .HandleAsync(new ListProjectDefaultReviewersRequest(workspace, projectKey, limit), CancellationToken.None)),
+            workspaceOption, projectKeyOption, listLimitOption);
+        drCommand.AddCommand(listCommand);
+
+        var addCommand = new Command("add", "Add a project default reviewer");
+        var addTargetOption = new Option<string>("--target", "Account ID or UUID of the user") { IsRequired = true };
+        addCommand.AddOption(addTargetOption);
+        addCommand.SetHandler((string? workspace, string projectKey, string target) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddProjectDefaultReviewerHandler>()
+                    .HandleAsync(new AddProjectDefaultReviewerRequest(workspace, projectKey, target), CancellationToken.None)),
+            workspaceOption, projectKeyOption, addTargetOption);
+        drCommand.AddCommand(addCommand);
+
+        var removeCommand = new Command("remove", "Remove a project default reviewer");
+        var removeTargetOption = new Option<string>("--target", "Account ID or UUID of the user") { IsRequired = true };
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        removeCommand.AddOption(removeTargetOption);
+        removeCommand.AddOption(yesOption);
+        removeCommand.SetHandler(async (string? workspace, string projectKey, string target, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Remove default reviewer '{target}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveProjectDefaultReviewerHandler>()
+                    .HandleAsync(new RemoveProjectDefaultReviewerRequest(workspace, projectKey, target), CancellationToken.None));
+        }, workspaceOption, projectKeyOption, removeTargetOption, yesOption);
+        drCommand.AddCommand(removeCommand);
+
+        return drCommand;
+    }
+
+    private static Command CreateProjectBranchingModelCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var bmCommand = new Command("branching-model",
+            "Inspect or update the project branching-model defaults");
+
+        var viewCommand = new Command("view", "Show the project branching-model defaults");
+        viewCommand.SetHandler((string? workspace, string projectKey) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectBranchingModelHandler>()
+                    .HandleAsync(new ViewProjectBranchingModelRequest(workspace, projectKey), CancellationToken.None)),
+            workspaceOption, projectKeyOption);
+        bmCommand.AddCommand(viewCommand);
+
+        var updateCommand = new Command("update",
+            "Replace project branching-model settings (PUT raw JSON payload to /branching-model/settings)");
+        var settingsJsonOption = new Option<string>("--settings", "JSON payload") { IsRequired = true };
+        updateCommand.AddOption(settingsJsonOption);
+        updateCommand.SetHandler((string? workspace, string projectKey, string settingsJson) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateProjectBranchingModelSettingsHandler>()
+                    .HandleAsync(new UpdateProjectBranchingModelSettingsRequest(workspace, projectKey, settingsJson), CancellationToken.None)),
+            workspaceOption, projectKeyOption, settingsJsonOption);
+        bmCommand.AddCommand(updateCommand);
+
+        return bmCommand;
+    }
+
+    private static Command CreateProjectDeployKeysCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var dkCommand = new Command("deploy-keys", "Manage project-level deploy keys");
+
+        var listCommand = new Command("list", "List project deploy keys");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum keys to list");
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string projectKey, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectDeployKeysHandler>()
+                    .HandleAsync(new ListProjectDeployKeysRequest(workspace, projectKey, limit), CancellationToken.None)),
+            workspaceOption, projectKeyOption, listLimitOption);
+        dkCommand.AddCommand(listCommand);
+
+        var viewCommand = new Command("view", "View a project deploy key");
+        var viewIdArg = new Argument<int>("key-id", "Deploy key ID");
+        viewCommand.AddArgument(viewIdArg);
+        viewCommand.SetHandler((string? workspace, string projectKey, int keyId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectDeployKeyHandler>()
+                    .HandleAsync(new ViewProjectDeployKeyRequest(workspace, projectKey, keyId), CancellationToken.None)),
+            workspaceOption, projectKeyOption, viewIdArg);
+        dkCommand.AddCommand(viewCommand);
+
+        var addCommand = new Command("add", "Add a project deploy key");
+        var addKeyOption = new Option<string>("--key", "Public SSH key body") { IsRequired = true };
+        var addLabelOption = new Option<string?>("--label", "Friendly label");
+        addCommand.AddOption(addKeyOption);
+        addCommand.AddOption(addLabelOption);
+        addCommand.SetHandler((string? workspace, string projectKey, string key, string? label) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddProjectDeployKeyHandler>()
+                    .HandleAsync(new AddProjectDeployKeyRequest(workspace, projectKey, key, label), CancellationToken.None)),
+            workspaceOption, projectKeyOption, addKeyOption, addLabelOption);
+        dkCommand.AddCommand(addCommand);
+
+        var deleteCommand = new Command("delete", "Delete a project deploy key");
+        var deleteIdArg = new Argument<int>("key-id", "Deploy key ID");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteIdArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string projectKey, int keyId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete deploy key #{keyId}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteProjectDeployKeyHandler>()
+                    .HandleAsync(new DeleteProjectDeployKeyRequest(workspace, projectKey, keyId), CancellationToken.None));
+        }, workspaceOption, projectKeyOption, deleteIdArg, yesOption);
+        dkCommand.AddCommand(deleteCommand);
+
+        return dkCommand;
     }
 
     private static Command CreateListCommand(IServiceProvider services)

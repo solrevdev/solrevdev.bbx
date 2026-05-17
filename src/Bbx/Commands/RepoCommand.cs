@@ -1,4 +1,7 @@
 using System.CommandLine;
+using Bbx.Features.Repos.BranchingModel.UpdateBranchingModelSettings;
+using Bbx.Features.Repos.BranchingModel.ViewBranchingModel;
+using Bbx.Features.Repos.BranchingModel.ViewBranchingModelSettings;
 using Bbx.Features.Repos.CloneRepo;
 using Bbx.Features.Repos.CreateRepo;
 using Bbx.Features.Repos.DefaultReviewers.AddDefaultReviewer;
@@ -6,13 +9,19 @@ using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
 using Bbx.Features.Repos.DefaultReviewers.ListDefaultReviewers;
 using Bbx.Features.Repos.DefaultReviewers.RemoveDefaultReviewer;
 using Bbx.Features.Repos.DeleteRepo;
+using Bbx.Features.Repos.DeployKeys.AddRepoDeployKey;
+using Bbx.Features.Repos.DeployKeys.DeleteRepoDeployKey;
+using Bbx.Features.Repos.DeployKeys.ListRepoDeployKeys;
+using Bbx.Features.Repos.DeployKeys.ViewRepoDeployKey;
 using Bbx.Features.Repos.ForkRepo;
 using Bbx.Features.Repos.Hooks.CreateRepoHook;
 using Bbx.Features.Repos.Hooks.DeleteRepoHook;
 using Bbx.Features.Repos.Hooks.ListRepoHooks;
 using Bbx.Features.Repos.Hooks.UpdateRepoHook;
 using Bbx.Features.Repos.Hooks.ViewRepoHook;
+using Bbx.Features.Repos.ListForks;
 using Bbx.Features.Repos.ListRepos;
+using Bbx.Features.Repos.ListWatchers;
 using Bbx.Features.Repos.RepoPermissions;
 using Bbx.Features.Repos.ViewRepo;
 using Microsoft.Extensions.DependencyInjection;
@@ -130,7 +139,141 @@ public static class RepoCommand
 
         command.AddCommand(CreateDefaultReviewersCommand(services, workspaceOption));
 
+        command.AddCommand(CreateForksCommand(services, workspaceOption));
+        command.AddCommand(CreateWatchersCommand(services, workspaceOption));
+        command.AddCommand(CreateBranchingModelCommand(services, workspaceOption));
+        command.AddCommand(CreateDeployKeysCommand(services, workspaceOption));
+
         return command;
+    }
+
+    private static Command CreateForksCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var forksCommand = new Command("forks", "List forks of a repository");
+        var repoOption = CommandOptions.CreateRepoOption();
+        forksCommand.AddGlobalOption(repoOption);
+
+        var listCommand = new Command("list", "List forks");
+        var limitOption = new Option<int>("--limit", () => 25, "Maximum forks to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListForksHandler>()
+                    .HandleAsync(new ListForksRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, limitOption);
+        forksCommand.AddCommand(listCommand);
+
+        return forksCommand;
+    }
+
+    private static Command CreateWatchersCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var watchersCommand = new Command("watchers", "List repository watchers");
+        var repoOption = CommandOptions.CreateRepoOption();
+        var limitOption = new Option<int>("--limit", () => 25, "Maximum watchers to list");
+        watchersCommand.AddOption(repoOption);
+        watchersCommand.AddOption(limitOption);
+        watchersCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWatchersHandler>()
+                    .HandleAsync(new ListWatchersRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, limitOption);
+
+        return watchersCommand;
+    }
+
+    private static Command CreateBranchingModelCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var bmCommand = new Command("branching-model", "Inspect or update the repository branching model");
+        var repoOption = CommandOptions.CreateRepoOption();
+        bmCommand.AddGlobalOption(repoOption);
+
+        var viewCommand = new Command("view", "Show the active branching model (computed)");
+        viewCommand.SetHandler((string? workspace, string? repo) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewBranchingModelHandler>()
+                    .HandleAsync(new ViewBranchingModelRequest(workspace, repo), CancellationToken.None)),
+            workspaceOption, repoOption);
+        bmCommand.AddCommand(viewCommand);
+
+        var settingsCommand = new Command("settings", "Show the configured branching-model settings");
+        settingsCommand.SetHandler((string? workspace, string? repo) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewBranchingModelSettingsHandler>()
+                    .HandleAsync(new ViewBranchingModelSettingsRequest(workspace, repo), CancellationToken.None)),
+            workspaceOption, repoOption);
+        bmCommand.AddCommand(settingsCommand);
+
+        var updateCommand = new Command("update",
+            "Replace branching-model settings (PUT raw JSON payload)");
+        var settingsJsonOption = new Option<string>("--settings",
+            "JSON payload (e.g., '{\"development\":{\"name\":\"main\",\"use_mainbranch\":true}}')")
+        { IsRequired = true };
+        updateCommand.AddOption(settingsJsonOption);
+        updateCommand.SetHandler((string? workspace, string? repo, string settingsJson) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateBranchingModelSettingsHandler>()
+                    .HandleAsync(new UpdateBranchingModelSettingsRequest(workspace, repo, settingsJson), CancellationToken.None)),
+            workspaceOption, repoOption, settingsJsonOption);
+        bmCommand.AddCommand(updateCommand);
+
+        return bmCommand;
+    }
+
+    private static Command CreateDeployKeysCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var dkCommand = new Command("deploy-keys", "Manage repository deploy keys");
+        var repoOption = CommandOptions.CreateRepoOption();
+        dkCommand.AddGlobalOption(repoOption);
+
+        var listCommand = new Command("list", "List deploy keys");
+        var limitOption = new Option<int>("--limit", () => 25, "Maximum keys to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListRepoDeployKeysHandler>()
+                    .HandleAsync(new ListRepoDeployKeysRequest(workspace, repo, limit), CancellationToken.None)),
+            workspaceOption, repoOption, limitOption);
+        dkCommand.AddCommand(listCommand);
+
+        var viewCommand = new Command("view", "View a deploy key");
+        var viewIdArg = new Argument<int>("key-id", "Deploy key ID");
+        viewCommand.AddArgument(viewIdArg);
+        viewCommand.SetHandler((string? workspace, string? repo, int keyId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewRepoDeployKeyHandler>()
+                    .HandleAsync(new ViewRepoDeployKeyRequest(workspace, repo, keyId), CancellationToken.None)),
+            workspaceOption, repoOption, viewIdArg);
+        dkCommand.AddCommand(viewCommand);
+
+        var addCommand = new Command("add", "Add a deploy key");
+        var addKeyOption = new Option<string>("--key", "Public SSH key body") { IsRequired = true };
+        var addLabelOption = new Option<string?>("--label", "Friendly label");
+        addCommand.AddOption(addKeyOption);
+        addCommand.AddOption(addLabelOption);
+        addCommand.SetHandler((string? workspace, string? repo, string key, string? label) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddRepoDeployKeyHandler>()
+                    .HandleAsync(new AddRepoDeployKeyRequest(workspace, repo, key, label), CancellationToken.None)),
+            workspaceOption, repoOption, addKeyOption, addLabelOption);
+        dkCommand.AddCommand(addCommand);
+
+        var deleteCommand = new Command("delete", "Delete a deploy key");
+        var deleteIdArg = new Argument<int>("key-id", "Deploy key ID");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteIdArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string? repo, int keyId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete deploy key #{keyId}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteRepoDeployKeyHandler>()
+                    .HandleAsync(new DeleteRepoDeployKeyRequest(workspace, repo, keyId), CancellationToken.None));
+        }, workspaceOption, repoOption, deleteIdArg, yesOption);
+        dkCommand.AddCommand(deleteCommand);
+
+        return dkCommand;
     }
 
     private static Command CreateDefaultReviewersCommand(IServiceProvider services, Option<string?> workspaceOption)

@@ -31,6 +31,7 @@ public class Program
         rootCommand.AddCommand(PipelineCommand.Create(Services));
         rootCommand.AddCommand(SnippetCommand.Create(Services));
         rootCommand.AddCommand(WorkspaceCommand.Create(Services));
+        rootCommand.AddCommand(UserCommand.Create(Services));
 
         var versionCommand = new Command("version", "Show version information");
         versionCommand.SetHandler(() =>

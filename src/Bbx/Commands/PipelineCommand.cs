@@ -6,15 +6,22 @@ using Bbx.Features.Pipelines.DeletePipelineSchedule;
 using Bbx.Features.Pipelines.DeletePipelineVariable;
 using Bbx.Features.Pipelines.ListDeploymentEnvironments;
 using Bbx.Features.Pipelines.ListPipelineCaches;
+using Bbx.Features.Pipelines.ListPipelineReports;
 using Bbx.Features.Pipelines.ListPipelineSchedules;
 using Bbx.Features.Pipelines.ListPipelineSteps;
 using Bbx.Features.Pipelines.ListPipelineVariables;
 using Bbx.Features.Pipelines.ListPipelines;
+using Bbx.Features.Pipelines.ListReportAnnotations;
+using Bbx.Features.Pipelines.ListTestCases;
+using Bbx.Features.Pipelines.ListTestReports;
+using Bbx.Features.Pipelines.OidcConfig;
+using Bbx.Features.Pipelines.OidcKeys;
 using Bbx.Features.Pipelines.PipelineLogs;
 using Bbx.Features.Pipelines.StopPipeline;
 using Bbx.Features.Pipelines.TriggerPipeline;
 using Bbx.Features.Pipelines.ViewDeploymentEnvironment;
 using Bbx.Features.Pipelines.ViewPipeline;
+using Bbx.Features.Pipelines.ViewPipelineReport;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
@@ -35,8 +42,130 @@ public static class PipelineCommand
         command.AddCommand(CreateSchedulesCommand(services));
         command.AddCommand(CreateCachesCommand(services));
         command.AddCommand(CreateDeploymentsCommand(services));
+        command.AddCommand(CreateReportsCommand(services));
+        command.AddCommand(CreateTestReportsCommand(services));
+        command.AddCommand(CreateTestCasesCommand(services));
+        command.AddCommand(CreateOidcCommand(services));
 
         return command;
+    }
+
+    private static Command CreateReportsCommand(IServiceProvider services)
+    {
+        var reportsCommand = new Command("reports", "Pipeline report metadata stored against a commit");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
+        reportsCommand.AddGlobalOption(workspaceOption);
+        reportsCommand.AddGlobalOption(repoOption);
+
+        var listCommand = new Command("list", "List reports on a commit");
+        var listHashArg = new Argument<string>("hash", "Commit hash");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum reports to list");
+        listCommand.AddArgument(listHashArg);
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string? repo, string hash, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListPipelineReportsHandler>()
+                    .HandleAsync(new ListPipelineReportsRequest(workspace, repo, hash, limit), CancellationToken.None)),
+            workspaceOption, repoOption, listHashArg, listLimitOption);
+        reportsCommand.AddCommand(listCommand);
+
+        var viewCommand = new Command("view", "View a single report on a commit");
+        var viewHashArg = new Argument<string>("hash", "Commit hash");
+        var viewReportIdArg = new Argument<string>("report-id", "Report UUID or external ID");
+        viewCommand.AddArgument(viewHashArg);
+        viewCommand.AddArgument(viewReportIdArg);
+        viewCommand.SetHandler((string? workspace, string? repo, string hash, string reportId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewPipelineReportHandler>()
+                    .HandleAsync(new ViewPipelineReportRequest(workspace, repo, hash, reportId), CancellationToken.None)),
+            workspaceOption, repoOption, viewHashArg, viewReportIdArg);
+        reportsCommand.AddCommand(viewCommand);
+
+        var annotationsCommand = new Command("annotations", "List annotations on a report");
+        var annHashArg = new Argument<string>("hash", "Commit hash");
+        var annReportIdArg = new Argument<string>("report-id", "Report UUID or external ID");
+        var annLimitOption = new Option<int>("--limit", () => 100, "Maximum annotations to list");
+        annotationsCommand.AddArgument(annHashArg);
+        annotationsCommand.AddArgument(annReportIdArg);
+        annotationsCommand.AddOption(annLimitOption);
+        annotationsCommand.SetHandler((string? workspace, string? repo, string hash, string reportId, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListReportAnnotationsHandler>()
+                    .HandleAsync(new ListReportAnnotationsRequest(workspace, repo, hash, reportId, limit), CancellationToken.None)),
+            workspaceOption, repoOption, annHashArg, annReportIdArg, annLimitOption);
+        reportsCommand.AddCommand(annotationsCommand);
+
+        return reportsCommand;
+    }
+
+    private static Command CreateTestReportsCommand(IServiceProvider services)
+    {
+        var command = new Command("test-reports",
+            "Show the test report metadata for a pipeline step");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
+        var pipelineUuidArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
+        var stepUuidArg = new Argument<string>("step-uuid", "Step UUID");
+        command.AddOption(workspaceOption);
+        command.AddOption(repoOption);
+        command.AddArgument(pipelineUuidArg);
+        command.AddArgument(stepUuidArg);
+        command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListTestReportsHandler>()
+                    .HandleAsync(new ListTestReportsRequest(workspace, repo, pipelineUuid, stepUuid), CancellationToken.None)),
+            workspaceOption, repoOption, pipelineUuidArg, stepUuidArg);
+        return command;
+    }
+
+    private static Command CreateTestCasesCommand(IServiceProvider services)
+    {
+        var command = new Command("test-cases",
+            "List test cases for a pipeline step's test report");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
+        var pipelineUuidArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
+        var stepUuidArg = new Argument<string>("step-uuid", "Step UUID");
+        var limitOption = new Option<int>("--limit", () => 200, "Maximum test cases to list");
+        command.AddOption(workspaceOption);
+        command.AddOption(repoOption);
+        command.AddArgument(pipelineUuidArg);
+        command.AddArgument(stepUuidArg);
+        command.AddOption(limitOption);
+        command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListTestCasesHandler>()
+                    .HandleAsync(new ListTestCasesRequest(workspace, repo, pipelineUuid, stepUuid, limit), CancellationToken.None)),
+            workspaceOption, repoOption, pipelineUuidArg, stepUuidArg, limitOption);
+        return command;
+    }
+
+    private static Command CreateOidcCommand(IServiceProvider services)
+    {
+        var oidcCommand = new Command("oidc", "Pipelines OIDC discovery and JWKS");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
+        oidcCommand.AddGlobalOption(workspaceOption);
+        oidcCommand.AddGlobalOption(repoOption);
+
+        var configCommand = new Command("config", "Show the OpenID provider configuration");
+        configCommand.SetHandler((string? workspace, string? repo) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<OidcConfigHandler>()
+                    .HandleAsync(new OidcConfigRequest(workspace, repo), CancellationToken.None)),
+            workspaceOption, repoOption);
+        oidcCommand.AddCommand(configCommand);
+
+        var keysCommand = new Command("keys", "Show the JWKS used to verify pipeline OIDC tokens");
+        keysCommand.SetHandler((string? workspace, string? repo) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<OidcKeysHandler>()
+                    .HandleAsync(new OidcKeysRequest(workspace, repo), CancellationToken.None)),
+            workspaceOption, repoOption);
+        oidcCommand.AddCommand(keysCommand);
+
+        return oidcCommand;
     }
 
     private static Command CreateListCommand(IServiceProvider services)
