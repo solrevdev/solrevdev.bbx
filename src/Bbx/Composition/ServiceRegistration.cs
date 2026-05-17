@@ -78,6 +78,10 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.Hooks.UpdateRepoHook.UpdateRepoHookHandler>();
         services.AddTransient<Features.Repos.Hooks.DeleteRepoHook.DeleteRepoHookHandler>();
 
+        services.AddTransient<Features.Source.LsSource.LsSourceHandler>();
+        services.AddTransient<Features.Source.CatSource.CatSourceHandler>();
+        services.AddTransient<Features.Source.WriteSource.WriteSourceHandler>();
+
         services.AddTransient<Features.PullRequests.ListPullRequests.ListPullRequestsHandler>();
         services.AddTransient<Features.PullRequests.ViewPullRequest.ViewPullRequestHandler>();
         services.AddTransient<Features.PullRequests.CreatePullRequest.CreatePullRequestHandler>();
