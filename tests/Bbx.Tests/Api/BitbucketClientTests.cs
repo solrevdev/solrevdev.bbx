@@ -145,6 +145,79 @@ public class BitbucketClientTests
         handler.Calls[0].Headers.Accept.Select(a => a.MediaType).Should().Equal("*/*");
     }
 
+    // Regression: the pull request diff/patch endpoints 302 to the commit-range
+    // diff. HttpClient drops Authorization when it follows a redirect, so the
+    // followed request came back as anonymous and Bitbucket answered
+    // "You may not have access to this repository".
+    [Fact]
+    public async Task Redirects_are_followed_with_credentials_reapplied_on_the_same_origin()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.EnqueueResponder(_ =>
+        {
+            var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+            redirect.Headers.Location = new Uri("https://api.bitbucket.org/2.0/repositories/ws/repo/diff/ws/repo:aaa%0Dbbb");
+            return redirect;
+        });
+        handler.Enqueue(HttpStatusCode.OK, "diff --git a/x b/x", "text/plain");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "token"));
+
+        var body = await client.GetStringAsync("repositories/ws/repo/pullrequests/1/diff");
+
+        body.Should().Be("diff --git a/x b/x");
+        handler.Calls.Should().HaveCount(2);
+        handler.Calls[1].RequestUri!.AbsolutePath.Should().Contain("/diff/ws/repo:");
+        handler.Calls[1].Headers.Authorization.Should().NotBeNull();
+        handler.Calls[1].Headers.Accept.Select(a => a.MediaType).Should().Equal("*/*");
+    }
+
+    [Fact]
+    public async Task Redirects_to_another_origin_do_not_carry_credentials()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.EnqueueResponder(_ =>
+        {
+            var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+            redirect.Headers.Location = new Uri("https://bbuseruploads.s3.amazonaws.com/artifact.zip");
+            return redirect;
+        });
+        handler.Enqueue(HttpStatusCode.OK, "binary", "application/octet-stream");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "token"));
+
+        await client.GetByteArrayAsync("repositories/ws/repo/downloads/artifact.zip");
+
+        handler.Calls.Should().HaveCount(2);
+        handler.Calls[1].RequestUri!.Host.Should().Be("bbuseruploads.s3.amazonaws.com");
+        handler.Calls[1].Headers.Authorization.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Redirect_loops_stop_rather_than_hanging()
+    {
+        var handler = new FakeHttpMessageHandler();
+        for (var i = 0; i < 10; i++)
+        {
+            handler.EnqueueResponder(_ =>
+            {
+                var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+                redirect.Headers.Location = new Uri("https://api.bitbucket.org/2.0/loop");
+                return redirect;
+            });
+        }
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetStringAsync("loop");
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        handler.Calls.Should().HaveCountLessThan(10);
+    }
+
     [Fact]
     public async Task Non_success_status_falls_back_to_status_when_body_is_not_bitbucket_error()
     {

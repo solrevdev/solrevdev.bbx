@@ -114,6 +114,8 @@ public class BitbucketClient : IDisposable
     /// </summary>
     private const string AnyMediaType = "*/*";
 
+    private const int MaxRedirects = 5;
+
     private async Task<HttpResponseMessage> SendAsync(
         HttpMethod method,
         string endpoint,
@@ -121,7 +123,46 @@ public class BitbucketClient : IDisposable
         CancellationToken ct,
         string? accept = null)
     {
-        var request = new HttpRequestMessage(method, NormalizeEndpoint(endpoint))
+        var current = new Uri(_client.BaseAddress!, NormalizeEndpoint(endpoint));
+        var response = await SendOnceAsync(method, current.AbsoluteUri, content, ct, accept);
+
+        // Redirects are followed here rather than by HttpClient because
+        // HttpClient drops the Authorization header when it follows one, which
+        // turns an authenticated request into an anonymous one. The pull request
+        // diff and patch endpoints 302 to the underlying commit-range diff, so
+        // they failed with "You may not have access to this repository".
+        // Only GET is followed: other verbs would need their body re-sent, and
+        // no Bitbucket endpoint we call redirects them.
+        var hops = 0;
+        while (IsRedirect(response) && method == HttpMethod.Get && hops++ < MaxRedirects)
+        {
+            var location = response.Headers.Location;
+            if (location is null) break;
+
+            var target = location.IsAbsoluteUri ? location : new Uri(current, location);
+            response.Dispose();
+
+            // Re-apply credentials only when staying on the same origin, so a
+            // redirect out to storage (downloads) cannot leak them.
+            var sameOrigin = Uri.Compare(target, current, UriComponents.SchemeAndServer,
+                UriFormat.UriEscaped, StringComparison.OrdinalIgnoreCase) == 0;
+
+            current = target;
+            response = await SendOnceAsync(HttpMethod.Get, target.AbsoluteUri, null, ct, accept, applyAuth: sameOrigin);
+        }
+
+        return response;
+    }
+
+    private async Task<HttpResponseMessage> SendOnceAsync(
+        HttpMethod method,
+        string url,
+        HttpContent? content,
+        CancellationToken ct,
+        string? accept,
+        bool applyAuth = true)
+    {
+        var request = new HttpRequestMessage(method, url)
         {
             Content = content,
         };
@@ -129,9 +170,18 @@ public class BitbucketClient : IDisposable
         {
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
         }
-        await _auth.ApplyAsync(request, ct);
+        if (applyAuth)
+        {
+            await _auth.ApplyAsync(request, ct);
+        }
         return await _client.SendAsync(request, ct);
     }
+
+    private static bool IsRedirect(HttpResponseMessage response) => (int)response.StatusCode switch
+    {
+        301 or 302 or 303 or 307 or 308 => true,
+        _ => false,
+    };
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {

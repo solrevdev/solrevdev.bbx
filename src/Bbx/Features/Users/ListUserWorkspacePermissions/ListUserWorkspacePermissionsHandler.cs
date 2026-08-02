@@ -20,10 +20,10 @@ public sealed class ListUserWorkspacePermissionsHandler(BitbucketClient client, 
                 permission = p.TryGetProperty("permission", out var perm) ? perm.GetString() : null,
                 last_accessed = p.TryGetProperty("last_accessed", out var la) ? la.GetString() : null,
                 added_on = p.TryGetProperty("added_on", out var ao) ? ao.GetString() : null,
-                workspace_slug = p.TryGetProperty("workspace", out var w) && w.TryGetProperty("slug", out var ws)
+                workspace_slug = p.TryGetObject("workspace", out var w) && w.TryGetProperty("slug", out var ws)
                     ? ws.GetString()
                     : null,
-                workspace_name = p.TryGetProperty("workspace", out var w2) && w2.TryGetProperty("name", out var wn)
+                workspace_name = p.TryGetObject("workspace", out var w2) && w2.TryGetProperty("name", out var wn)
                     ? wn.GetString()
                     : null,
             });

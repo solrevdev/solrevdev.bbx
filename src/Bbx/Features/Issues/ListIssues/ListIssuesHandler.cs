@@ -41,8 +41,8 @@ internal static class IssueFormatter
         state = issue.TryGetProperty("state", out var s) ? s.GetString() : null,
         kind = issue.TryGetProperty("kind", out var k) ? k.GetString() : null,
         priority = issue.TryGetProperty("priority", out var p) ? p.GetString() : null,
-        reporter = issue.TryGetProperty("reporter", out var r) && r.TryGetProperty("display_name", out var rdn) ? rdn.GetString() : null,
-        assignee = issue.TryGetProperty("assignee", out var a) && a.TryGetProperty("display_name", out var adn) ? adn.GetString() : null,
+        reporter = issue.TryGetObject("reporter", out var r) && r.TryGetProperty("display_name", out var rdn) ? rdn.GetString() : null,
+        assignee = issue.TryGetObject("assignee", out var a) && a.TryGetProperty("display_name", out var adn) ? adn.GetString() : null,
         created_on = issue.TryGetProperty("created_on", out var co) ? co.GetString() : null,
         updated_on = issue.TryGetProperty("updated_on", out var uo) ? uo.GetString() : null,
     };

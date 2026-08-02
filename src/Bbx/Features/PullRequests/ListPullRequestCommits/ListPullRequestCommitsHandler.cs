@@ -24,7 +24,7 @@ public sealed class ListPullRequestCommitsHandler(BitbucketClient client, Creden
                 short_hash = hash is { Length: > 12 } ? hash[..12] : hash,
                 message = commit.TryGetProperty("message", out var m) ? m.GetString() : null,
                 date = commit.TryGetProperty("date", out var d) ? d.GetString() : null,
-                author = commit.TryGetProperty("author", out var a) && a.TryGetProperty("raw", out var raw)
+                author = commit.TryGetObject("author", out var a) && a.TryGetProperty("raw", out var raw)
                     ? raw.GetString()
                     : null,
             });

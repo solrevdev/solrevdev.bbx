@@ -27,7 +27,7 @@ public sealed class ListWorkspacePermissionsHandler(BitbucketClient client, Cred
                     username = u.TryGetProperty("username", out var un) ? un.GetString() : null,
                     account_id = u.TryGetProperty("account_id", out var a) ? a.GetString() : null,
                 } : null!,
-                workspace = perm.TryGetProperty("workspace", out var w) && w.TryGetProperty("slug", out var s) ? s.GetString() : null,
+                workspace = perm.TryGetObject("workspace", out var w) && w.TryGetProperty("slug", out var s) ? s.GetString() : null,
             });
 
             if (permissions.Count >= request.Limit) break;

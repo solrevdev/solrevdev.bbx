@@ -26,8 +26,8 @@ public sealed class ViewWorkspaceHandler(BitbucketClient client, CredentialManag
             created_on = ws.TryGetProperty("created_on", out var c) ? c.GetString() : null,
             links = ws.TryGetProperty("links", out var l) ? (object)new
             {
-                html = l.TryGetProperty("html", out var h) && h.TryGetProperty("href", out var href) ? href.GetString() : null,
-                avatar = l.TryGetProperty("avatar", out var a) && a.TryGetProperty("href", out var ahref) ? ahref.GetString() : null,
+                html = l.TryGetObject("html", out var h) && h.TryGetProperty("href", out var href) ? href.GetString() : null,
+                avatar = l.TryGetObject("avatar", out var a) && a.TryGetProperty("href", out var ahref) ? ahref.GetString() : null,
             } : null!,
         };
     }

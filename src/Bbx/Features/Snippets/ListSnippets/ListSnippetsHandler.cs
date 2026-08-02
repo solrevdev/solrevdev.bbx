@@ -26,7 +26,7 @@ public sealed class ListSnippetsHandler(BitbucketClient client, CredentialManage
                 scm = snippet.TryGetProperty("scm", out var s) ? s.GetString() : "git",
                 created_on = snippet.TryGetProperty("created_on", out var c) ? c.GetString() : null,
                 updated_on = snippet.TryGetProperty("updated_on", out var u) ? u.GetString() : null,
-                owner = snippet.TryGetProperty("owner", out var o) && o.TryGetProperty("display_name", out var d) ? d.GetString() : null,
+                owner = snippet.TryGetObject("owner", out var o) && o.TryGetProperty("display_name", out var d) ? d.GetString() : null,
             });
 
             if (snippets.Count >= request.Limit) break;

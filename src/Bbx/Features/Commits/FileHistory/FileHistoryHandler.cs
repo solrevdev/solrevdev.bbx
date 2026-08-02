@@ -23,7 +23,7 @@ public sealed class FileHistoryHandler(BitbucketClient client, CredentialManager
         {
             entries.Add(new
             {
-                commit = entry.TryGetProperty("commit", out var c) && c.TryGetProperty("hash", out var h)
+                commit = entry.TryGetObject("commit", out var c) && c.TryGetProperty("hash", out var h)
                     ? h.GetString()
                     : null,
                 path = entry.TryGetProperty("path", out var p) ? p.GetString() : null,

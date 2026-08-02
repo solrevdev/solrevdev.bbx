@@ -24,7 +24,7 @@ public sealed class SnippetCommentsHandler(BitbucketClient client, CredentialMan
             return new
             {
                 id = comment.GetProperty("id").GetInt32(),
-                content = comment.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
+                content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
                 created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null,
             };
         }
@@ -42,8 +42,8 @@ public sealed class SnippetCommentsHandler(BitbucketClient client, CredentialMan
             comments.Add(new
             {
                 id = comment.GetProperty("id").GetInt32(),
-                content = comment.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
-                user = comment.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
+                content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
+                user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
                 created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null,
             });
         }

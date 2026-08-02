@@ -25,10 +25,10 @@ public sealed class ListTagsHandler(BitbucketClient client, CredentialManager cr
             tags.Add(new
             {
                 name = tag.TryGetProperty("name", out var n) ? n.GetString() : null,
-                target = tag.TryGetProperty("target", out var t) && t.TryGetProperty("hash", out var h)
+                target = tag.TryGetObject("target", out var t) && t.TryGetProperty("hash", out var h)
                     ? h.GetString()?[..Math.Min(12, h.GetString()?.Length ?? 0)]
                     : null,
-                tagger = tag.TryGetProperty("tagger", out var tg) && tg.TryGetProperty("user", out var u)
+                tagger = tag.TryGetObject("tagger", out var tg) && tg.TryGetObject("user", out var u)
                          && u.TryGetProperty("display_name", out var dn)
                     ? dn.GetString()
                     : null,

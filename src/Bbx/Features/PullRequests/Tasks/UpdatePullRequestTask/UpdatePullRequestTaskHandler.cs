@@ -35,7 +35,7 @@ public sealed class UpdatePullRequestTaskHandler(BitbucketClient client, Credent
                 ? i.GetInt32()
                 : request.TaskId,
             state = task.TryGetProperty("state", out var s) ? s.GetString() : null,
-            content = task.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var raw)
+            content = task.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw)
                 ? raw.GetString()
                 : null,
             updated_on = task.TryGetProperty("updated_on", out var uo) ? uo.GetString() : null,

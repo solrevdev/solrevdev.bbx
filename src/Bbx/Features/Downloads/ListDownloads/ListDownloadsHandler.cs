@@ -27,7 +27,7 @@ public sealed class ListDownloadsHandler(BitbucketClient client, CredentialManag
                     ? d.GetInt32()
                     : (int?)null,
                 created_on = dl.TryGetProperty("created_on", out var co) ? co.GetString() : null,
-                user = dl.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn)
+                user = dl.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn)
                     ? dn.GetString()
                     : null,
             });

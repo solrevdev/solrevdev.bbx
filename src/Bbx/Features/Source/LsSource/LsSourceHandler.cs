@@ -27,7 +27,7 @@ public sealed class LsSourceHandler(BitbucketClient client, CredentialManager cr
                 size = entry.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.Number
                     ? s.GetInt64()
                     : (long?)null,
-                commit = entry.TryGetProperty("commit", out var c) && c.TryGetProperty("hash", out var h)
+                commit = entry.TryGetObject("commit", out var c) && c.TryGetProperty("hash", out var h)
                     ? h.GetString()
                     : null,
             });

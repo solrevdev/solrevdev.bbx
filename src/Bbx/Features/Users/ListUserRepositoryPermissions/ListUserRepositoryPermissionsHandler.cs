@@ -18,7 +18,7 @@ public sealed class ListUserRepositoryPermissionsHandler(BitbucketClient client,
             perms.Add(new
             {
                 permission = p.TryGetProperty("permission", out var perm) ? perm.GetString() : null,
-                repository_full_name = p.TryGetProperty("repository", out var r) && r.TryGetProperty("full_name", out var fn)
+                repository_full_name = p.TryGetObject("repository", out var r) && r.TryGetProperty("full_name", out var fn)
                     ? fn.GetString()
                     : null,
                 added_on = p.TryGetProperty("added_on", out var ao) ? ao.GetString() : null,

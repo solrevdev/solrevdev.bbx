@@ -23,12 +23,12 @@ public sealed class ListPullRequestTasksHandler(BitbucketClient client, Credenti
                     ? i.GetInt32()
                     : (int?)null,
                 state = task.TryGetProperty("state", out var s) ? s.GetString() : null,
-                content = task.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var raw)
+                content = task.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw)
                     ? raw.GetString()
                     : null,
                 created_on = task.TryGetProperty("created_on", out var co) ? co.GetString() : null,
                 updated_on = task.TryGetProperty("updated_on", out var uo) ? uo.GetString() : null,
-                creator = task.TryGetProperty("creator", out var cr) && cr.TryGetProperty("display_name", out var dn)
+                creator = task.TryGetObject("creator", out var cr) && cr.TryGetProperty("display_name", out var dn)
                     ? dn.GetString()
                     : null,
             });

@@ -13,7 +13,7 @@ public sealed class CloneRepoHandler(BitbucketClient client, CredentialManager c
             "Error: Invalid repository path.");
 
         var result = await client.GetAsync<JsonElement>($"/repositories/{ws}/{repo}", ct);
-        if (result.TryGetProperty("links", out var links) && links.TryGetProperty("clone", out var cloneLinks))
+        if (result.TryGetObject("links", out var links) && links.TryGetProperty("clone", out var cloneLinks))
         {
             foreach (var link in cloneLinks.EnumerateArray())
             {

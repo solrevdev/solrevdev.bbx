@@ -63,7 +63,7 @@ internal static class PipelineFormat
                 name = GetString(repo, "name"),
                 full_name = GetString(repo, "full_name"),
             } : null!,
-            links = p.TryGetProperty("links", out var links) && links.TryGetProperty("html", out var html)
+            links = p.TryGetObject("links", out var links) && links.TryGetProperty("html", out var html)
                 ? GetString(html, "href") : null,
         };
     }

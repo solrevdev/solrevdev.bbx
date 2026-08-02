@@ -37,7 +37,7 @@ public sealed class CreateSnippetHandler(BitbucketClient client, CredentialManag
             title = snippet.TryGetProperty("title", out var t) ? t.GetString() : null,
             is_private = snippet.TryGetProperty("is_private", out var p) && p.GetBoolean(),
             created_on = snippet.TryGetProperty("created_on", out var c) ? c.GetString() : null,
-            links = snippet.TryGetProperty("links", out var l) && l.TryGetProperty("html", out var h) && h.TryGetProperty("href", out var href)
+            links = snippet.TryGetObject("links", out var l) && l.TryGetObject("html", out var h) && h.TryGetProperty("href", out var href)
                 ? href.GetString() : null,
         };
     }

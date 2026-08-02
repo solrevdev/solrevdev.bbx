@@ -39,8 +39,8 @@ internal static class CommitFormatter
         hash = commit.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
         full_hash = commit.TryGetProperty("hash", out var fh) ? fh.GetString() : null,
         message = commit.TryGetProperty("message", out var m) ? m.GetString()?.Split('\n')[0] : null,
-        author = commit.TryGetProperty("author", out var a) && a.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() :
-                 commit.TryGetProperty("author", out var a2) && a2.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
+        author = commit.TryGetObject("author", out var a) && a.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() :
+                 commit.TryGetObject("author", out var a2) && a2.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
         date = commit.TryGetProperty("date", out var d) ? d.GetString() : null,
     };
 }

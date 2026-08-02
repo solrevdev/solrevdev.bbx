@@ -25,7 +25,7 @@ public sealed class AddPullRequestTaskHandler(BitbucketClient client, Credential
                 ? i.GetInt32()
                 : (int?)null,
             state = task.TryGetProperty("state", out var s) ? s.GetString() : null,
-            content = task.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var raw)
+            content = task.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw)
                 ? raw.GetString()
                 : null,
             created_on = task.TryGetProperty("created_on", out var co) ? co.GetString() : null,

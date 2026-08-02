@@ -25,9 +25,9 @@ public sealed class ListBranchesHandler(BitbucketClient client, CredentialManage
             branches.Add(new
             {
                 name = branch.TryGetProperty("name", out var n) ? n.GetString() : null,
-                target = branch.TryGetProperty("target", out var t) && t.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
-                author = branch.TryGetProperty("target", out var t2) && t2.TryGetProperty("author", out var a) && a.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
-                date = branch.TryGetProperty("target", out var t3) && t3.TryGetProperty("date", out var d) ? d.GetString() : null,
+                target = branch.TryGetObject("target", out var t) && t.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
+                author = branch.TryGetObject("target", out var t2) && t2.TryGetObject("author", out var a) && a.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
+                date = branch.TryGetObject("target", out var t3) && t3.TryGetProperty("date", out var d) ? d.GetString() : null,
             });
             if (++count >= request.Limit) break;
         }

@@ -23,7 +23,7 @@ public sealed class ListForksHandler(BitbucketClient client, CredentialManager c
                 slug = fork.TryGetProperty("slug", out var s) ? s.GetString() : null,
                 is_private = fork.TryGetProperty("is_private", out var ip) && ip.GetBoolean(),
                 created_on = fork.TryGetProperty("created_on", out var co) ? co.GetString() : null,
-                owner = fork.TryGetProperty("workspace", out var w) && w.TryGetProperty("slug", out var ws2)
+                owner = fork.TryGetObject("workspace", out var w) && w.TryGetProperty("slug", out var ws2)
                     ? ws2.GetString()
                     : null,
             });

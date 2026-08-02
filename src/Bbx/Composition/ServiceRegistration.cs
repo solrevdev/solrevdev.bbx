@@ -16,6 +16,10 @@ public static class ServiceRegistration
         services.AddSingleton<HttpMessageHandler>(_ => new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+
+            // BitbucketClient follows redirects itself so it can re-apply the
+            // Authorization header, which HttpClient drops when redirecting.
+            AllowAutoRedirect = false,
         });
 
         services.AddSingleton(sp =>

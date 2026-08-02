@@ -24,7 +24,7 @@ public sealed class MergeBaseHandler(BitbucketClient client, CredentialManager c
             hash = commit.TryGetProperty("hash", out var h) ? h.GetString() : null,
             date = commit.TryGetProperty("date", out var d) ? d.GetString() : null,
             message = commit.TryGetProperty("message", out var m) ? m.GetString() : null,
-            author = commit.TryGetProperty("author", out var a) && a.TryGetProperty("raw", out var raw)
+            author = commit.TryGetObject("author", out var a) && a.TryGetProperty("raw", out var raw)
                 ? raw.GetString()
                 : null,
         };
