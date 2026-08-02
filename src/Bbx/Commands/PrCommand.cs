@@ -80,18 +80,26 @@ public static class PrCommand
 
         var mergeCommand = new Command("merge", "Merge a pull request");
         var mergeIdArg = new Argument<int>("id", "Pull request ID");
-        var strategyOption = new Option<string>("--strategy", () => "merge", "Merge strategy (merge, squash, fast_forward)");
+        var strategyOption = new Option<string>("--strategy", () => "merge_commit",
+            "Merge strategy (merge_commit, squash, fast_forward). 'merge' is accepted for merge_commit.");
         var messageOption = new Option<string?>("--message", "Merge commit message");
         var closeSourceMergeOption = new Option<bool>("--close-source-branch", "Close source branch after merge");
+        // Merging writes to the destination branch and cannot be undone from
+        // here, so it confirms like the other destructive verbs.
+        var mergeYesOption = new Option<bool>("--yes", "Skip confirmation prompt");
         mergeCommand.AddArgument(mergeIdArg);
         mergeCommand.AddOption(strategyOption);
         mergeCommand.AddOption(messageOption);
         mergeCommand.AddOption(closeSourceMergeOption);
-        mergeCommand.SetHandler((string? workspace, string? repo, int id, string strategy, string? message, bool closeSource) =>
-            CommandRunner.RunJsonAsync(() =>
+        mergeCommand.AddOption(mergeYesOption);
+        mergeCommand.SetHandler(async (string? workspace, string? repo, int id, string strategy, string? message, bool closeSource, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Merge PR #{id} using '{strategy}'? [y/N]: "))
+                return;
+            await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<MergePullRequestHandler>()
-                    .HandleAsync(new MergePullRequestRequest(workspace, repo, id, strategy, message, closeSource), CancellationToken.None)),
-            workspaceOption, repoOption, mergeIdArg, strategyOption, messageOption, closeSourceMergeOption);
+                    .HandleAsync(new MergePullRequestRequest(workspace, repo, id, strategy, message, closeSource), CancellationToken.None));
+        }, workspaceOption, repoOption, mergeIdArg, strategyOption, messageOption, closeSourceMergeOption, mergeYesOption);
         command.AddCommand(mergeCommand);
 
         var approveCommand = new Command("approve", "Approve a pull request");

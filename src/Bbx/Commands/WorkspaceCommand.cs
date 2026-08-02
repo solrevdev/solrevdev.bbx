@@ -136,6 +136,10 @@ public static class WorkspaceCommand
     private static Command CreateProjectDefaultReviewersCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
     {
         var drCommand = new Command("default-reviewers", "Manage project-level default reviewers");
+        // The handlers bind this option, so it has to be registered too. Without
+        // that the project key parsed as null and every request went to
+        // /workspaces/{ws}/projects//default-reviewers.
+        drCommand.AddGlobalOption(projectKeyOption);
 
         var listCommand = new Command("list", "List project default reviewers");
         var listLimitOption = new Option<int>("--limit", () => 25, "Maximum reviewers to list");
@@ -179,6 +183,7 @@ public static class WorkspaceCommand
     {
         var bmCommand = new Command("branching-model",
             "Inspect or update the project branching-model defaults");
+        bmCommand.AddGlobalOption(projectKeyOption);
 
         var viewCommand = new Command("view", "Show the project branching-model defaults");
         viewCommand.SetHandler((string? workspace, string projectKey) =>
@@ -205,6 +210,7 @@ public static class WorkspaceCommand
     private static Command CreateProjectDeployKeysCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
     {
         var dkCommand = new Command("deploy-keys", "Manage project-level deploy keys");
+        dkCommand.AddGlobalOption(projectKeyOption);
 
         var listCommand = new Command("list", "List project deploy keys");
         var listLimitOption = new Option<int>("--limit", () => 25, "Maximum keys to list");

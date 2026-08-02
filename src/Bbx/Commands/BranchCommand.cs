@@ -106,12 +106,19 @@ public static class BranchCommand
 
         var restrictionsDeleteCommand = new Command("delete", "Delete a branch restriction");
         var restrictionIdArg = new Argument<int>("id", "Restriction ID");
+        // Confirms like the other delete verbs; removing a restriction relaxes
+        // protection on a branch.
+        var restrictionYesOption = new Option<bool>("--yes", "Skip confirmation prompt");
         restrictionsDeleteCommand.AddArgument(restrictionIdArg);
-        restrictionsDeleteCommand.SetHandler((string? workspace, string? repo, int id) =>
-            CommandRunner.RunActionAsync(() =>
+        restrictionsDeleteCommand.AddOption(restrictionYesOption);
+        restrictionsDeleteCommand.SetHandler(async (string? workspace, string? repo, int id, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete branch restriction #{id}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteBranchRestrictionHandler>()
-                    .HandleAsync(new DeleteBranchRestrictionRequest(workspace, repo, id), CancellationToken.None)),
-            workspaceOption, repoOption, restrictionIdArg);
+                    .HandleAsync(new DeleteBranchRestrictionRequest(workspace, repo, id), CancellationToken.None));
+        }, workspaceOption, repoOption, restrictionIdArg, restrictionYesOption);
         restrictionsCommand.AddCommand(restrictionsDeleteCommand);
 
         command.AddCommand(restrictionsCommand);
