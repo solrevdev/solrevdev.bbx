@@ -1,7 +1,5 @@
-using System.Net;
 using Bbx.Auth;
-using Bbx.Features.Auth.LoginOAuth;
-using Bbx.Features.Auth.SetupOAuth;
+using Bbx.Features.Auth.LoginApiToken;
 using Bbx.Tests.TestKit;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,14 +18,11 @@ public class AuthGateTests
             Username = "jane@example.com",
             ApiToken = "ATATT",
         });
-        var fakeHttp = new FakeHttpMessageHandler();
-        var browser = new StubBrowserLauncher();
-        var services = BuildServices(store, fakeHttp, browser);
+        var services = BuildServices(store);
 
         await AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None);
 
-        fakeHttp.Calls.Should().BeEmpty();
-        browser.LaunchedUrls.Should().BeEmpty();
+        store.SaveCount.Should().Be(0, "an authenticated run must not rewrite the config");
     }
 
     [Fact]
@@ -39,16 +34,13 @@ public class AuthGateTests
         AuthGate.IsInteractive = AuthGate.DefaultIsInteractive;
         try
         {
-            var store = new InMemoryCredentialStore();
-            var fakeHttp = new FakeHttpMessageHandler();
-            var browser = new StubBrowserLauncher();
-            var services = BuildServices(store, fakeHttp, browser);
+            var services = BuildServices(new InMemoryCredentialStore());
 
             var act = async () => await AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None);
 
-            await act.Should().ThrowAsync<BbxUserException>().WithMessage("*Not authenticated*");
-            browser.LaunchedUrls.Should().BeEmpty();
-            fakeHttp.Calls.Should().BeEmpty();
+            (await act.Should().ThrowAsync<BbxUserException>())
+                .WithMessage("*Not authenticated*")
+                .And.Message.Should().Contain("api-tokens", "the error should say where to get one");
         }
         finally
         {
@@ -60,14 +52,13 @@ public class AuthGateTests
     [Fact]
     public async Task Falls_back_to_error_when_stdin_is_not_a_tty()
     {
+        var previousVar = Environment.GetEnvironmentVariable("BBX_NO_INTERACTIVE");
         var previousHook = AuthGate.IsInteractive;
+        Environment.SetEnvironmentVariable("BBX_NO_INTERACTIVE", null);
         AuthGate.IsInteractive = () => false;
         try
         {
-            var store = new InMemoryCredentialStore();
-            var fakeHttp = new FakeHttpMessageHandler();
-            var browser = new StubBrowserLauncher();
-            var services = BuildServices(store, fakeHttp, browser);
+            var services = BuildServices(new InMemoryCredentialStore());
 
             var act = async () => await AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None);
 
@@ -75,99 +66,94 @@ public class AuthGateTests
         }
         finally
         {
+            Environment.SetEnvironmentVariable("BBX_NO_INTERACTIVE", previousVar);
+            AuthGate.IsInteractive = previousHook;
+        }
+    }
+
+    // First run in a terminal prompts for a token rather than failing, then the
+    // original command carries on with the credential it just stored.
+    [Fact]
+    public async Task Prompts_for_a_token_when_interactive_and_stores_it()
+    {
+        var previousHook = AuthGate.IsInteractive;
+        AuthGate.IsInteractive = () => true;
+        var originalIn = Console.In;
+        try
+        {
+            var store = new InMemoryCredentialStore();
+            var services = BuildServices(store);
+            Console.SetIn(new StringReader("jane@example.com\nATATTsecret\n"));
+
+            await CaptureConsole.RunAsync(() =>
+                AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None));
+
+            var saved = store.Load();
+            saved.Username.Should().Be("jane@example.com");
+            saved.ApiToken.Should().Be("ATATTsecret");
+            saved.AuthMethod.Should().Be("api-token");
+        }
+        finally
+        {
+            Console.SetIn(originalIn);
             AuthGate.IsInteractive = previousHook;
         }
     }
 
     [Fact]
-    public async Task Happy_auto_launch_with_existing_consumer_runs_flow_and_invalidates_provider()
+    public async Task Invalidates_the_cached_provider_so_the_command_sees_the_new_credential()
     {
         var previousHook = AuthGate.IsInteractive;
-        var previousPort = AuthGate.LoginPort;
         AuthGate.IsInteractive = () => true;
-        var port = FreePort.Pick();
-        AuthGate.LoginPort = port;
-
+        var originalIn = Console.In;
         try
         {
-            var store = new InMemoryCredentialStore(new BbxConfig
-            {
-                OAuthClientId = "cid",
-                OAuthClientSecret = "csec",
-            });
-            var fakeHttp = new FakeHttpMessageHandler();
-            fakeHttp.Enqueue(HttpStatusCode.OK,
-                """{"access_token":"at1","refresh_token":"rt1","expires_in":7200}""");
-            fakeHttp.Enqueue(HttpStatusCode.OK,
-                """{"display_name":"Jane Doe","username":"jane"}""");
+            var store = new InMemoryCredentialStore();
+            var services = BuildServices(store);
 
-            var browser = new StubBrowserLauncher();
-            browser.OnLaunch = url => { _ = Task.Run(async () =>
-            {
-                var state = ExtractState(url);
-                using var http = new HttpClient();
-                await http.GetAsync($"http://127.0.0.1:{port}/callback?code=auth-code&state={state}");
-            }); };
+            // Resolve once with no credentials so the provider caches NullAuthProvider.
+            var provider = services.GetRequiredService<IAuthProvider>();
+            using var before = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
+            await provider.ApplyAsync(before, CancellationToken.None);
+            before.Headers.Authorization.Should().BeNull();
 
-            var services = BuildServices(store, fakeHttp, browser);
-
+            Console.SetIn(new StringReader("jane@example.com\nATATTsecret\n"));
             await CaptureConsole.RunAsync(() =>
                 AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None));
 
-            var snapshot = store.Snapshot();
-            snapshot.Should().NotBeNull();
-            snapshot!.AuthMethod.Should().Be("oauth");
-            snapshot.AccessToken.Should().Be("at1");
-            snapshot.RefreshToken.Should().Be("rt1");
-            snapshot.Username.Should().Be("jane");
-
-            // ConfigAuthProvider was Invalidated by AuthGate, so it now
-            // resolves to the OAuth provider rather than the pre-login
-            // NullAuthProvider.
-            var auth = services.GetRequiredService<IAuthProvider>();
-            using var probe = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
-            await auth.ApplyAsync(probe, CancellationToken.None);
-            probe.Headers.Authorization!.Scheme.Should().Be("Bearer");
-            probe.Headers.Authorization.Parameter.Should().Be("at1");
+            using var after = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
+            await provider.ApplyAsync(after, CancellationToken.None);
+            after.Headers.Authorization.Should().NotBeNull();
+            after.Headers.Authorization!.Scheme.Should().Be("Basic");
         }
         finally
         {
+            Console.SetIn(originalIn);
             AuthGate.IsInteractive = previousHook;
-            AuthGate.LoginPort = previousPort;
         }
     }
 
-    private static IServiceProvider BuildServices(
-        InMemoryCredentialStore store,
-        FakeHttpMessageHandler fakeHttp,
-        StubBrowserLauncher browser)
+    private static IServiceProvider BuildServices(InMemoryCredentialStore store)
+        => BuildServices(store, Verified());
+
+    // LoginApiTokenHandler verifies the credential against /user before saving.
+    private static FakeHttpMessageHandler Verified()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(System.Net.HttpStatusCode.OK,
+            """{"display_name":"Jane Doe","username":"jane"}""");
+        return http;
+    }
+
+    private static IServiceProvider BuildServices(InMemoryCredentialStore store, FakeHttpMessageHandler http)
     {
         var sc = new ServiceCollection();
+        sc.AddSingleton(_ => TestHttpClientFactory.Create(http));
         sc.AddSingleton<ICredentialStore>(store);
         sc.AddSingleton<CredentialManager>();
-        sc.AddSingleton(_ => new HttpClient(fakeHttp));
-        sc.AddSingleton<IBrowserLauncher>(browser);
-        sc.AddSingleton(sp => new OAuthFlow(
-            sp.GetRequiredService<IBrowserLauncher>(),
-            sp.GetRequiredService<HttpClient>()));
-        sc.AddSingleton(sp => new OAuthAuthProvider(
-            sp.GetRequiredService<CredentialManager>(),
-            sp.GetRequiredService<HttpClient>()));
         sc.AddSingleton<ConfigAuthProvider>();
         sc.AddSingleton<IAuthProvider>(sp => sp.GetRequiredService<ConfigAuthProvider>());
-        sc.AddTransient<SetupOAuthHandler>();
-        sc.AddTransient<LoginOAuthHandler>();
+        sc.AddTransient<LoginApiTokenHandler>();
         return sc.BuildServiceProvider();
-    }
-
-    private static string ExtractState(string url)
-    {
-        var query = new Uri(url).Query.TrimStart('?');
-        foreach (var pair in query.Split('&'))
-        {
-            var parts = pair.Split('=', 2);
-            if (parts.Length == 2 && parts[0] == "state") return Uri.UnescapeDataString(parts[1]);
-        }
-        throw new InvalidOperationException("state not found in URL: " + url);
     }
 }

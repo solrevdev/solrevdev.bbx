@@ -32,10 +32,6 @@ public sealed class ConfigAuthProvider : IAuthProvider
     {
         var creds = _services.GetRequiredService<CredentialManager>();
         var config = creds.LoadConfig();
-        if (config.AuthMethod == "oauth" && !string.IsNullOrEmpty(config.RefreshToken))
-        {
-            return _services.GetRequiredService<OAuthAuthProvider>();
-        }
         if (!string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.ApiToken))
         {
             return new BasicAuthProvider(config.Username, config.ApiToken);

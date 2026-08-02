@@ -146,6 +146,7 @@ public class BitbucketClientTests
             .WithMessage("*lack one or more required privilege scopes*HTTP 403*")
             .And.Message.Should()
                 .Contain("Missing token scopes: admin:repository:bitbucket")
+                .And.Contain("api-tokens", "the error should say where to re-issue the token")
                 .And.NotContain("read:repository:bitbucket.", "already granted scopes are not missing");
     }
 

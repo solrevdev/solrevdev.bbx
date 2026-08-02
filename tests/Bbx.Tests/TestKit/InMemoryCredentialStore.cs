@@ -30,11 +30,6 @@ internal sealed class InMemoryCredentialStore : ICredentialStore
     private static BbxConfig Clone(BbxConfig source) => new()
     {
         AuthMethod = source.AuthMethod,
-        AccessToken = source.AccessToken,
-        RefreshToken = source.RefreshToken,
-        TokenExpiry = source.TokenExpiry,
-        OAuthClientId = source.OAuthClientId,
-        OAuthClientSecret = source.OAuthClientSecret,
         Username = source.Username,
         ApiToken = source.ApiToken,
         DefaultWorkspace = source.DefaultWorkspace,

@@ -10,25 +10,20 @@ namespace Bbx.Tests.Features.Auth;
 [Collection("Console")]
 public class AuthStatusHandlerTests
 {
+    // A config written before OAuth was removed still has AuthMethod "oauth" but
+    // no usable credential, so status must report it as unauthenticated rather
+    // than claiming a method bbx can no longer honour.
     [Fact]
-    public async Task OAuth_status_reports_auth_method_and_expires_at()
+    public async Task Stale_oauth_config_reads_as_not_authenticated()
     {
-        var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
         var store = new InMemoryCredentialStore(new BbxConfig
         {
             AuthMethod = "oauth",
-            AccessToken = "at",
-            RefreshToken = "rt",
-            TokenExpiry = expiresAt,
-            OAuthClientId = "cid",
-            OAuthClientSecret = "csec",
             Username = "jane",
             DefaultWorkspace = "acme",
         });
         var creds = new CredentialManager(store);
         var fakeHttp = new FakeHttpMessageHandler();
-        fakeHttp.Enqueue(HttpStatusCode.OK,
-            """{"display_name":"Jane Doe","username":"jane"}""");
         using var http = TestHttpClientFactory.Create(fakeHttp);
         using var client = new BitbucketClient(http, new NullAuthProvider());
 
@@ -36,10 +31,8 @@ public class AuthStatusHandlerTests
         var (stdout, _) = await CaptureConsole.RunAsync(() =>
             handler.HandleAsync(new AuthStatusRequest(), CancellationToken.None));
 
-        stdout.Should().Contain("Auth method: oauth");
-        stdout.Should().Contain("Expires at:");
-        stdout.Should().Contain("Default workspace: acme");
-        stdout.Should().Contain("Jane Doe");
+        stdout.Should().Contain("Not authenticated");
+        fakeHttp.Calls.Should().BeEmpty();
     }
 
     [Fact]

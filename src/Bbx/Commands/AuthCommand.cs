@@ -1,11 +1,7 @@
 using System.CommandLine;
 using Bbx.Auth;
 using Bbx.Features.Auth.LoginApiToken;
-using Bbx.Features.Auth.LoginGuide;
-using Bbx.Features.Auth.LoginOAuth;
 using Bbx.Features.Auth.Logout;
-using Bbx.Features.Auth.Refresh;
-using Bbx.Features.Auth.SetupOAuth;
 using Bbx.Features.Auth.SetWorkspace;
 using Bbx.Features.Auth.Status;
 using Bbx.Features.Auth.Token;
@@ -20,8 +16,6 @@ public static class AuthCommand
         var command = new Command("auth", "Manage authentication");
 
         command.AddCommand(BuildLoginCommand(services));
-        command.AddCommand(BuildSetupOAuthCommand(services));
-        command.AddCommand(BuildRefreshCommand(services));
         command.AddCommand(BuildStatusCommand(services));
         command.AddCommand(BuildLogoutCommand(services));
         command.AddCommand(BuildTokenCommand(services));
@@ -32,95 +26,47 @@ public static class AuthCommand
 
     private static Command BuildLoginCommand(IServiceProvider services)
     {
-        var loginCommand = new Command("login", "Authenticate with Bitbucket");
+        var loginCommand = new Command("login", "Authenticate with an Atlassian API token");
 
-        var oauthOption = new Option<bool>("--oauth", "Use OAuth 2.0 authorization-code flow (the default in an interactive shell)");
-        var apiTokenOption = new Option<bool>("--api-token", "Use Atlassian API token authentication (fallback for CI / scripts)");
-        var clientIdOption = new Option<string?>("--client-id", "OAuth consumer client_id (only with --oauth)");
-        var clientSecretOption = new Option<string?>("--client-secret", "OAuth consumer client_secret (only with --oauth)");
-        var portOption = new Option<int>("--port", () => 53682, "Loopback port for the OAuth callback (only with --oauth)");
-        var noBrowserOption = new Option<bool>("--no-browser", "Print the OAuth URL instead of opening a browser (only with --oauth)");
-        var scopesOption = new Option<string?>("--scopes", "Comma-separated scopes (informational; Bitbucket honours consumer scopes)");
+        // Kept as flags so existing scripts and muscle memory still work; the
+        // token flow is the only one, so passing it changes nothing.
+        var apiTokenOption = new Option<bool>("--api-token", "Use an Atlassian API token (the only supported method)");
+        var emailOption = new Option<string?>("--email", "Atlassian account email (prompted for when omitted)");
+        var tokenOption = new Option<string?>("--token",
+            "API token. Prefer omitting it and letting bbx prompt, or pipe it in, so it stays out of your shell history.");
 
-        loginCommand.AddOption(oauthOption);
         loginCommand.AddOption(apiTokenOption);
-        loginCommand.AddOption(clientIdOption);
-        loginCommand.AddOption(clientSecretOption);
-        loginCommand.AddOption(portOption);
-        loginCommand.AddOption(noBrowserOption);
-        loginCommand.AddOption(scopesOption);
+        loginCommand.AddOption(emailOption);
+        loginCommand.AddOption(tokenOption);
 
-        loginCommand.SetHandler(async (context) =>
+        loginCommand.SetHandler(async (string? email, string? token) =>
         {
-            var useOauth = context.ParseResult.GetValueForOption(oauthOption);
-            var useApiToken = context.ParseResult.GetValueForOption(apiTokenOption);
-            var clientId = context.ParseResult.GetValueForOption(clientIdOption);
-            var clientSecret = context.ParseResult.GetValueForOption(clientSecretOption);
-            var port = context.ParseResult.GetValueForOption(portOption);
-            var noBrowser = context.ParseResult.GetValueForOption(noBrowserOption);
-            var scopes = context.ParseResult.GetValueForOption(scopesOption);
-
-            // OAuth is the default when neither method is named, matching the
-            // first-run auto-launch and `gh auth login`. A browser flow cannot
-            // work with no TTY, so a non-interactive shell still gets the guide
-            // and has to choose a method explicitly.
-            if (useOauth || (!useApiToken && AuthGate.IsInteractive()))
+            if (string.IsNullOrWhiteSpace(email))
             {
-                await CommandRunner.RunActionNoGateAsync(() =>
-                    services.GetRequiredService<LoginOAuthHandler>()
-                        .HandleAsync(new LoginOAuthRequest(clientId, clientSecret, port, noBrowser, scopes), CancellationToken.None));
+                Console.Error.WriteLine("Create a token at https://bitbucket.org/account/settings/api-tokens/");
+                Console.Error.Write("Email (Atlassian account): ");
+                email = Console.ReadLine()?.Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                Console.Error.Write("API Token: ");
+                token = SecretInput.ReadSecret();
+            }
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+            {
+                Console.Error.WriteLine("Error: Email and API token required");
+                Environment.ExitCode = 1;
                 return;
             }
 
-            if (useApiToken)
-            {
-                Console.Write("Email (Atlassian account): ");
-                var email = Console.ReadLine()?.Trim();
-                Console.Write("API Token: ");
-                var token = SecretInput.ReadSecret();
-
-                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
-                {
-                    Console.Error.WriteLine("Error: Email and API token required");
-                    return;
-                }
-
-                await CommandRunner.RunActionNoGateAsync(() =>
-                    services.GetRequiredService<LoginApiTokenHandler>()
-                        .HandleAsync(new LoginApiTokenRequest(email, token), CancellationToken.None));
-                return;
-            }
-
-            await services.GetRequiredService<LoginGuideHandler>()
-                .HandleAsync(new LoginGuideRequest(), CancellationToken.None);
-        });
+            await CommandRunner.RunActionNoGateAsync(() =>
+                services.GetRequiredService<LoginApiTokenHandler>()
+                    .HandleAsync(new LoginApiTokenRequest(email, token), CancellationToken.None));
+        }, emailOption, tokenOption);
 
         return loginCommand;
-    }
-
-    private static Command BuildSetupOAuthCommand(IServiceProvider services)
-    {
-        var setupCommand = new Command("setup-oauth", "Print the Bitbucket OAuth consumer setup walkthrough");
-        var openOption = new Option<bool>("--open", "Open the workspace API settings page in the browser");
-        setupCommand.AddOption(openOption);
-        setupCommand.SetHandler(async (bool open) =>
-        {
-            await services.GetRequiredService<SetupOAuthHandler>()
-                .HandleAsync(new SetupOAuthRequest(open), CancellationToken.None);
-        }, openOption);
-        return setupCommand;
-    }
-
-    private static Command BuildRefreshCommand(IServiceProvider services)
-    {
-        var refreshCommand = new Command("refresh", "Force an OAuth token refresh and print the new expiry");
-        refreshCommand.SetHandler(async () =>
-        {
-            await CommandRunner.RunActionNoGateAsync(() =>
-                services.GetRequiredService<RefreshHandler>()
-                    .HandleAsync(new RefreshRequest(), CancellationToken.None));
-        });
-        return refreshCommand;
     }
 
     private static Command BuildStatusCommand(IServiceProvider services)

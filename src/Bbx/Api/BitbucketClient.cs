@@ -208,7 +208,9 @@ public class BitbucketClient : IDisposable
                 var missing = error.Error.MissingScopes().ToList();
                 if (missing.Count > 0)
                 {
-                    errorMessage += $" Missing token scopes: {string.Join(", ", missing)}.";
+                    errorMessage += $" Missing token scopes: {string.Join(", ", missing)}."
+                        + " Re-issue your token with those scopes at"
+                        + " https://bitbucket.org/account/settings/api-tokens/";
                 }
 
                 // Deprecation errors carry the changelog entry that explains them.

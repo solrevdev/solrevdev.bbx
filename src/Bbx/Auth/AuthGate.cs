@@ -1,22 +1,23 @@
-using Bbx.Features.Auth.LoginOAuth;
-using Bbx.Features.Auth.SetupOAuth;
+using Bbx.Features.Auth.LoginApiToken;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Auth;
 
 public static class AuthGate
 {
-    // Test seams: production wires IsInteractive to Console.IsInputRedirected
-    // + the BBX_NO_INTERACTIVE opt-out, and uses OAuthFlow.DefaultPort for
-    // the loopback bind. Tests can swap these under [Collection("Console")]
-    // to drive the happy-path auto-launch without an actual TTY.
+    // Test seam: production wires IsInteractive to Console.IsInputRedirected
+    // plus the BBX_NO_INTERACTIVE opt-out. Tests swap it under
+    // [Collection("Console")] to drive the prompt without an actual TTY.
     internal static Func<bool> IsInteractive { get; set; } = DefaultIsInteractive;
-    internal static int LoginPort { get; set; } = OAuthFlow.DefaultPort;
 
     internal static bool DefaultIsInteractive()
         => !Console.IsInputRedirected
            && !string.Equals(Environment.GetEnvironmentVariable("BBX_NO_INTERACTIVE"), "1", StringComparison.Ordinal);
 
+    /// <summary>
+    /// Make sure a credential is stored before a command runs, prompting for
+    /// one on first use when there is a terminal to prompt at.
+    /// </summary>
     public static async Task EnsureAuthenticatedAsync(IServiceProvider services, CancellationToken ct)
     {
         var creds = services.GetRequiredService<CredentialManager>();
@@ -25,45 +26,28 @@ public static class AuthGate
         if (!IsInteractive())
         {
             throw new BbxUserException(
-                "Error: Not authenticated. Run: bbx auth login --oauth (or --api-token).");
+                "Error: Not authenticated. Run: bbx auth login\n" +
+                "  Create a token at https://bitbucket.org/account/settings/api-tokens/");
         }
 
-        Console.Error.WriteLine("No credentials found — starting OAuth login.");
+        Console.Error.WriteLine("No credentials found. Create an API token at:");
+        Console.Error.WriteLine("  https://bitbucket.org/account/settings/api-tokens/");
+        Console.Error.WriteLine();
+        Console.Error.Write("Email (Atlassian account): ");
+        var email = Console.ReadLine()?.Trim();
+        Console.Error.Write("API Token: ");
+        var token = SecretInput.ReadSecret();
 
-        var config = creds.LoadConfig();
-        var clientId = config.OAuthClientId;
-        var clientSecret = config.OAuthClientSecret;
-
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
         {
-            await services.GetRequiredService<SetupOAuthHandler>()
-                .HandleAsync(new SetupOAuthRequest(Open: false), ct);
-            Console.Error.WriteLine();
-            Console.Error.Write("client_id (Key from the consumer page): ");
-            clientId = Console.ReadLine()?.Trim();
-            Console.Error.Write("client_secret (Secret from the consumer page): ");
-            clientSecret = SecretInput.ReadSecret();
-
-            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
-            {
-                throw new BbxUserException("Error: client_id and client_secret are required.");
-            }
-
-            config.OAuthClientId = clientId;
-            config.OAuthClientSecret = clientSecret;
-            creds.SaveConfig(config);
-        }
-        else
-        {
-            Console.Error.WriteLine("Found OAuth consumer in config.");
+            throw new BbxUserException("Error: Email and API token are required.");
         }
 
-        var message = await services.GetRequiredService<LoginOAuthHandler>()
-            .HandleAsync(new LoginOAuthRequest(clientId, clientSecret, LoginPort, NoBrowser: false, Scopes: null), ct);
-        Console.Error.WriteLine(message);
+        await services.GetRequiredService<LoginApiTokenHandler>()
+            .HandleAsync(new LoginApiTokenRequest(email, token), ct);
 
         // The shared IAuthProvider cached NullAuthProvider before login;
-        // invalidate it so the original command picks up the new tokens.
+        // invalidate it so the original command picks up the new credential.
         if (services.GetService<IAuthProvider>() is ConfigAuthProvider configAuth)
         {
             configAuth.Invalidate();

@@ -29,12 +29,17 @@ public sealed class LoginApiTokenHandler(CredentialManager credentials, HttpClie
         var displayName = user.TryGetProperty("display_name", out var dn) ? dn.GetString() : "Unknown";
         var username = user.TryGetProperty("username", out var un) ? un.GetString() : null;
 
+        // Keep a default workspace the user has already chosen. Overwriting it
+        // with the account name silently retargeted every -w-less command at the
+        // personal workspace after re-authenticating.
+        var existing = credentials.LoadConfig().DefaultWorkspace;
+
         credentials.SaveConfig(new BbxConfig
         {
             AuthMethod = "api-token",
             Username = request.Email,
             ApiToken = request.ApiToken,
-            DefaultWorkspace = username,
+            DefaultWorkspace = string.IsNullOrEmpty(existing) ? username : existing,
         });
 
         return $"✓ Authenticated as {displayName}";

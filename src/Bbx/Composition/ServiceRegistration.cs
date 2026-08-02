@@ -37,14 +37,6 @@ public static class ServiceRegistration
         services.AddSingleton<ICredentialStore, FileCredentialStore>();
         services.AddSingleton<CredentialManager>();
 
-        services.AddSingleton<IBrowserLauncher, DefaultBrowserLauncher>();
-        services.AddSingleton(sp => new OAuthFlow(
-            sp.GetRequiredService<IBrowserLauncher>(),
-            sp.GetRequiredService<HttpClient>()));
-        services.AddSingleton(sp => new OAuthAuthProvider(
-            sp.GetRequiredService<CredentialManager>(),
-            sp.GetRequiredService<HttpClient>()));
-
         services.AddSingleton<ConfigAuthProvider>();
         services.AddSingleton<IAuthProvider>(sp => sp.GetRequiredService<ConfigAuthProvider>());
 
@@ -60,10 +52,6 @@ public static class ServiceRegistration
     private static void RegisterHandlers(IServiceCollection services)
     {
         services.AddTransient<Features.Auth.LoginApiToken.LoginApiTokenHandler>();
-        services.AddTransient<Features.Auth.LoginOAuth.LoginOAuthHandler>();
-        services.AddTransient<Features.Auth.LoginGuide.LoginGuideHandler>();
-        services.AddTransient<Features.Auth.SetupOAuth.SetupOAuthHandler>();
-        services.AddTransient<Features.Auth.Refresh.RefreshHandler>();
         services.AddTransient<Features.Auth.Status.AuthStatusHandler>();
         services.AddTransient<Features.Auth.Logout.LogoutHandler>();
         services.AddTransient<Features.Auth.Token.AuthTokenHandler>();

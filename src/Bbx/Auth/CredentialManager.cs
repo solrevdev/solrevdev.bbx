@@ -6,25 +6,7 @@ public sealed class CredentialManager
 
     public CredentialManager(ICredentialStore store) => _store = store;
 
-    public BbxConfig LoadConfig()
-    {
-        var config = _store.Load();
-        if (TryMigrate(config))
-        {
-            try
-            {
-                _store.Save(config);
-            }
-            catch
-            {
-                // Migration write-back is best-effort: if the on-disk file
-                // can't be rewritten (read-only fs, perms), keep the
-                // in-memory migrated shape so the current run still works.
-                // The next successful Save call will persist the new shape.
-            }
-        }
-        return config;
-    }
+    public BbxConfig LoadConfig() => _store.Load();
 
     public void SaveConfig(BbxConfig config) => _store.Save(config);
 
@@ -33,32 +15,23 @@ public sealed class CredentialManager
     public bool HasCredentials()
     {
         var config = LoadConfig();
-        return !string.IsNullOrEmpty(config.AccessToken) ||
-               (!string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.ApiToken));
-    }
-
-    private static bool TryMigrate(BbxConfig config)
-    {
-        if (!string.IsNullOrEmpty(config.AuthMethod)) return false;
-
-        if (!string.IsNullOrEmpty(config.AccessToken) && !string.IsNullOrEmpty(config.RefreshToken))
-        {
-            config.AuthMethod = "oauth";
-            return true;
-        }
-
-        return false;
+        return !string.IsNullOrEmpty(config.Username) && !string.IsNullOrEmpty(config.ApiToken);
     }
 }
 
+/// <summary>
+/// On-disk shape of <c>~/.config/bbx/config.json</c>.
+/// </summary>
+/// <remarks>
+/// Atlassian API tokens are the only supported credential. They go over the
+/// wire as HTTP Basic (email:token), the same shape app passwords used.
+/// Unknown properties are ignored on load, so a config written by a build that
+/// still had OAuth is read for its Username / ApiToken / DefaultWorkspace, and
+/// the stale fields are dropped on the next save.
+/// </remarks>
 public class BbxConfig
 {
     public string? AuthMethod { get; set; }
-    public string? AccessToken { get; set; }
-    public string? RefreshToken { get; set; }
-    public DateTimeOffset? TokenExpiry { get; set; }
-    public string? OAuthClientId { get; set; }
-    public string? OAuthClientSecret { get; set; }
     public string? Username { get; set; }
     public string? ApiToken { get; set; }
     public string? DefaultWorkspace { get; set; }
