@@ -21,50 +21,50 @@ public static class BranchCommand
         var workspaceOption = CommandOptions.CreateWorkspaceOption();
         var repoOption = CommandOptions.CreateRepoOption();
         var command = new Command("branch", "Manage branches");
-        command.AddGlobalOption(workspaceOption);
-        command.AddGlobalOption(repoOption);
+        command.AddRecursiveOption(workspaceOption);
+        command.AddRecursiveOption(repoOption);
 
         var listCommand = new Command("list", "List branches");
-        var limitOption = new Option<int>("--limit", () => 25, "Maximum branches to list");
-        var sortOption = new Option<string?>("--sort", "Sort by field (e.g., -name for descending)");
-        var queryOption = new Option<string?>("--query", "BBQL query filter");
-        listCommand.AddOption(limitOption);
-        listCommand.AddOption(sortOption);
-        listCommand.AddOption(queryOption);
+        var limitOption = new Option<int>("--limit") { Description = "Maximum branches to list", DefaultValueFactory = _ => 25 };
+        var sortOption = new Option<string?>("--sort") { Description = "Sort by field (e.g., -name for descending)" };
+        var queryOption = new Option<string?>("--query") { Description = "BBQL query filter" };
+        listCommand.Options.Add(limitOption);
+        listCommand.Options.Add(sortOption);
+        listCommand.Options.Add(queryOption);
         listCommand.SetHandler((string? workspace, string? repo, int limit, string? sort, string? query) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListBranchesHandler>()
                     .HandleAsync(new ListBranchesRequest(workspace, repo, limit, sort, query), CancellationToken.None)),
             workspaceOption, repoOption, limitOption, sortOption, queryOption);
-        command.AddCommand(listCommand);
+        command.Subcommands.Add(listCommand);
 
         var viewCommand = new Command("view", "View branch details");
-        var nameArg = new Argument<string>("name", "Branch name");
-        viewCommand.AddArgument(nameArg);
+        var nameArg = new Argument<string>("name") { Description = "Branch name" };
+        viewCommand.Arguments.Add(nameArg);
         viewCommand.SetHandler((string? workspace, string? repo, string name) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewBranchHandler>()
                     .HandleAsync(new ViewBranchRequest(workspace, repo, name), CancellationToken.None)),
             workspaceOption, repoOption, nameArg);
-        command.AddCommand(viewCommand);
+        command.Subcommands.Add(viewCommand);
 
         var createCommand = new Command("create", "Create a new branch");
-        var createNameArg = new Argument<string>("name", "Branch name");
-        var targetOption = new Option<string>("--target", "Target commit hash or branch name") { IsRequired = true };
-        createCommand.AddArgument(createNameArg);
-        createCommand.AddOption(targetOption);
+        var createNameArg = new Argument<string>("name") { Description = "Branch name" };
+        var targetOption = new Option<string>("--target") { Description = "Target commit hash or branch name" , Required = true };
+        createCommand.Arguments.Add(createNameArg);
+        createCommand.Options.Add(targetOption);
         createCommand.SetHandler((string? workspace, string? repo, string name, string target) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateBranchHandler>()
                     .HandleAsync(new CreateBranchRequest(workspace, repo, name, target), CancellationToken.None)),
             workspaceOption, repoOption, createNameArg, targetOption);
-        command.AddCommand(createCommand);
+        command.Subcommands.Add(createCommand);
 
         var deleteCommand = new Command("delete", "Delete a branch");
-        var deleteNameArg = new Argument<string>("name", "Branch name to delete");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation");
-        deleteCommand.AddArgument(deleteNameArg);
-        deleteCommand.AddOption(yesOption);
+        var deleteNameArg = new Argument<string>("name") { Description = "Branch name to delete" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        deleteCommand.Arguments.Add(deleteNameArg);
+        deleteCommand.Options.Add(yesOption);
         deleteCommand.SetHandler(async (string? workspace, string? repo, string name, bool yes) =>
         {
             if (!yes)
@@ -80,7 +80,7 @@ public static class BranchCommand
                 services.GetRequiredService<DeleteBranchHandler>()
                     .HandleAsync(new DeleteBranchRequest(workspace, repo, name), CancellationToken.None));
         }, workspaceOption, repoOption, deleteNameArg, yesOption);
-        command.AddCommand(deleteCommand);
+        command.Subcommands.Add(deleteCommand);
 
         var restrictionsCommand = new Command("restrictions", "Manage branch restrictions");
 
@@ -90,27 +90,27 @@ public static class BranchCommand
                 services.GetRequiredService<ListBranchRestrictionsHandler>()
                     .HandleAsync(new ListBranchRestrictionsRequest(workspace, repo), CancellationToken.None)),
             workspaceOption, repoOption);
-        restrictionsCommand.AddCommand(restrictionsListCommand);
+        restrictionsCommand.Subcommands.Add(restrictionsListCommand);
 
         var restrictionsAddCommand = new Command("add", "Add a branch restriction");
-        var kindOption = new Option<string>("--kind", "Restriction kind (push, force, delete, require_passing_builds_to_merge, require_approvals_to_merge, etc.)") { IsRequired = true };
-        var patternOption = new Option<string>("--pattern", "Branch pattern (glob or exact match)") { IsRequired = true };
-        restrictionsAddCommand.AddOption(kindOption);
-        restrictionsAddCommand.AddOption(patternOption);
+        var kindOption = new Option<string>("--kind") { Description = "Restriction kind (push, force, delete, require_passing_builds_to_merge, require_approvals_to_merge, etc.)" , Required = true };
+        var patternOption = new Option<string>("--pattern") { Description = "Branch pattern (glob or exact match)" , Required = true };
+        restrictionsAddCommand.Options.Add(kindOption);
+        restrictionsAddCommand.Options.Add(patternOption);
         restrictionsAddCommand.SetHandler((string? workspace, string? repo, string kind, string pattern) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddBranchRestrictionHandler>()
                     .HandleAsync(new AddBranchRestrictionRequest(workspace, repo, kind, pattern), CancellationToken.None)),
             workspaceOption, repoOption, kindOption, patternOption);
-        restrictionsCommand.AddCommand(restrictionsAddCommand);
+        restrictionsCommand.Subcommands.Add(restrictionsAddCommand);
 
         var restrictionsDeleteCommand = new Command("delete", "Delete a branch restriction");
-        var restrictionIdArg = new Argument<int>("id", "Restriction ID");
+        var restrictionIdArg = new Argument<int>("id") { Description = "Restriction ID" };
         // Confirms like the other delete verbs; removing a restriction relaxes
         // protection on a branch.
-        var restrictionYesOption = new Option<bool>("--yes", "Skip confirmation prompt");
-        restrictionsDeleteCommand.AddArgument(restrictionIdArg);
-        restrictionsDeleteCommand.AddOption(restrictionYesOption);
+        var restrictionYesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
+        restrictionsDeleteCommand.Arguments.Add(restrictionIdArg);
+        restrictionsDeleteCommand.Options.Add(restrictionYesOption);
         restrictionsDeleteCommand.SetHandler(async (string? workspace, string? repo, int id, bool yes) =>
         {
             if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete branch restriction #{id}? [y/N]: "))
@@ -119,11 +119,11 @@ public static class BranchCommand
                 services.GetRequiredService<DeleteBranchRestrictionHandler>()
                     .HandleAsync(new DeleteBranchRestrictionRequest(workspace, repo, id), CancellationToken.None));
         }, workspaceOption, repoOption, restrictionIdArg, restrictionYesOption);
-        restrictionsCommand.AddCommand(restrictionsDeleteCommand);
+        restrictionsCommand.Subcommands.Add(restrictionsDeleteCommand);
 
-        command.AddCommand(restrictionsCommand);
+        command.Subcommands.Add(restrictionsCommand);
 
-        command.AddCommand(CreateTagCommand(services, workspaceOption, repoOption));
+        command.Subcommands.Add(CreateTagCommand(services, workspaceOption, repoOption));
 
         return command;
     }
@@ -133,48 +133,48 @@ public static class BranchCommand
         var tagCommand = new Command("tag", "Manage tags");
 
         var listCommand = new Command("list", "List tags");
-        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum tags to list");
-        var listSortOption = new Option<string?>("--sort", "Sort by field (e.g., -name for descending)");
-        var listQueryOption = new Option<string?>("--query", "BBQL query filter");
-        listCommand.AddOption(listLimitOption);
-        listCommand.AddOption(listSortOption);
-        listCommand.AddOption(listQueryOption);
+        var listLimitOption = new Option<int>("--limit") { Description = "Maximum tags to list", DefaultValueFactory = _ => 25 };
+        var listSortOption = new Option<string?>("--sort") { Description = "Sort by field (e.g., -name for descending)" };
+        var listQueryOption = new Option<string?>("--query") { Description = "BBQL query filter" };
+        listCommand.Options.Add(listLimitOption);
+        listCommand.Options.Add(listSortOption);
+        listCommand.Options.Add(listQueryOption);
         listCommand.SetHandler((string? workspace, string? repo, int limit, string? sort, string? query) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListTagsHandler>()
                     .HandleAsync(new ListTagsRequest(workspace, repo, limit, sort, query), CancellationToken.None)),
             workspaceOption, repoOption, listLimitOption, listSortOption, listQueryOption);
-        tagCommand.AddCommand(listCommand);
+        tagCommand.Subcommands.Add(listCommand);
 
         var viewCommand = new Command("view", "View tag details");
-        var viewNameArg = new Argument<string>("name", "Tag name");
-        viewCommand.AddArgument(viewNameArg);
+        var viewNameArg = new Argument<string>("name") { Description = "Tag name" };
+        viewCommand.Arguments.Add(viewNameArg);
         viewCommand.SetHandler((string? workspace, string? repo, string name) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewTagHandler>()
                     .HandleAsync(new ViewTagRequest(workspace, repo, name), CancellationToken.None)),
             workspaceOption, repoOption, viewNameArg);
-        tagCommand.AddCommand(viewCommand);
+        tagCommand.Subcommands.Add(viewCommand);
 
         var createCommand = new Command("create", "Create a new tag");
-        var createNameArg = new Argument<string>("name", "Tag name");
-        var createTargetOption = new Option<string>("--target", "Target commit hash or branch name") { IsRequired = true };
-        var createMessageOption = new Option<string?>("--message", "Annotation message (creates an annotated tag)");
-        createCommand.AddArgument(createNameArg);
-        createCommand.AddOption(createTargetOption);
-        createCommand.AddOption(createMessageOption);
+        var createNameArg = new Argument<string>("name") { Description = "Tag name" };
+        var createTargetOption = new Option<string>("--target") { Description = "Target commit hash or branch name" , Required = true };
+        var createMessageOption = new Option<string?>("--message") { Description = "Annotation message (creates an annotated tag)" };
+        createCommand.Arguments.Add(createNameArg);
+        createCommand.Options.Add(createTargetOption);
+        createCommand.Options.Add(createMessageOption);
         createCommand.SetHandler((string? workspace, string? repo, string name, string target, string? message) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateTagHandler>()
                     .HandleAsync(new CreateTagRequest(workspace, repo, name, target, message), CancellationToken.None)),
             workspaceOption, repoOption, createNameArg, createTargetOption, createMessageOption);
-        tagCommand.AddCommand(createCommand);
+        tagCommand.Subcommands.Add(createCommand);
 
         var deleteCommand = new Command("delete", "Delete a tag");
-        var deleteNameArg = new Argument<string>("name", "Tag name to delete");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation");
-        deleteCommand.AddArgument(deleteNameArg);
-        deleteCommand.AddOption(yesOption);
+        var deleteNameArg = new Argument<string>("name") { Description = "Tag name to delete" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        deleteCommand.Arguments.Add(deleteNameArg);
+        deleteCommand.Options.Add(yesOption);
         deleteCommand.SetHandler(async (string? workspace, string? repo, string name, bool yes) =>
         {
             if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete tag '{name}'? [y/N]: "))
@@ -183,7 +183,7 @@ public static class BranchCommand
                 services.GetRequiredService<DeleteTagHandler>()
                     .HandleAsync(new DeleteTagRequest(workspace, repo, name), CancellationToken.None));
         }, workspaceOption, repoOption, deleteNameArg, yesOption);
-        tagCommand.AddCommand(deleteCommand);
+        tagCommand.Subcommands.Add(deleteCommand);
 
         return tagCommand;
     }

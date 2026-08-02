@@ -58,8 +58,8 @@ API tokens only; OAuth was removed. A token is Basic auth (`email:token`) stored
 at `~/.config/bbx/config.json`. Set `BBX_NO_INTERACTIVE=1` so a missing
 credential fails fast instead of prompting.
 
-Some endpoints need scopes a token may not carry. A 403 names the missing scope —
-report that to the user rather than working around it.
+Some endpoints need scopes a token may not carry. A 403 names the missing scope.
+Report that to the user rather than working around it.
 
 ## Commits
 

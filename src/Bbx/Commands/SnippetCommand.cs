@@ -17,14 +17,14 @@ public static class SnippetCommand
     {
         var command = new Command("snippet", "Manage Bitbucket snippets");
 
-        command.AddCommand(CreateListCommand(services));
-        command.AddCommand(CreateViewCommand(services));
-        command.AddCommand(CreateCreateCommand(services));
-        command.AddCommand(CreateUpdateCommand(services));
-        command.AddCommand(CreateDeleteCommand(services));
-        command.AddCommand(CreateFilesCommand(services));
-        command.AddCommand(CreateWatchCommand(services));
-        command.AddCommand(CreateCommentsCommand(services));
+        command.Subcommands.Add(CreateListCommand(services));
+        command.Subcommands.Add(CreateViewCommand(services));
+        command.Subcommands.Add(CreateCreateCommand(services));
+        command.Subcommands.Add(CreateUpdateCommand(services));
+        command.Subcommands.Add(CreateDeleteCommand(services));
+        command.Subcommands.Add(CreateFilesCommand(services));
+        command.Subcommands.Add(CreateWatchCommand(services));
+        command.Subcommands.Add(CreateCommentsCommand(services));
 
         return command;
     }
@@ -32,13 +32,13 @@ public static class SnippetCommand
     private static Command CreateListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List snippets");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified, omit for personal snippets)");
-        var roleOption = new Option<string?>(["--role", "-r"], "Filter by role: owner, contributor, member");
-        var limitOption = new Option<int>(["--limit", "-l"], () => 25, "Maximum number of snippets to return");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified, omit for personal snippets)" };
+        var roleOption = new Option<string?>("--role", "-r") { Description = "Filter by role: owner, contributor, member" };
+        var limitOption = new Option<int>("--limit", "-l") { Description = "Maximum number of snippets to return", DefaultValueFactory = _ => 25 };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(roleOption);
-        command.AddOption(limitOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(roleOption);
+        command.Options.Add(limitOption);
 
         command.SetHandler((string? workspace, string? role, int limit) =>
             CommandRunner.RunJsonAsync(() =>
@@ -51,11 +51,11 @@ public static class SnippetCommand
     private static Command CreateViewCommand(IServiceProvider services)
     {
         var command = new Command("view", "View a snippet");
-        var snippetIdArg = new Argument<string>("snippet-id", "Snippet ID");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
 
-        command.AddArgument(snippetIdArg);
-        command.AddOption(workspaceOption);
+        command.Arguments.Add(snippetIdArg);
+        command.Options.Add(workspaceOption);
 
         command.SetHandler((string snippetId, string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
@@ -68,15 +68,15 @@ public static class SnippetCommand
     private static Command CreateCreateCommand(IServiceProvider services)
     {
         var command = new Command("create", "Create a new snippet");
-        var titleOption = new Option<string>(["--title", "-t"], "Snippet title") { IsRequired = true };
-        var fileOption = new Option<string[]>(["--file", "-f"], "File(s) to include in snippet (can be specified multiple times)") { IsRequired = true, AllowMultipleArgumentsPerToken = true };
-        var privateOption = new Option<bool>(["--private", "-p"], () => false, "Make snippet private");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
+        var titleOption = new Option<string>("--title", "-t") { Description = "Snippet title" , Required = true };
+        var fileOption = new Option<string[]>("--file", "-f") { Description = "File(s) to include in snippet (can be specified multiple times)" , Required = true, AllowMultipleArgumentsPerToken = true };
+        var privateOption = new Option<bool>("--private", "-p") { Description = "Make snippet private", DefaultValueFactory = _ => false };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
 
-        command.AddOption(titleOption);
-        command.AddOption(fileOption);
-        command.AddOption(privateOption);
-        command.AddOption(workspaceOption);
+        command.Options.Add(titleOption);
+        command.Options.Add(fileOption);
+        command.Options.Add(privateOption);
+        command.Options.Add(workspaceOption);
 
         command.SetHandler((string title, string[] files, bool isPrivate, string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
@@ -89,17 +89,17 @@ public static class SnippetCommand
     private static Command CreateUpdateCommand(IServiceProvider services)
     {
         var command = new Command("update", "Update an existing snippet");
-        var snippetIdArg = new Argument<string>("snippet-id", "Snippet ID");
-        var titleOption = new Option<string?>(["--title", "-t"], "New title");
-        var fileOption = new Option<string[]?>(["--file", "-f"], "File(s) to update/add (can be specified multiple times)");
-        var privateOption = new Option<bool?>(["--private", "-p"], "Make snippet private");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var titleOption = new Option<string?>("--title", "-t") { Description = "New title" };
+        var fileOption = new Option<string[]?>("--file", "-f") { Description = "File(s) to update/add (can be specified multiple times)" };
+        var privateOption = new Option<bool?>("--private", "-p") { Description = "Make snippet private" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
 
-        command.AddArgument(snippetIdArg);
-        command.AddOption(titleOption);
-        command.AddOption(fileOption);
-        command.AddOption(privateOption);
-        command.AddOption(workspaceOption);
+        command.Arguments.Add(snippetIdArg);
+        command.Options.Add(titleOption);
+        command.Options.Add(fileOption);
+        command.Options.Add(privateOption);
+        command.Options.Add(workspaceOption);
 
         command.SetHandler((string snippetId, string? title, string[]? files, bool? isPrivate, string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
@@ -112,13 +112,13 @@ public static class SnippetCommand
     private static Command CreateDeleteCommand(IServiceProvider services)
     {
         var command = new Command("delete", "Delete a snippet");
-        var snippetIdArg = new Argument<string>("snippet-id", "Snippet ID");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
-        var yesOption = new Option<bool>(["--yes", "-y"], () => false, "Skip confirmation prompt");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var yesOption = new Option<bool>("--yes", "-y") { Description = "Skip confirmation prompt", DefaultValueFactory = _ => false };
 
-        command.AddArgument(snippetIdArg);
-        command.AddOption(workspaceOption);
-        command.AddOption(yesOption);
+        command.Arguments.Add(snippetIdArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(yesOption);
 
         command.SetHandler(async (string snippetId, string? workspace, bool yes) =>
         {
@@ -134,15 +134,15 @@ public static class SnippetCommand
     private static Command CreateFilesCommand(IServiceProvider services)
     {
         var command = new Command("files", "List or get files in a snippet");
-        var snippetIdArg = new Argument<string>("snippet-id", "Snippet ID");
-        var fileNameArg = new Argument<string?>("file-name", () => null, "File name to retrieve (optional)");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
-        var rawOption = new Option<bool>(["--raw", "-r"], () => false, "Output raw file content (only when file-name specified)");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var fileNameArg = new Argument<string?>("file-name") { Description = "File name to retrieve (optional)", DefaultValueFactory = _ => null };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var rawOption = new Option<bool>("--raw", "-r") { Description = "Output raw file content (only when file-name specified)", DefaultValueFactory = _ => false };
 
-        command.AddArgument(snippetIdArg);
-        command.AddArgument(fileNameArg);
-        command.AddOption(workspaceOption);
-        command.AddOption(rawOption);
+        command.Arguments.Add(snippetIdArg);
+        command.Arguments.Add(fileNameArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(rawOption);
 
         command.SetHandler(async (string snippetId, string? fileName, string? workspace, bool raw) =>
         {
@@ -168,15 +168,15 @@ public static class SnippetCommand
     private static Command CreateWatchCommand(IServiceProvider services)
     {
         var command = new Command("watch", "Watch/unwatch a snippet or list watchers");
-        var snippetIdArg = new Argument<string>("snippet-id", "Snippet ID");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
-        var listOption = new Option<bool>(["--list", "-l"], () => false, "List watchers instead of watching");
-        var unwatchOption = new Option<bool>(["--unwatch", "-u"], () => false, "Stop watching the snippet");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var listOption = new Option<bool>("--list", "-l") { Description = "List watchers instead of watching", DefaultValueFactory = _ => false };
+        var unwatchOption = new Option<bool>("--unwatch", "-u") { Description = "Stop watching the snippet", DefaultValueFactory = _ => false };
 
-        command.AddArgument(snippetIdArg);
-        command.AddOption(workspaceOption);
-        command.AddOption(listOption);
-        command.AddOption(unwatchOption);
+        command.Arguments.Add(snippetIdArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(listOption);
+        command.Options.Add(unwatchOption);
 
         command.SetHandler((string snippetId, string? workspace, bool list, bool unwatch) =>
             CommandRunner.RunJsonAsync(() =>
@@ -189,15 +189,15 @@ public static class SnippetCommand
     private static Command CreateCommentsCommand(IServiceProvider services)
     {
         var command = new Command("comments", "Manage snippet comments");
-        var snippetIdArg = new Argument<string>("snippet-id", "Snippet ID");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
-        var addOption = new Option<string?>(["--add", "-a"], "Add a new comment with this content");
-        var deleteOption = new Option<int?>(["--delete", "-d"], "Delete comment by ID");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var addOption = new Option<string?>("--add", "-a") { Description = "Add a new comment with this content" };
+        var deleteOption = new Option<int?>("--delete", "-d") { Description = "Delete comment by ID" };
 
-        command.AddArgument(snippetIdArg);
-        command.AddOption(workspaceOption);
-        command.AddOption(addOption);
-        command.AddOption(deleteOption);
+        command.Arguments.Add(snippetIdArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(addOption);
+        command.Options.Add(deleteOption);
 
         command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId) =>
             CommandRunner.RunJsonAsync(() =>

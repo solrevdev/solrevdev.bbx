@@ -13,55 +13,54 @@ public static class SrcCommand
         var workspaceOption = CommandOptions.CreateWorkspaceOption();
         var repoOption = CommandOptions.CreateRepoOption();
         var command = new Command("src", "Browse and write repository source files");
-        command.AddGlobalOption(workspaceOption);
-        command.AddGlobalOption(repoOption);
+        command.AddRecursiveOption(workspaceOption);
+        command.AddRecursiveOption(repoOption);
 
         var lsCommand = new Command("ls", "List entries at a path");
-        var lsRefOption = new Option<string>("--ref", "Commit hash or branch name") { IsRequired = true };
-        var lsPathArg = new Argument<string?>("path", () => null, "Directory path (defaults to repo root)");
-        var lsLimitOption = new Option<int>("--limit", () => 100, "Maximum entries to list");
-        lsCommand.AddOption(lsRefOption);
-        lsCommand.AddArgument(lsPathArg);
-        lsCommand.AddOption(lsLimitOption);
+        var lsRefOption = new Option<string>("--ref") { Description = "Commit hash or branch name" , Required = true };
+        var lsPathArg = new Argument<string?>("path") { Description = "Directory path (defaults to repo root)", DefaultValueFactory = _ => null };
+        var lsLimitOption = new Option<int>("--limit") { Description = "Maximum entries to list", DefaultValueFactory = _ => 100 };
+        lsCommand.Options.Add(lsRefOption);
+        lsCommand.Arguments.Add(lsPathArg);
+        lsCommand.Options.Add(lsLimitOption);
         lsCommand.SetHandler((string? workspace, string? repo, string @ref, string? path, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<LsSourceHandler>()
                     .HandleAsync(new LsSourceRequest(workspace, repo, @ref, path, limit), CancellationToken.None)),
             workspaceOption, repoOption, lsRefOption, lsPathArg, lsLimitOption);
-        command.AddCommand(lsCommand);
+        command.Subcommands.Add(lsCommand);
 
         var catCommand = new Command("cat", "Print file contents at a ref");
-        var catRefOption = new Option<string>("--ref", "Commit hash or branch name") { IsRequired = true };
-        var catPathArg = new Argument<string>("path", "File path");
-        catCommand.AddOption(catRefOption);
-        catCommand.AddArgument(catPathArg);
+        var catRefOption = new Option<string>("--ref") { Description = "Commit hash or branch name" , Required = true };
+        var catPathArg = new Argument<string>("path") { Description = "File path" };
+        catCommand.Options.Add(catRefOption);
+        catCommand.Arguments.Add(catPathArg);
         catCommand.SetHandler((string? workspace, string? repo, string @ref, string path) =>
             CommandRunner.RunRawAsync(() =>
                 services.GetRequiredService<CatSourceHandler>()
                     .HandleAsync(new CatSourceRequest(workspace, repo, @ref, path), CancellationToken.None)),
             workspaceOption, repoOption, catRefOption, catPathArg);
-        command.AddCommand(catCommand);
+        command.Subcommands.Add(catCommand);
 
         var writeCommand = new Command("write", "Commit one or more files to a branch");
-        var writeBranchOption = new Option<string>("--branch", "Target branch") { IsRequired = true };
-        var writeMessageOption = new Option<string>("--message", "Commit message") { IsRequired = true };
-        var writeFileOption = new Option<string[]>("--file",
-            "File mapping: <local>=<repo-path>. Repeat for multiple files.")
-        {
-            IsRequired = true,
+        var writeBranchOption = new Option<string>("--branch") { Description = "Target branch" , Required = true };
+        var writeMessageOption = new Option<string>("--message") { Description = "Commit message" , Required = true };
+        var writeFileOption = new Option<string[]>("--file")
+        { Description = "File mapping: <local>=<repo-path>. Repeat for multiple files." ,
+            Required = true,
             AllowMultipleArgumentsPerToken = false,
         };
-        var writeAuthorOption = new Option<string?>("--author", "Author override (e.g., 'Jane Doe <jane@example.com>')");
-        writeCommand.AddOption(writeBranchOption);
-        writeCommand.AddOption(writeMessageOption);
-        writeCommand.AddOption(writeFileOption);
-        writeCommand.AddOption(writeAuthorOption);
+        var writeAuthorOption = new Option<string?>("--author") { Description = "Author override (e.g., 'Jane Doe <jane@example.com>')" };
+        writeCommand.Options.Add(writeBranchOption);
+        writeCommand.Options.Add(writeMessageOption);
+        writeCommand.Options.Add(writeFileOption);
+        writeCommand.Options.Add(writeAuthorOption);
         writeCommand.SetHandler((string? workspace, string? repo, string branch, string message, string[] files, string? author) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<WriteSourceHandler>()
                     .HandleAsync(new WriteSourceRequest(workspace, repo, branch, message, files, author), CancellationToken.None)),
             workspaceOption, repoOption, writeBranchOption, writeMessageOption, writeFileOption, writeAuthorOption);
-        command.AddCommand(writeCommand);
+        command.Subcommands.Add(writeCommand);
 
         return command;
     }

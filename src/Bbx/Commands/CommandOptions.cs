@@ -6,15 +6,17 @@ internal static class CommandOptions
 {
     public static Option<string?> CreateWorkspaceOption()
     {
-        return new Option<string?>(
-            aliases: ["--workspace", "-w"],
-            description: "Bitbucket workspace (defaults to configured workspace)");
+        return new Option<string?>("--workspace", "-w")
+        {
+            Description = "Bitbucket workspace (defaults to configured workspace)",
+        };
     }
 
     public static Option<string?> CreateRepoOption()
     {
-        return new Option<string?>(
-            aliases: ["--repo", "-r"],
-            description: "Repository slug");
+        return new Option<string?>("--repo", "-r")
+        {
+            Description = "Repository slug",
+        };
     }
 }

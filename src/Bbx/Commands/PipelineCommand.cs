@@ -32,20 +32,20 @@ public static class PipelineCommand
     {
         var command = new Command("pipeline", "Manage Bitbucket Pipelines");
 
-        command.AddCommand(CreateListCommand(services));
-        command.AddCommand(CreateViewCommand(services));
-        command.AddCommand(CreateTriggerCommand(services));
-        command.AddCommand(CreateStopCommand(services));
-        command.AddCommand(CreateLogsCommand(services));
-        command.AddCommand(CreateStepsCommand(services));
-        command.AddCommand(CreateVariablesCommand(services));
-        command.AddCommand(CreateSchedulesCommand(services));
-        command.AddCommand(CreateCachesCommand(services));
-        command.AddCommand(CreateDeploymentsCommand(services));
-        command.AddCommand(CreateReportsCommand(services));
-        command.AddCommand(CreateTestReportsCommand(services));
-        command.AddCommand(CreateTestCasesCommand(services));
-        command.AddCommand(CreateOidcCommand(services));
+        command.Subcommands.Add(CreateListCommand(services));
+        command.Subcommands.Add(CreateViewCommand(services));
+        command.Subcommands.Add(CreateTriggerCommand(services));
+        command.Subcommands.Add(CreateStopCommand(services));
+        command.Subcommands.Add(CreateLogsCommand(services));
+        command.Subcommands.Add(CreateStepsCommand(services));
+        command.Subcommands.Add(CreateVariablesCommand(services));
+        command.Subcommands.Add(CreateSchedulesCommand(services));
+        command.Subcommands.Add(CreateCachesCommand(services));
+        command.Subcommands.Add(CreateDeploymentsCommand(services));
+        command.Subcommands.Add(CreateReportsCommand(services));
+        command.Subcommands.Add(CreateTestReportsCommand(services));
+        command.Subcommands.Add(CreateTestCasesCommand(services));
+        command.Subcommands.Add(CreateOidcCommand(services));
 
         return command;
     }
@@ -53,48 +53,48 @@ public static class PipelineCommand
     private static Command CreateReportsCommand(IServiceProvider services)
     {
         var reportsCommand = new Command("reports", "Pipeline report metadata stored against a commit");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        reportsCommand.AddGlobalOption(workspaceOption);
-        reportsCommand.AddGlobalOption(repoOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        reportsCommand.AddRecursiveOption(workspaceOption);
+        reportsCommand.AddRecursiveOption(repoOption);
 
         var listCommand = new Command("list", "List reports on a commit");
-        var listHashArg = new Argument<string>("hash", "Commit hash");
-        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum reports to list");
-        listCommand.AddArgument(listHashArg);
-        listCommand.AddOption(listLimitOption);
+        var listHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var listLimitOption = new Option<int>("--limit") { Description = "Maximum reports to list", DefaultValueFactory = _ => 25 };
+        listCommand.Arguments.Add(listHashArg);
+        listCommand.Options.Add(listLimitOption);
         listCommand.SetHandler((string? workspace, string? repo, string hash, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineReportsHandler>()
                     .HandleAsync(new ListPipelineReportsRequest(workspace, repo, hash, limit), CancellationToken.None)),
             workspaceOption, repoOption, listHashArg, listLimitOption);
-        reportsCommand.AddCommand(listCommand);
+        reportsCommand.Subcommands.Add(listCommand);
 
         var viewCommand = new Command("view", "View a single report on a commit");
-        var viewHashArg = new Argument<string>("hash", "Commit hash");
-        var viewReportIdArg = new Argument<string>("report-id", "Report UUID or external ID");
-        viewCommand.AddArgument(viewHashArg);
-        viewCommand.AddArgument(viewReportIdArg);
+        var viewHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var viewReportIdArg = new Argument<string>("report-id") { Description = "Report UUID or external ID" };
+        viewCommand.Arguments.Add(viewHashArg);
+        viewCommand.Arguments.Add(viewReportIdArg);
         viewCommand.SetHandler((string? workspace, string? repo, string hash, string reportId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewPipelineReportHandler>()
                     .HandleAsync(new ViewPipelineReportRequest(workspace, repo, hash, reportId), CancellationToken.None)),
             workspaceOption, repoOption, viewHashArg, viewReportIdArg);
-        reportsCommand.AddCommand(viewCommand);
+        reportsCommand.Subcommands.Add(viewCommand);
 
         var annotationsCommand = new Command("annotations", "List annotations on a report");
-        var annHashArg = new Argument<string>("hash", "Commit hash");
-        var annReportIdArg = new Argument<string>("report-id", "Report UUID or external ID");
-        var annLimitOption = new Option<int>("--limit", () => 100, "Maximum annotations to list");
-        annotationsCommand.AddArgument(annHashArg);
-        annotationsCommand.AddArgument(annReportIdArg);
-        annotationsCommand.AddOption(annLimitOption);
+        var annHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var annReportIdArg = new Argument<string>("report-id") { Description = "Report UUID or external ID" };
+        var annLimitOption = new Option<int>("--limit") { Description = "Maximum annotations to list", DefaultValueFactory = _ => 100 };
+        annotationsCommand.Arguments.Add(annHashArg);
+        annotationsCommand.Arguments.Add(annReportIdArg);
+        annotationsCommand.Options.Add(annLimitOption);
         annotationsCommand.SetHandler((string? workspace, string? repo, string hash, string reportId, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListReportAnnotationsHandler>()
                     .HandleAsync(new ListReportAnnotationsRequest(workspace, repo, hash, reportId, limit), CancellationToken.None)),
             workspaceOption, repoOption, annHashArg, annReportIdArg, annLimitOption);
-        reportsCommand.AddCommand(annotationsCommand);
+        reportsCommand.Subcommands.Add(annotationsCommand);
 
         return reportsCommand;
     }
@@ -103,14 +103,14 @@ public static class PipelineCommand
     {
         var command = new Command("test-reports",
             "Show the test report metadata for a pipeline step");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var pipelineUuidArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
-        var stepUuidArg = new Argument<string>("step-uuid", "Step UUID");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(pipelineUuidArg);
-        command.AddArgument(stepUuidArg);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var pipelineUuidArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID" };
+        var stepUuidArg = new Argument<string>("step-uuid") { Description = "Step UUID" };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(pipelineUuidArg);
+        command.Arguments.Add(stepUuidArg);
         command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListTestReportsHandler>()
@@ -123,16 +123,16 @@ public static class PipelineCommand
     {
         var command = new Command("test-cases",
             "List test cases for a pipeline step's test report");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var pipelineUuidArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
-        var stepUuidArg = new Argument<string>("step-uuid", "Step UUID");
-        var limitOption = new Option<int>("--limit", () => 200, "Maximum test cases to list");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(pipelineUuidArg);
-        command.AddArgument(stepUuidArg);
-        command.AddOption(limitOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var pipelineUuidArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID" };
+        var stepUuidArg = new Argument<string>("step-uuid") { Description = "Step UUID" };
+        var limitOption = new Option<int>("--limit") { Description = "Maximum test cases to list", DefaultValueFactory = _ => 200 };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(pipelineUuidArg);
+        command.Arguments.Add(stepUuidArg);
+        command.Options.Add(limitOption);
         command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListTestCasesHandler>()
@@ -144,10 +144,10 @@ public static class PipelineCommand
     private static Command CreateOidcCommand(IServiceProvider services)
     {
         var oidcCommand = new Command("oidc", "Pipelines OIDC discovery and JWKS");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        oidcCommand.AddGlobalOption(workspaceOption);
-        oidcCommand.AddGlobalOption(repoOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        oidcCommand.AddRecursiveOption(workspaceOption);
+        oidcCommand.AddRecursiveOption(repoOption);
 
         var configCommand = new Command("config", "Show the OpenID provider configuration");
         configCommand.SetHandler((string? workspace, string? repo) =>
@@ -155,7 +155,7 @@ public static class PipelineCommand
                 services.GetRequiredService<OidcConfigHandler>()
                     .HandleAsync(new OidcConfigRequest(workspace, repo), CancellationToken.None)),
             workspaceOption, repoOption);
-        oidcCommand.AddCommand(configCommand);
+        oidcCommand.Subcommands.Add(configCommand);
 
         var keysCommand = new Command("keys", "Show the JWKS used to verify pipeline OIDC tokens");
         keysCommand.SetHandler((string? workspace, string? repo) =>
@@ -163,7 +163,7 @@ public static class PipelineCommand
                 services.GetRequiredService<OidcKeysHandler>()
                     .HandleAsync(new OidcKeysRequest(workspace, repo), CancellationToken.None)),
             workspaceOption, repoOption);
-        oidcCommand.AddCommand(keysCommand);
+        oidcCommand.Subcommands.Add(keysCommand);
 
         return oidcCommand;
     }
@@ -171,19 +171,19 @@ public static class PipelineCommand
     private static Command CreateListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List pipelines for a repository");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var statusOption = new Option<string?>("--status", "Filter by status (PENDING, BUILDING, COMPLETED, HALTED, FAILED, SUCCESSFUL, STOPPED)");
-        var sortOption = new Option<string>("--sort", () => "-created_on", "Sort field (prefix with - for descending)");
-        var limitOption = new Option<int>("--limit", () => 25, "Maximum number of pipelines to return");
-        var targetBranchOption = new Option<string?>("--branch", "Filter by target branch");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var statusOption = new Option<string?>("--status") { Description = "Filter by status (PENDING, BUILDING, COMPLETED, HALTED, FAILED, SUCCESSFUL, STOPPED)" };
+        var sortOption = new Option<string>("--sort") { Description = "Sort field (prefix with - for descending)", DefaultValueFactory = _ => "-created_on" };
+        var limitOption = new Option<int>("--limit") { Description = "Maximum number of pipelines to return", DefaultValueFactory = _ => 25 };
+        var targetBranchOption = new Option<string?>("--branch") { Description = "Filter by target branch" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddOption(statusOption);
-        command.AddOption(sortOption);
-        command.AddOption(limitOption);
-        command.AddOption(targetBranchOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Options.Add(statusOption);
+        command.Options.Add(sortOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(targetBranchOption);
 
         command.SetHandler((string? workspace, string? repo, string? status, string sort, int limit, string? branch) =>
             CommandRunner.RunJsonAsync(() =>
@@ -196,13 +196,13 @@ public static class PipelineCommand
     private static Command CreateViewCommand(IServiceProvider services)
     {
         var command = new Command("view", "View details of a specific pipeline");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var pipelineArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(pipelineArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(pipelineArg);
 
         command.SetHandler((string? workspace, string? repo, string pipelineUuid) =>
             CommandRunner.RunJsonAsync(() =>
@@ -215,21 +215,21 @@ public static class PipelineCommand
     private static Command CreateTriggerCommand(IServiceProvider services)
     {
         var command = new Command("trigger", "Trigger a new pipeline run");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var branchOption = new Option<string>("--branch", () => "main", "Branch to run pipeline on (also used as the PR source branch when --pull-request is set)");
-        var commitOption = new Option<string?>("--commit", "Specific commit hash to run on (branch trigger only)");
-        var patternOption = new Option<string?>("--pattern", "Custom pipeline pattern (selector) to run");
-        var pullRequestOption = new Option<string?>("--pull-request", "Trigger the pull-request pipeline for this PR id (uses --branch as the PR's source branch)");
-        var variablesOption = new Option<string[]>("--variable", "Pipeline variables in key=value format") { AllowMultipleArgumentsPerToken = true };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var branchOption = new Option<string>("--branch") { Description = "Branch to run pipeline on (also used as the PR source branch when --pull-request is set)", DefaultValueFactory = _ => "main" };
+        var commitOption = new Option<string?>("--commit") { Description = "Specific commit hash to run on (branch trigger only)" };
+        var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern (selector) to run" };
+        var pullRequestOption = new Option<string?>("--pull-request") { Description = "Trigger the pull-request pipeline for this PR id (uses --branch as the PR's source branch)" };
+        var variablesOption = new Option<string[]>("--variable") { Description = "Pipeline variables in key=value format" , AllowMultipleArgumentsPerToken = true };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddOption(branchOption);
-        command.AddOption(commitOption);
-        command.AddOption(patternOption);
-        command.AddOption(pullRequestOption);
-        command.AddOption(variablesOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Options.Add(branchOption);
+        command.Options.Add(commitOption);
+        command.Options.Add(patternOption);
+        command.Options.Add(pullRequestOption);
+        command.Options.Add(variablesOption);
 
         command.SetHandler((string? workspace, string? repo, string branch, string? commit, string? pattern, string? pullRequest, string[] variables) =>
             CommandRunner.RunJsonAsync(() =>
@@ -242,15 +242,15 @@ public static class PipelineCommand
     private static Command CreateStopCommand(IServiceProvider services)
     {
         var command = new Command("stop", "Stop a running pipeline");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID to stop");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var pipelineArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID to stop" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(pipelineArg);
-        command.AddOption(yesOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(pipelineArg);
+        command.Options.Add(yesOption);
 
         command.SetHandler(async (string? workspace, string? repo, string pipelineUuid, bool yes) =>
         {
@@ -266,17 +266,17 @@ public static class PipelineCommand
     private static Command CreateLogsCommand(IServiceProvider services)
     {
         var command = new Command("logs", "View logs for a pipeline step");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
-        var stepArg = new Argument<string>("step-uuid", "Step UUID");
-        var followOption = new Option<bool>("--follow", "Follow log output (not yet implemented)");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var pipelineArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID" };
+        var stepArg = new Argument<string>("step-uuid") { Description = "Step UUID" };
+        var followOption = new Option<bool>("--follow") { Description = "Follow log output (not yet implemented)" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(pipelineArg);
-        command.AddArgument(stepArg);
-        command.AddOption(followOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(pipelineArg);
+        command.Arguments.Add(stepArg);
+        command.Options.Add(followOption);
 
         command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid, bool follow) =>
             CommandRunner.RunJsonAsync(() =>
@@ -289,13 +289,13 @@ public static class PipelineCommand
     private static Command CreateStepsCommand(IServiceProvider services)
     {
         var command = new Command("steps", "List steps for a pipeline");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var pipelineArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(pipelineArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(pipelineArg);
 
         command.SetHandler((string? workspace, string? repo, string pipelineUuid) =>
             CommandRunner.RunJsonAsync(() =>
@@ -308,19 +308,19 @@ public static class PipelineCommand
     private static Command CreateVariablesCommand(IServiceProvider services)
     {
         var command = new Command("variables", "Manage pipeline variables");
-        command.AddCommand(CreateVariablesListCommand(services));
-        command.AddCommand(CreateVariablesAddCommand(services));
-        command.AddCommand(CreateVariablesDeleteCommand(services));
+        command.Subcommands.Add(CreateVariablesListCommand(services));
+        command.Subcommands.Add(CreateVariablesAddCommand(services));
+        command.Subcommands.Add(CreateVariablesDeleteCommand(services));
         return command;
     }
 
     private static Command CreateVariablesListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List pipeline variables");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineVariablesHandler>()
@@ -332,17 +332,17 @@ public static class PipelineCommand
     private static Command CreateVariablesAddCommand(IServiceProvider services)
     {
         var command = new Command("add", "Add a pipeline variable");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var keyOption = new Option<string>("--key", "Variable key") { IsRequired = true };
-        var valueOption = new Option<string>("--value", "Variable value") { IsRequired = true };
-        var securedOption = new Option<bool>("--secured", "Mark as secured (value hidden)");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var keyOption = new Option<string>("--key") { Description = "Variable key" , Required = true };
+        var valueOption = new Option<string>("--value") { Description = "Variable value" , Required = true };
+        var securedOption = new Option<bool>("--secured") { Description = "Mark as secured (value hidden)" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddOption(keyOption);
-        command.AddOption(valueOption);
-        command.AddOption(securedOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Options.Add(keyOption);
+        command.Options.Add(valueOption);
+        command.Options.Add(securedOption);
 
         command.SetHandler((string? workspace, string? repo, string key, string value, bool secured) =>
             CommandRunner.RunJsonAsync(() =>
@@ -355,15 +355,15 @@ public static class PipelineCommand
     private static Command CreateVariablesDeleteCommand(IServiceProvider services)
     {
         var command = new Command("delete", "Delete a pipeline variable");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var uuidArg = new Argument<string>("uuid", "Variable UUID to delete");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var uuidArg = new Argument<string>("uuid") { Description = "Variable UUID to delete" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(uuidArg);
-        command.AddOption(yesOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(uuidArg);
+        command.Options.Add(yesOption);
 
         command.SetHandler(async (string? workspace, string? repo, string uuid, bool yes) =>
         {
@@ -379,19 +379,19 @@ public static class PipelineCommand
     private static Command CreateSchedulesCommand(IServiceProvider services)
     {
         var command = new Command("schedules", "Manage pipeline schedules");
-        command.AddCommand(CreateSchedulesListCommand(services));
-        command.AddCommand(CreateSchedulesCreateCommand(services));
-        command.AddCommand(CreateSchedulesDeleteCommand(services));
+        command.Subcommands.Add(CreateSchedulesListCommand(services));
+        command.Subcommands.Add(CreateSchedulesCreateCommand(services));
+        command.Subcommands.Add(CreateSchedulesDeleteCommand(services));
         return command;
     }
 
     private static Command CreateSchedulesListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List pipeline schedules");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineSchedulesHandler>()
@@ -403,19 +403,19 @@ public static class PipelineCommand
     private static Command CreateSchedulesCreateCommand(IServiceProvider services)
     {
         var command = new Command("create", "Create a pipeline schedule");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var cronOption = new Option<string>("--cron", "Cron expression (e.g., '0 0 * * *')") { IsRequired = true };
-        var branchOption = new Option<string>("--branch", () => "main", "Target branch");
-        var patternOption = new Option<string?>("--pattern", "Custom pipeline pattern");
-        var enabledOption = new Option<bool>("--enabled", () => true, "Enable the schedule");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var cronOption = new Option<string>("--cron") { Description = "Cron expression (e.g., '0 0 * * *')" , Required = true };
+        var branchOption = new Option<string>("--branch") { Description = "Target branch", DefaultValueFactory = _ => "main" };
+        var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern" };
+        var enabledOption = new Option<bool>("--enabled") { Description = "Enable the schedule", DefaultValueFactory = _ => true };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddOption(cronOption);
-        command.AddOption(branchOption);
-        command.AddOption(patternOption);
-        command.AddOption(enabledOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Options.Add(cronOption);
+        command.Options.Add(branchOption);
+        command.Options.Add(patternOption);
+        command.Options.Add(enabledOption);
 
         command.SetHandler((string? workspace, string? repo, string cron, string branch, string? pattern, bool enabled) =>
             CommandRunner.RunJsonAsync(() =>
@@ -428,15 +428,15 @@ public static class PipelineCommand
     private static Command CreateSchedulesDeleteCommand(IServiceProvider services)
     {
         var command = new Command("delete", "Delete a pipeline schedule");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var uuidArg = new Argument<string>("uuid", "Schedule UUID to delete");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var uuidArg = new Argument<string>("uuid") { Description = "Schedule UUID to delete" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(uuidArg);
-        command.AddOption(yesOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(uuidArg);
+        command.Options.Add(yesOption);
 
         command.SetHandler(async (string? workspace, string? repo, string uuid, bool yes) =>
         {
@@ -452,18 +452,18 @@ public static class PipelineCommand
     private static Command CreateCachesCommand(IServiceProvider services)
     {
         var command = new Command("caches", "Manage pipeline caches");
-        command.AddCommand(CreateCachesListCommand(services));
-        command.AddCommand(CreateCachesClearCommand(services));
+        command.Subcommands.Add(CreateCachesListCommand(services));
+        command.Subcommands.Add(CreateCachesClearCommand(services));
         return command;
     }
 
     private static Command CreateCachesListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List pipeline caches");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineCachesHandler>()
@@ -475,15 +475,15 @@ public static class PipelineCommand
     private static Command CreateCachesClearCommand(IServiceProvider services)
     {
         var command = new Command("clear", "Clear a pipeline cache");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var nameArg = new Argument<string>("name", "Cache name to clear");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var nameArg = new Argument<string>("name") { Description = "Cache name to clear" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
 
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(nameArg);
-        command.AddOption(yesOption);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(nameArg);
+        command.Options.Add(yesOption);
 
         command.SetHandler(async (string? workspace, string? repo, string name, bool yes) =>
         {
@@ -499,18 +499,18 @@ public static class PipelineCommand
     private static Command CreateDeploymentsCommand(IServiceProvider services)
     {
         var command = new Command("deployments", "Manage deployment environments");
-        command.AddCommand(CreateDeploymentsListCommand(services));
-        command.AddCommand(CreateDeploymentsViewCommand(services));
+        command.Subcommands.Add(CreateDeploymentsListCommand(services));
+        command.Subcommands.Add(CreateDeploymentsViewCommand(services));
         return command;
     }
 
     private static Command CreateDeploymentsListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List deployment environments");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListDeploymentEnvironmentsHandler>()
@@ -522,12 +522,12 @@ public static class PipelineCommand
     private static Command CreateDeploymentsViewCommand(IServiceProvider services)
     {
         var command = new Command("view", "View deployment environment details");
-        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
-        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
-        var envArg = new Argument<string>("environment", "Environment UUID or name");
-        command.AddOption(workspaceOption);
-        command.AddOption(repoOption);
-        command.AddArgument(envArg);
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
+        var envArg = new Argument<string>("environment") { Description = "Environment UUID or name" };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Arguments.Add(envArg);
         command.SetHandler((string? workspace, string? repo, string environment) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewDeploymentEnvironmentHandler>()

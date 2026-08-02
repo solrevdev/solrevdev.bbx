@@ -14,37 +14,37 @@ public static class DownloadCommand
         var workspaceOption = CommandOptions.CreateWorkspaceOption();
         var repoOption = CommandOptions.CreateRepoOption();
         var command = new Command("download", "Manage repository download artifacts");
-        command.AddGlobalOption(workspaceOption);
-        command.AddGlobalOption(repoOption);
+        command.AddRecursiveOption(workspaceOption);
+        command.AddRecursiveOption(repoOption);
 
         var listCommand = new Command("list", "List downloads");
-        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum downloads to list");
-        listCommand.AddOption(listLimitOption);
+        var listLimitOption = new Option<int>("--limit") { Description = "Maximum downloads to list", DefaultValueFactory = _ => 25 };
+        listCommand.Options.Add(listLimitOption);
         listCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListDownloadsHandler>()
                     .HandleAsync(new ListDownloadsRequest(workspace, repo, limit), CancellationToken.None)),
             workspaceOption, repoOption, listLimitOption);
-        command.AddCommand(listCommand);
+        command.Subcommands.Add(listCommand);
 
         var uploadCommand = new Command("upload", "Upload a new download artifact");
-        var uploadFileOption = new Option<string>("--file", "Path to the local file to upload") { IsRequired = true };
-        var uploadNameOption = new Option<string?>("--name", "Name on Bitbucket (defaults to local filename)");
-        uploadCommand.AddOption(uploadFileOption);
-        uploadCommand.AddOption(uploadNameOption);
+        var uploadFileOption = new Option<string>("--file") { Description = "Path to the local file to upload" , Required = true };
+        var uploadNameOption = new Option<string?>("--name") { Description = "Name on Bitbucket (defaults to local filename)" };
+        uploadCommand.Options.Add(uploadFileOption);
+        uploadCommand.Options.Add(uploadNameOption);
         uploadCommand.SetHandler((string? workspace, string? repo, string filePath, string? name) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UploadDownloadHandler>()
                     .HandleAsync(new UploadDownloadRequest(workspace, repo, filePath, name), CancellationToken.None)),
             workspaceOption, repoOption, uploadFileOption, uploadNameOption);
-        command.AddCommand(uploadCommand);
+        command.Subcommands.Add(uploadCommand);
 
         var getCommand = new Command("get", "Download an artifact");
-        var getFilenameArg = new Argument<string>("filename", "Artifact filename on Bitbucket");
-        var getOutputOption = new Option<string?>("--output",
-            "Write to <path> instead of stdout (and emit JSON metadata)");
-        getCommand.AddArgument(getFilenameArg);
-        getCommand.AddOption(getOutputOption);
+        var getFilenameArg = new Argument<string>("filename") { Description = "Artifact filename on Bitbucket" };
+        var getOutputOption = new Option<string?>("--output")
+        { Description = "Write to <path> instead of stdout (and emit JSON metadata)" };
+        getCommand.Arguments.Add(getFilenameArg);
+        getCommand.Options.Add(getOutputOption);
         getCommand.SetHandler(async (string? workspace, string? repo, string filename, string? output) =>
         {
             if (!string.IsNullOrEmpty(output))
@@ -70,13 +70,13 @@ public static class DownloadCommand
                 services.GetRequiredService<GetDownloadHandler>()
                     .HandleAsync(new GetDownloadRequest(workspace, repo, filename, null), CancellationToken.None));
         }, workspaceOption, repoOption, getFilenameArg, getOutputOption);
-        command.AddCommand(getCommand);
+        command.Subcommands.Add(getCommand);
 
         var deleteCommand = new Command("delete", "Delete a download artifact");
-        var deleteFilenameArg = new Argument<string>("filename", "Artifact filename");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation");
-        deleteCommand.AddArgument(deleteFilenameArg);
-        deleteCommand.AddOption(yesOption);
+        var deleteFilenameArg = new Argument<string>("filename") { Description = "Artifact filename" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        deleteCommand.Arguments.Add(deleteFilenameArg);
+        deleteCommand.Options.Add(yesOption);
         deleteCommand.SetHandler(async (string? workspace, string? repo, string filename, bool yes) =>
         {
             if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete download '{filename}'? [y/N]: "))
@@ -85,7 +85,7 @@ public static class DownloadCommand
                 services.GetRequiredService<DeleteDownloadHandler>()
                     .HandleAsync(new DeleteDownloadRequest(workspace, repo, filename), CancellationToken.None));
         }, workspaceOption, repoOption, deleteFilenameArg, yesOption);
-        command.AddCommand(deleteCommand);
+        command.Subcommands.Add(deleteCommand);
 
         return command;
     }

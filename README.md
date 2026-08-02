@@ -97,7 +97,7 @@ scopes at https://bitbucket.org/account/settings/api-tokens/
 
 ### In CI
 
-Write the config file directly — no prompting:
+Write the config file directly so nothing prompts:
 
 ```yaml
 - name: Configure bbx
@@ -143,7 +143,7 @@ bbx pr list -r myrepo --state OPEN | jq -r '.pull_requests[].title'
 
 Prompts, warnings and errors go to stderr, so the pipe above stays clean.
 
-**2. Exit `0` on success, `1` on failure** — a bad argument, missing credentials, or any API error.
+**2. Exit `0` on success, `1` on failure.** That covers a bad argument, missing credentials, and any API error.
 
 ```bash
 if ! prs=$(bbx pr list -r myrepo --state OPEN); then
@@ -168,7 +168,7 @@ Every group takes `-w`/`--workspace` and, where relevant, `-r`/`--repo`.
 Destructive commands prompt unless you pass `--yes`.
 
 <details open>
-<summary><strong>auth</strong> — credentials</summary>
+<summary><strong>auth</strong>: credentials</summary>
 
 ```bash
 bbx auth login                    # prompt for email + API token
@@ -181,7 +181,7 @@ bbx auth logout                   # clear stored credentials
 </details>
 
 <details>
-<summary><strong>repo</strong> — repositories, hooks, deploy keys, reviewers</summary>
+<summary><strong>repo</strong>: repositories, hooks, deploy keys, reviewers</summary>
 
 ```bash
 bbx repo list -w myws --limit 10
@@ -202,7 +202,7 @@ bbx repo branching-model view|settings|update -w myws -r myrepo
 </details>
 
 <details>
-<summary><strong>pr</strong> — pull requests, tasks, reviews</summary>
+<summary><strong>pr</strong>: pull requests, tasks, reviews</summary>
 
 ```bash
 bbx pr list -w myws -r myrepo --state OPEN --limit 25
@@ -229,7 +229,7 @@ Merge strategies: `merge_commit` (default), `squash`, `fast_forward`.
 </details>
 
 <details>
-<summary><strong>branch</strong> — branches, restrictions, tags</summary>
+<summary><strong>branch</strong>: branches, restrictions, tags</summary>
 
 ```bash
 bbx branch list -w myws -r myrepo --limit 25
@@ -246,7 +246,7 @@ bbx branch tag list|view|create|delete -w myws -r myrepo
 </details>
 
 <details>
-<summary><strong>commit</strong> — history, diffs, build statuses</summary>
+<summary><strong>commit</strong>: history, diffs, build statuses</summary>
 
 ```bash
 bbx commit list -w myws -r myrepo --limit 25
@@ -263,7 +263,7 @@ bbx commit status update <hash> --key ci --state FAILED --url https://ci/1 -w my
 </details>
 
 <details>
-<summary><strong>src</strong> — browse and write files</summary>
+<summary><strong>src</strong>: browse and write files</summary>
 
 ```bash
 bbx src ls --ref main -w myws -r myrepo
@@ -276,7 +276,7 @@ bbx src write --branch main --message "docs: update" --file ./local.md=README.md
 </details>
 
 <details>
-<summary><strong>pipeline</strong> — runs, logs, variables, schedules</summary>
+<summary><strong>pipeline</strong>: runs, logs, variables, schedules</summary>
 
 ```bash
 bbx pipeline list -w myws -r myrepo --limit 10
@@ -300,7 +300,7 @@ UUIDs include the braces. Quote them so your shell doesn't expand them.
 </details>
 
 <details>
-<summary><strong>download</strong> — repository artifacts</summary>
+<summary><strong>download</strong>: repository artifacts</summary>
 
 ```bash
 bbx download list -w myws -r myrepo
@@ -311,7 +311,7 @@ bbx download delete build.zip --yes -w myws -r myrepo
 </details>
 
 <details>
-<summary><strong>workspace</strong> — members, hooks, projects</summary>
+<summary><strong>workspace</strong>: members, hooks, projects</summary>
 
 ```bash
 bbx workspace view myws
@@ -355,7 +355,7 @@ bbx issue comment|comments <id> -w myws -r myrepo
 > [!IMPORTANT]
 > `bbx workspace list` and `bbx user permissions workspaces|repositories` return
 > **HTTP 410 Gone**. Atlassian removed the cross-workspace discovery endpoints
-> under CHANGE-2770. Nothing in `bbx` can bring them back — name the workspace,
+> under CHANGE-2770. Nothing in `bbx` can bring them back. Name the workspace,
 > or set one with `bbx auth set-workspace`.
 
 ## Recipes
@@ -454,7 +454,7 @@ Layout:
 
 ```
 src/Bbx/
-  Api/            BitbucketClient — pagination, redirects, error shaping
+  Api/            BitbucketClient: pagination, redirects, error shaping
   Auth/           credential storage and the auth gate
   Commands/       System.CommandLine wiring only, no business logic
   Features/       one folder per verb: request + handler

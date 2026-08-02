@@ -5,39 +5,41 @@ The format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.
 this project uses [Conventional Commits](https://www.conventionalcommits.org/),
 so commit history is the source of truth for the fine grain.
 
-Versioning follows [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`.
+Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 ## [Unreleased]
 
 (none.)
 
-## [2.0.0] — API tokens, wider coverage, a test suite
+## [1.0.0] first public release
 
-First stable release. Breaking against the unreleased 1.x prototype.
+Nothing before this was published to NuGet, so this is the baseline rather
+than a break from anything.
 
-### Removed
+### Auth
 
-- **OAuth.** `bbx auth login --oauth`, `bbx auth setup-oauth` and
-  `bbx auth refresh` are gone, along with the stored consumer and tokens.
-  Bitbucket's OAuth is bring-your-own-consumer: every user had to create a
-  private consumer, set a callback URL and copy a key and secret before
-  logging in once. That is more work than pasting an API token and needs
-  workspace admin rights. Anyone who logged in with OAuth must run
-  `bbx auth login` again.
-- **App passwords.** Bitbucket retires them on 2026-06-09.
+Atlassian API tokens are the only supported credential. OAuth was built and
+then removed before release: Bitbucket's OAuth is bring-your-own-consumer,
+so every user would have had to create a private consumer, set a callback
+URL and copy a key and secret before logging in once. That is more work than
+pasting a token, and it needs workspace admin rights. App passwords are not
+supported either; Bitbucket retires them on 2026-06-09.
+
+### Known gaps
+
 - `bbx workspace list` and `bbx user permissions {workspaces,repositories}`
-  still exist but return HTTP 410: Atlassian withdrew the underlying
-  endpoints under CHANGE-2770.
+  return HTTP 410. Atlassian withdrew those endpoints under CHANGE-2770.
+- Bitbucket Issues shut down on 2026-08-20; the `issue` group goes with them.
 
-### Added
+### Included
 
 - Coverage for source files (`src`), downloads, tags, deploy keys, default
   reviewers, branching models, PR tasks, commit statuses, pipeline reports
   and test cases, OIDC, workspace hooks and workspace projects.
 - `--json-compact` (and `BBX_JSON_COMPACT=1`) for single-line JSON.
-- A test project: 190 tests over a fake HTTP handler, wired into CI.
+- A test project: 205 tests over a fake HTTP handler, wired into CI.
 
-### Fixed
+### Fixed before release
 
 - `bbx pipeline logs` returned HTTP 406. Non-JSON GETs now send
   `Accept: */*`; the log endpoint serves `application/octet-stream` and

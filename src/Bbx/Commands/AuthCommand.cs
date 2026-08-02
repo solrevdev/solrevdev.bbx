@@ -15,11 +15,11 @@ public static class AuthCommand
     {
         var command = new Command("auth", "Manage authentication");
 
-        command.AddCommand(BuildLoginCommand(services));
-        command.AddCommand(BuildStatusCommand(services));
-        command.AddCommand(BuildLogoutCommand(services));
-        command.AddCommand(BuildTokenCommand(services));
-        command.AddCommand(BuildSetWorkspaceCommand(services));
+        command.Subcommands.Add(BuildLoginCommand(services));
+        command.Subcommands.Add(BuildStatusCommand(services));
+        command.Subcommands.Add(BuildLogoutCommand(services));
+        command.Subcommands.Add(BuildTokenCommand(services));
+        command.Subcommands.Add(BuildSetWorkspaceCommand(services));
 
         return command;
     }
@@ -30,14 +30,14 @@ public static class AuthCommand
 
         // Kept as flags so existing scripts and muscle memory still work; the
         // token flow is the only one, so passing it changes nothing.
-        var apiTokenOption = new Option<bool>("--api-token", "Use an Atlassian API token (the only supported method)");
-        var emailOption = new Option<string?>("--email", "Atlassian account email (prompted for when omitted)");
-        var tokenOption = new Option<string?>("--token",
-            "API token. Prefer omitting it and letting bbx prompt, or pipe it in, so it stays out of your shell history.");
+        var apiTokenOption = new Option<bool>("--api-token") { Description = "Use an Atlassian API token (the only supported method)" };
+        var emailOption = new Option<string?>("--email") { Description = "Atlassian account email (prompted for when omitted)" };
+        var tokenOption = new Option<string?>("--token")
+        { Description = "API token. Prefer omitting it and letting bbx prompt, or pipe it in, so it stays out of your shell history." };
 
-        loginCommand.AddOption(apiTokenOption);
-        loginCommand.AddOption(emailOption);
-        loginCommand.AddOption(tokenOption);
+        loginCommand.Options.Add(apiTokenOption);
+        loginCommand.Options.Add(emailOption);
+        loginCommand.Options.Add(tokenOption);
 
         loginCommand.SetHandler(async (string? email, string? token) =>
         {
@@ -106,8 +106,8 @@ public static class AuthCommand
     private static Command BuildSetWorkspaceCommand(IServiceProvider services)
     {
         var setWorkspaceCommand = new Command("set-workspace", "Set default workspace");
-        var workspaceArg = new Argument<string>("workspace", "Workspace slug to set as default");
-        setWorkspaceCommand.AddArgument(workspaceArg);
+        var workspaceArg = new Argument<string>("workspace") { Description = "Workspace slug to set as default" };
+        setWorkspaceCommand.Arguments.Add(workspaceArg);
         setWorkspaceCommand.SetHandler(async (string workspace) =>
         {
             await CommandRunner.RunActionNoGateAsync(() =>

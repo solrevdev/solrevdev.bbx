@@ -23,7 +23,8 @@ src/Bbx/
   Program.cs        entry point; builds DI once, owns the exit-code contract
   Api/              BitbucketClient, JsonElementExtensions
   Auth/             ICredentialStore, CredentialManager, IAuthProvider, AuthGate
-  Commands/         System.CommandLine wiring ONLY — no business logic
+  Commands/         System.CommandLine wiring ONLY, no business logic
+    CommandBinding.cs  SetHandler/Bound<T> binding over System.CommandLine 2.0
   Features/<Area>/<Verb>/   Request record + Handler, co-located
   Composition/      ServiceRegistration (DI), JsonOptions
 tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureConsole
@@ -33,7 +34,7 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
 
 1. **Handlers hold the logic.** A file in `Commands/` parses arguments and calls
    a handler through `CommandRunner`. Nothing else.
-2. **Endpoints carry no leading slash** — `NormalizeEndpoint` strips one, because
+2. **Endpoints carry no leading slash.** `NormalizeEndpoint` strips one, because
    a leading `/` breaks `HttpClient` BaseAddress resolution. Absolute URLs pass
    through unchanged (pagination `next` links).
 3. **Use `TryGetObject`, not `TryGetProperty`, for nested objects.**
@@ -49,17 +50,23 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
 6. **`PostAsync`/`PutAsync` tolerate an empty body.** A 204 deserialised as `""`
    throws.
 7. **Exit codes.** A value returned from `Main` overrides `Environment.ExitCode`,
-   so `Main` keeps a non-zero `InvokeAsync` result and otherwise returns what the
-   handler set. A top-level `UseExceptionHandler` prints the message rather than
-   a stack trace.
+   so `Main` keeps a non-zero invocation result and otherwise returns what the
+   handler set. System.CommandLine 2.0 has no built-in exception handler, so
+   `Main` wraps the invocation and prints the message rather than a stack trace.
 8. **Errors carry context.** `EnsureSuccessAsync` appends the HTTP status, names
    missing scopes from `error.detail.required`, and prints
    `error.data.announcement_url` for deprecations. `BitbucketErrorDetail.Detail`
-   must stay a `JsonElement` — it is an object for scope failures and a string
+   must stay a `JsonElement`, because it is an object for scope failures and a string
    everywhere else.
 9. **Destructive verbs take `--yes`** and confirm otherwise.
 10. **Tests do not run in parallel** (`AssemblyInfo.cs`), because several capture
     `Console` or touch `Environment.ExitCode`.
+11. **Commands are bound through `CommandBinding`.** 2.0 replaced the typed
+    `SetHandler(handler, symbols…)` family with a single `SetAction(ParseResult…)`
+    callback. `Commands/CommandBinding.cs` keeps the declarative shape and the
+    compile-time check that each bound symbol matches its handler parameter.
+    A broken command definition still compiles, so parse-level behaviour is
+    covered by `CommandSurfaceTests`.
 
 ## Auth
 
@@ -76,7 +83,7 @@ workspace admin rights a contributor may not have.
 
 ## Endpoints Bitbucket has withdrawn
 
-Do not try to "fix" these — they return 410 Gone:
+Do not try to "fix" these. They return 410 Gone:
 
 - `/2.0/workspaces` (`bbx workspace list`)
 - `/2.0/user/permissions/{workspaces,repositories}`
@@ -88,8 +95,8 @@ with them.
 
 ## Adding a command
 
-1. `Features/<Area>/<Verb>/<Verb>Request.cs` — a record.
-2. `Features/<Area>/<Verb>/<Verb>Handler.cs` — constructor-inject
+1. `Features/<Area>/<Verb>/<Verb>Request.cs`, a record.
+2. `Features/<Area>/<Verb>/<Verb>Handler.cs`: constructor-inject
    `BitbucketClient` and `CredentialManager`; resolve workspace/repo through
    `Resolve`; return an anonymous object.
 3. Register it in `ServiceRegistration.RegisterHandlers`.

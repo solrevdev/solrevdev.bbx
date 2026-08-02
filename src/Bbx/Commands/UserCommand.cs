@@ -18,52 +18,55 @@ public static class UserCommand
         var command = new Command("user", "User account, emails, permissions, SSH keys");
 
         var emailsCommand = new Command("emails", "List your account email addresses");
-        var emailsLimitOption = new Option<int>("--limit", () => 25, "Maximum emails to list");
-        emailsCommand.AddOption(emailsLimitOption);
+        var emailsLimitOption = new Option<int>("--limit") { Description = "Maximum emails to list", DefaultValueFactory = _ => 25 };
+        emailsCommand.Options.Add(emailsLimitOption);
         emailsCommand.SetHandler((int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListUserEmailsHandler>()
                     .HandleAsync(new ListUserEmailsRequest(limit), CancellationToken.None)),
             emailsLimitOption);
-        command.AddCommand(emailsCommand);
+        command.Subcommands.Add(emailsCommand);
 
         var permissionsCommand = new Command("permissions",
             "List your workspace and repository permissions");
 
         var permsWsCommand = new Command("workspaces", "List your workspace memberships and roles");
-        var permsWsLimitOption = new Option<int>("--limit", () => 50, "Maximum entries to list");
-        permsWsCommand.AddOption(permsWsLimitOption);
+        var permsWsLimitOption = new Option<int>("--limit") { Description = "Maximum entries to list", DefaultValueFactory = _ => 50 };
+        permsWsCommand.Options.Add(permsWsLimitOption);
         permsWsCommand.SetHandler((int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListUserWorkspacePermissionsHandler>()
                     .HandleAsync(new ListUserWorkspacePermissionsRequest(limit), CancellationToken.None)),
             permsWsLimitOption);
-        permissionsCommand.AddCommand(permsWsCommand);
+        permissionsCommand.Subcommands.Add(permsWsCommand);
 
         var permsRepoCommand = new Command("repositories", "List your repository-level permissions");
-        var permsRepoLimitOption = new Option<int>("--limit", () => 50, "Maximum entries to list");
-        permsRepoCommand.AddOption(permsRepoLimitOption);
+        var permsRepoLimitOption = new Option<int>("--limit") { Description = "Maximum entries to list", DefaultValueFactory = _ => 50 };
+        permsRepoCommand.Options.Add(permsRepoLimitOption);
         permsRepoCommand.SetHandler((int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListUserRepositoryPermissionsHandler>()
                     .HandleAsync(new ListUserRepositoryPermissionsRequest(limit), CancellationToken.None)),
             permsRepoLimitOption);
-        permissionsCommand.AddCommand(permsRepoCommand);
+        permissionsCommand.Subcommands.Add(permsRepoCommand);
 
-        command.AddCommand(permissionsCommand);
+        command.Subcommands.Add(permissionsCommand);
 
         var viewCommand = new Command("view", "View a user profile (defaults to the authenticated account)");
-        var viewUserArg = new Argument<string>("selected-user", () => string.Empty,
-            "Account UUID or account ID (defaults to the authenticated account). Usernames are no longer accepted by Bitbucket.");
-        viewCommand.AddArgument(viewUserArg);
+        var viewUserArg = new Argument<string>("selected-user")
+        {
+            Description = "Account UUID or account ID (defaults to the authenticated account). Usernames are no longer accepted by Bitbucket.",
+            DefaultValueFactory = _ => string.Empty,
+        };
+        viewCommand.Arguments.Add(viewUserArg);
         viewCommand.SetHandler((string selectedUser) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewUserHandler>()
                     .HandleAsync(new ViewUserRequest(selectedUser), CancellationToken.None)),
             viewUserArg);
-        command.AddCommand(viewCommand);
+        command.Subcommands.Add(viewCommand);
 
-        command.AddCommand(CreateSshKeysCommand(services));
+        command.Subcommands.Add(CreateSshKeysCommand(services));
 
         return command;
     }
@@ -71,47 +74,49 @@ public static class UserCommand
     private static Command CreateSshKeysCommand(IServiceProvider services)
     {
         var sshCommand = new Command("ssh-keys", "Manage account SSH keys");
-        var userOption = new Option<string?>(["--user", "-u"],
-            "User selector (UUID, account ID, username); defaults to 'me'");
-        sshCommand.AddGlobalOption(userOption);
+        var userOption = new Option<string?>("--user", "-u")
+        {
+            Description = "User selector (UUID or account ID); defaults to the authenticated account",
+        };
+        sshCommand.AddRecursiveOption(userOption);
 
         var listCommand = new Command("list", "List SSH keys");
-        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum keys to list");
-        listCommand.AddOption(listLimitOption);
+        var listLimitOption = new Option<int>("--limit") { Description = "Maximum keys to list", DefaultValueFactory = _ => 25 };
+        listCommand.Options.Add(listLimitOption);
         listCommand.SetHandler((string? user, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListSshKeysHandler>()
                     .HandleAsync(new ListSshKeysRequest(user ?? "me", limit), CancellationToken.None)),
             userOption, listLimitOption);
-        sshCommand.AddCommand(listCommand);
+        sshCommand.Subcommands.Add(listCommand);
 
         var viewCommand = new Command("view", "View an SSH key");
-        var viewIdArg = new Argument<string>("key-id", "SSH key UUID");
-        viewCommand.AddArgument(viewIdArg);
+        var viewIdArg = new Argument<string>("key-id") { Description = "SSH key UUID" };
+        viewCommand.Arguments.Add(viewIdArg);
         viewCommand.SetHandler((string? user, string keyId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewSshKeyHandler>()
                     .HandleAsync(new ViewSshKeyRequest(user ?? "me", keyId), CancellationToken.None)),
             userOption, viewIdArg);
-        sshCommand.AddCommand(viewCommand);
+        sshCommand.Subcommands.Add(viewCommand);
 
         var addCommand = new Command("add", "Add an SSH key");
-        var addKeyOption = new Option<string>("--key", "Public SSH key body") { IsRequired = true };
-        var addLabelOption = new Option<string?>("--label", "Friendly label");
-        addCommand.AddOption(addKeyOption);
-        addCommand.AddOption(addLabelOption);
+        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body" , Required = true };
+        var addLabelOption = new Option<string?>("--label") { Description = "Friendly label" };
+        addCommand.Options.Add(addKeyOption);
+        addCommand.Options.Add(addLabelOption);
         addCommand.SetHandler((string? user, string key, string? label) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddSshKeyHandler>()
                     .HandleAsync(new AddSshKeyRequest(user ?? "me", key, label), CancellationToken.None)),
             userOption, addKeyOption, addLabelOption);
-        sshCommand.AddCommand(addCommand);
+        sshCommand.Subcommands.Add(addCommand);
 
         var deleteCommand = new Command("delete", "Delete an SSH key");
-        var deleteIdArg = new Argument<string>("key-id", "SSH key UUID");
-        var yesOption = new Option<bool>("--yes", "Skip confirmation");
-        deleteCommand.AddArgument(deleteIdArg);
-        deleteCommand.AddOption(yesOption);
+        var deleteIdArg = new Argument<string>("key-id") { Description = "SSH key UUID" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        deleteCommand.Arguments.Add(deleteIdArg);
+        deleteCommand.Options.Add(yesOption);
         deleteCommand.SetHandler(async (string? user, string keyId, bool yes) =>
         {
             if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete SSH key '{keyId}'? [y/N]: "))
@@ -120,7 +125,7 @@ public static class UserCommand
                 services.GetRequiredService<DeleteSshKeyHandler>()
                     .HandleAsync(new DeleteSshKeyRequest(user ?? "me", keyId), CancellationToken.None));
         }, userOption, deleteIdArg, yesOption);
-        sshCommand.AddCommand(deleteCommand);
+        sshCommand.Subcommands.Add(deleteCommand);
 
         return sshCommand;
     }

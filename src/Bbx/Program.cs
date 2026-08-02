@@ -1,6 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Builder;
-using System.CommandLine.Parsing;
 using System.Text;
 using Bbx.Commands;
 using Bbx.Composition;
@@ -18,7 +16,7 @@ public class Program
 
         // `--json-compact` is a global formatting toggle. It's stripped here
         // before System.CommandLine sees the args so every group inherits
-        // it transparently — same effect as setting BBX_JSON_COMPACT=1.
+        // it transparently, the same effect as setting BBX_JSON_COMPACT=1.
         var compactEnv = Environment.GetEnvironmentVariable("BBX_JSON_COMPACT");
         var compactFromEnv = !string.IsNullOrEmpty(compactEnv)
             && (compactEnv == "1" || string.Equals(compactEnv, "true", StringComparison.OrdinalIgnoreCase));
@@ -29,55 +27,57 @@ public class Program
 
         Services = ServiceRegistration.Build();
 
-        var rootCommand = new RootCommand("Bitbucket Cloud CLI for LLM integration")
-        {
-            Name = "bbx",
-        };
+        var rootCommand = new RootCommand("Bitbucket Cloud CLI for LLM integration");
         // Registered for --help discoverability only; the option is already
-        // consumed above before InvokeAsync runs.
-        rootCommand.AddGlobalOption(new Option<bool>(
-            "--json-compact",
-            "Print JSON on a single line (no whitespace). Default: pretty-printed. Env: BBX_JSON_COMPACT=1."));
+        // consumed above before the parse runs.
+        rootCommand.AddRecursiveOption(new Option<bool>("--json-compact")
+        {
+            Description = "Print JSON on a single line (no whitespace). Default: pretty-printed. Env: BBX_JSON_COMPACT=1.",
+        });
 
-        rootCommand.AddCommand(AuthCommand.Create(Services));
-        rootCommand.AddCommand(RepoCommand.Create(Services));
-        rootCommand.AddCommand(PrCommand.Create(Services));
-        rootCommand.AddCommand(BranchCommand.Create(Services));
-        rootCommand.AddCommand(CommitCommand.Create(Services));
-        rootCommand.AddCommand(SrcCommand.Create(Services));
-        rootCommand.AddCommand(DownloadCommand.Create(Services));
-        rootCommand.AddCommand(IssueCommand.Create(Services));
-        rootCommand.AddCommand(PipelineCommand.Create(Services));
-        rootCommand.AddCommand(SnippetCommand.Create(Services));
-        rootCommand.AddCommand(WorkspaceCommand.Create(Services));
-        rootCommand.AddCommand(UserCommand.Create(Services));
+        rootCommand.Subcommands.Add(AuthCommand.Create(Services));
+        rootCommand.Subcommands.Add(RepoCommand.Create(Services));
+        rootCommand.Subcommands.Add(PrCommand.Create(Services));
+        rootCommand.Subcommands.Add(BranchCommand.Create(Services));
+        rootCommand.Subcommands.Add(CommitCommand.Create(Services));
+        rootCommand.Subcommands.Add(SrcCommand.Create(Services));
+        rootCommand.Subcommands.Add(DownloadCommand.Create(Services));
+        rootCommand.Subcommands.Add(IssueCommand.Create(Services));
+        rootCommand.Subcommands.Add(PipelineCommand.Create(Services));
+        rootCommand.Subcommands.Add(SnippetCommand.Create(Services));
+        rootCommand.Subcommands.Add(WorkspaceCommand.Create(Services));
+        rootCommand.Subcommands.Add(UserCommand.Create(Services));
 
         var versionCommand = new Command("version", "Show version information");
-        versionCommand.SetHandler(() =>
+        versionCommand.SetAction(_ =>
         {
             var version = typeof(Program).Assembly.GetName().Version;
             Console.WriteLine($"bbx version {version?.ToString(3) ?? "1.0.0"}");
         });
-        rootCommand.AddCommand(versionCommand);
+        rootCommand.Subcommands.Add(versionCommand);
 
-        // CommandRunner catches the expected failures, but anything else that
-        // escapes a handler would otherwise print a full stack trace. Report the
-        // message instead; the exit code stays 1 either way.
-        var parser = new CommandLineBuilder(rootCommand)
-            .UseDefaults()
-            .UseExceptionHandler((exception, context) =>
-            {
-                Console.Error.WriteLine($"Error: {exception.Message}");
-                context.ExitCode = 1;
-            })
-            .Build();
+        var parseResult = rootCommand.Parse(args);
 
-        // A value returned from Main overrides Environment.ExitCode, and
-        // InvokeAsync reports 0 whenever a handler returned normally. Handlers
-        // catch their own errors and set Environment.ExitCode, so returning
-        // InvokeAsync's result alone made every failed command exit 0 and look
+        int exitCode;
+        try
+        {
+            exitCode = await parseResult.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            // CommandRunner catches the expected failures. Anything else that
+            // escapes a handler would otherwise print a full stack trace;
+            // System.CommandLine 2.0 dropped the built-in exception handler, so
+            // report the message here instead.
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+
+        // A value returned from Main overrides Environment.ExitCode, and the
+        // invocation reports 0 whenever a handler returned normally. Handlers
+        // catch their own errors and set Environment.ExitCode, so returning the
+        // invocation's result alone made every failed command exit 0 and look
         // successful to a script or an agent.
-        var exitCode = await parser.InvokeAsync(args);
         return exitCode != 0 ? exitCode : Environment.ExitCode;
     }
 }
