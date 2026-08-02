@@ -80,6 +80,29 @@ with the scopes you need:
 | Pipelines | Read, Write | CI/CD |
 | Snippets | Read, Write | Code snippets |
 
+A token missing a scope gets HTTP 403, and bbx names what is missing:
+
+```
+Error: Your credentials lack one or more required privilege scopes.
+(HTTP 403 Forbidden) Missing token scopes: admin:repository:bitbucket.
+```
+
+Deploy keys, branch restrictions, and branching-model settings all need the
+Admin scope on Repositories, not just Write.
+
+### Exit codes
+
+`0` on success, `1` on failure: a bad argument, missing credentials, or any
+API error. Data goes to stdout and errors to stderr, so a script can branch on
+the exit code and parse stdout without filtering:
+
+```bash
+if ! prs=$(bbx pr list -w myworkspace -r myrepo --state OPEN); then
+  echo "lookup failed" >&2
+  exit 1
+fi
+```
+
 ### Common auth commands
 
 ```bash
@@ -480,10 +503,12 @@ bbx snippet comments abc123 --delete 42
 
 ### Workspaces
 
-```bash
-# List your workspaces
-bbx workspace list
+> **`bbx workspace list` no longer works.** Atlassian withdrew `/2.0/workspaces`
+> under CHANGE-2770, so the API answers HTTP 410 Gone. Nothing in bbx can
+> restore it. Name the workspace directly, or set a default once with
+> `bbx auth set-workspace <workspace>`.
 
+```bash
 # View workspace details
 bbx workspace view myworkspace
 
@@ -524,11 +549,14 @@ bbx workspace project deploy-keys delete 7   -w myworkspace --project-key PROJ -
 bbx user emails
 
 # Show your workspace and repository permissions
+# Both return HTTP 410 Gone: Atlassian withdrew them under CHANGE-2770.
 bbx user permissions workspaces
 bbx user permissions repositories
 
-# View any user's public profile (by UUID, account ID, or username)
-bbx user view {uuid-or-account-id-or-username}
+# View a profile. With no argument, reports the authenticated account.
+# Bitbucket no longer accepts usernames here, only a UUID or account ID.
+bbx user view
+bbx user view {uuid-or-account-id}
 
 # Manage your account SSH keys (defaults to the current user; use --user to target someone else)
 bbx user ssh-keys list

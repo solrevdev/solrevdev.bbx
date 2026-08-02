@@ -153,7 +153,11 @@ the binary's `--help` output.
 ## Key Design Decisions
 
 1. **JSON-only output** - All commands output JSON for LLM consumption
-2. **Error handling** - Errors go to stderr, data to stdout
+2. **Error handling** - Errors go to stderr, data to stdout. `Program.Main` returns a non-zero `InvokeAsync` code, else whatever `Environment.ExitCode` the handler set — a value returned from `Main` overrides `Environment.ExitCode`, so returning `InvokeAsync`'s result alone made every failed command exit 0. A top-level `UseExceptionHandler` prints the message for anything that escapes a handler instead of a stack trace.
+2a. **Non-JSON GETs** - `GetStringAsync` / `GetRawAsync` / `GetByteArrayAsync` send `Accept: */*`. The default `Accept: application/json` makes the pipeline step log endpoint answer HTTP 406 rather than fall back to `application/octet-stream`.
+2b. **Redirects** - `BitbucketClient` follows GET redirects itself (`AllowAutoRedirect = false`) because HttpClient drops `Authorization` when it follows one, which broke `pr diff` / `pr patch`. Credentials are re-applied on the same origin only.
+2c. **JSON nulls** - Use `JsonElement.TryGetObject` for nested objects. `TryGetProperty` reports success for a property holding JSON `null`, and reading through it throws (a lightweight tag has `"tagger": null`).
+2d. **API errors** - `EnsureSuccessAsync` appends the HTTP status, names missing token scopes from `error.detail.required`, and prints `error.data.announcement_url` for deprecations. `BitbucketErrorDetail.Detail` must stay a `JsonElement` — it is an object for scope failures and a string elsewhere.
 3. **Authentication** - OAuth 2.0 (loopback authorization-code) is the primary auth method; Atlassian API tokens are the documented fallback. Both stored in `~/.config/bbx/config.json` (mode 600). `--app-password` is gone — Bitbucket retires app passwords on 2026-06-09.
 4. **API token auth** - Uses Basic auth (email:token), same Basic-auth wire shape app passwords used. Atlassian API tokens are NOT Bearer tokens.
 5. **OAuth flow** - `OAuthFlow` runs the loopback `HttpListener` flow on `http://localhost:53682/callback` (fixed — BYO consumer). `OAuthAuthProvider` handles refresh-and-rotate (60s safety margin, SemaphoreSlim guard, rotated refresh tokens persisted via `CredentialManager.SaveConfig`).

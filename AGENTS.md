@@ -275,8 +275,12 @@ bbx repo list -w yourworkspace --limit 5
 
 # Test individual commands
 bbx pr list -w yourworkspace -r yourrepo --state OPEN --limit 5
-bbx workspace list
+bbx workspace view yourworkspace
 ```
+
+`bbx workspace list` and `bbx user permissions {workspaces,repositories}` now
+return HTTP 410 Gone. Atlassian withdrew those endpoints under CHANGE-2770;
+name the workspace instead, or set a default with `bbx auth set-workspace`.
 
 When running from source without installing:
 
