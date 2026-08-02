@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Bbx.Api;
 using Bbx.Auth;
+using Bbx.Features.Users;
 
 namespace Bbx.Features.Users.SshKeys.ListSshKeys;
 
@@ -11,7 +12,7 @@ public sealed class ListSshKeysHandler(BitbucketClient client, CredentialManager
         if (!credentials.HasCredentials())
             throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
-        var user = string.IsNullOrEmpty(request.SelectedUser) ? "me" : request.SelectedUser;
+        var user = await UserSelector.ResolveAsync(client, request.SelectedUser, ct);
         var keys = new List<object>();
         var count = 0;
         await foreach (var k in client.GetPaginatedAsync<JsonElement>(

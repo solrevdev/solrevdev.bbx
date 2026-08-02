@@ -185,25 +185,35 @@ public class BitbucketClient : IDisposable
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
-        if (!response.IsSuccessStatusCode)
-        {
-            var content = await response.Content.ReadAsStringAsync();
-            var errorMessage = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
+        if (response.IsSuccessStatusCode) return;
 
-            try
+        var status = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
+        var content = await response.Content.ReadAsStringAsync();
+        var errorMessage = status;
+
+        try
+        {
+            var error = JsonSerializer.Deserialize<BitbucketError>(content, JsonOptions);
+            if (!string.IsNullOrWhiteSpace(error?.Error?.Message))
             {
-                var error = JsonSerializer.Deserialize<BitbucketError>(content, JsonOptions);
-                if (error?.Error?.Message != null)
+                // Keep the status alongside the API text. Bitbucket answers an
+                // unknown username with just the username ("solrevdev"), which
+                // reads as noise without the 404.
+                errorMessage = $"{error!.Error!.Message} ({status})";
+
+                // Deprecation errors carry the changelog entry that explains them.
+                var announcement = error.Error.Data?.AnnouncementUrl;
+                if (!string.IsNullOrWhiteSpace(announcement))
                 {
-                    errorMessage = error.Error.Message;
+                    errorMessage += $" See {announcement}";
                 }
             }
-            catch
-            {
-            }
-
-            throw new HttpRequestException(errorMessage);
         }
+        catch (JsonException)
+        {
+        }
+
+        throw new HttpRequestException(errorMessage);
     }
 
     private static JsonSerializerOptions JsonOptions => new()
@@ -246,4 +256,10 @@ public class BitbucketErrorDetail
     public string? Message { get; set; }
     public string? Detail { get; set; }
     public string? Id { get; set; }
+    public BitbucketErrorData? Data { get; set; }
+}
+
+public class BitbucketErrorData
+{
+    public string? AnnouncementUrl { get; set; }
 }

@@ -52,8 +52,9 @@ public static class UserCommand
 
         command.AddCommand(permissionsCommand);
 
-        var viewCommand = new Command("view", "View a user profile by UUID, account ID, or username");
-        var viewUserArg = new Argument<string>("selected-user", "UUID, account ID, or username");
+        var viewCommand = new Command("view", "View a user profile (defaults to the authenticated account)");
+        var viewUserArg = new Argument<string>("selected-user", () => string.Empty,
+            "Account UUID or account ID (defaults to the authenticated account). Usernames are no longer accepted by Bitbucket.");
         viewCommand.AddArgument(viewUserArg);
         viewCommand.SetHandler((string selectedUser) =>
             CommandRunner.RunJsonAsync(() =>

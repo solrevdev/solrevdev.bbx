@@ -10,8 +10,13 @@ public sealed class ViewUserHandler(BitbucketClient client, CredentialManager cr
     {
         if (!credentials.HasCredentials())
             throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
-        if (string.IsNullOrEmpty(request.SelectedUser))
-            throw new BbxUserException("Error: <selected-user> is required (UUID, account ID, or username).");
+        // No selector means "show me". Bitbucket exposes that as /2.0/user,
+        // a different route from /2.0/users/{selected_user}.
+        if (string.IsNullOrEmpty(request.SelectedUser)
+            || request.SelectedUser.Equals("me", StringComparison.OrdinalIgnoreCase))
+        {
+            return await client.GetAsync<JsonElement>("user", ct);
+        }
 
         return await client.GetAsync<JsonElement>(
             $"/users/{Uri.EscapeDataString(request.SelectedUser)}", ct);

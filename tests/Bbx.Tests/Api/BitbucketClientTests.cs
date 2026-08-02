@@ -103,7 +103,41 @@ public class BitbucketClientTests
         var client = new BitbucketClient(http, new NullAuthProvider());
 
         var act = async () => await client.GetAsync<JsonElement>("repositories/ws/missing");
-        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("Repository not found");
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("Repository not found (HTTP 404 Not Found)");
+    }
+
+    // Bitbucket answers an unknown user selector with just the selector
+    // ("solrevdev"), which is meaningless without the status alongside it.
+    [Fact]
+    public async Task Error_message_carries_the_http_status()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.NotFound, """{"type":"error","error":{"message":"solrevdev"}}""");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetAsync<JsonElement>("users/solrevdev");
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("solrevdev (HTTP 404 Not Found)");
+    }
+
+    [Fact]
+    public async Task Deprecation_errors_point_at_the_changelog_entry()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.Gone, """
+            {"type":"error","error":{"message":"CHANGE-2770 - Functionality has been deprecated",
+            "data":{"announcement_url":"https://developer.atlassian.com/cloud/bitbucket/changelog#CHANGE-2770"}}}
+            """);
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetAsync<JsonElement>("workspaces");
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("*CHANGE-2770*HTTP 410*See https://developer.atlassian.com/*");
     }
 
     [Fact]
