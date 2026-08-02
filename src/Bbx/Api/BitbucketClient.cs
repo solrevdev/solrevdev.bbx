@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -26,21 +27,21 @@ public class BitbucketClient : IDisposable
 
     public async Task<string> GetStringAsync(string endpoint, CancellationToken ct = default)
     {
-        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct, AnyMediaType);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetRawAsync(string endpoint, CancellationToken ct = default)
     {
-        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct, AnyMediaType);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<byte[]> GetByteArrayAsync(string endpoint, CancellationToken ct = default)
     {
-        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct, AnyMediaType);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsByteArrayAsync(ct);
     }
@@ -104,16 +105,30 @@ public class BitbucketClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Accept value for endpoints that do not serve JSON. The client sends
+    /// <c>Accept: application/json</c> as a default header, which some endpoints
+    /// reject with HTTP 406 rather than falling back to their native type. The
+    /// pipeline step log endpoint (<c>application/octet-stream</c>) is one.
+    /// Setting Accept on the request suppresses the default for that call.
+    /// </summary>
+    private const string AnyMediaType = "*/*";
+
     private async Task<HttpResponseMessage> SendAsync(
         HttpMethod method,
         string endpoint,
         HttpContent? content,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? accept = null)
     {
         var request = new HttpRequestMessage(method, NormalizeEndpoint(endpoint))
         {
             Content = content,
         };
+        if (accept is not null)
+        {
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+        }
         await _auth.ApplyAsync(request, ct);
         return await _client.SendAsync(request, ct);
     }

@@ -107,6 +107,45 @@ public class BitbucketClientTests
     }
 
     [Fact]
+    public async Task GetAsync_sends_json_accept_header()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.OK, "{}");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        await client.GetAsync<JsonElement>("user");
+
+        handler.Calls[0].Headers.Accept.Select(a => a.MediaType).Should().Equal("application/json");
+    }
+
+    // Regression: the pipeline step log endpoint serves application/octet-stream
+    // and answers Accept: application/json with HTTP 406 instead of falling back.
+    [Theory]
+    [InlineData("raw")]
+    [InlineData("string")]
+    [InlineData("bytes")]
+    public async Task Non_json_gets_send_wildcard_accept_header(string flavour)
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.OK, "log output", "application/octet-stream");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var endpoint = "repositories/ws/repo/pipelines/{p}/steps/{s}/log";
+        switch (flavour)
+        {
+            case "raw": await client.GetRawAsync(endpoint); break;
+            case "string": await client.GetStringAsync(endpoint); break;
+            default: await client.GetByteArrayAsync(endpoint); break;
+        }
+
+        handler.Calls[0].Headers.Accept.Select(a => a.MediaType).Should().Equal("*/*");
+    }
+
+    [Fact]
     public async Task Non_success_status_falls_back_to_status_when_body_is_not_bitbucket_error()
     {
         var handler = new FakeHttpMessageHandler();
