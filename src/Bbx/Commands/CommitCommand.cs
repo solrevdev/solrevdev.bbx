@@ -1,13 +1,25 @@
 using System.CommandLine;
-using System.Text.Json;
-using Bbx.Api;
-using Bbx.Auth;
+using Bbx.Features.Commits.ApproveCommit;
+using Bbx.Features.Commits.CommitDiff;
+using Bbx.Features.Commits.CommitDiffstat;
+using Bbx.Features.Commits.CommitPatch;
+using Bbx.Features.Commits.CreateCommitStatus;
+using Bbx.Features.Commits.FileHistory;
+using Bbx.Features.Commits.ListCommitComments;
+using Bbx.Features.Commits.ListCommitPullRequests;
+using Bbx.Features.Commits.ListCommitStatuses;
+using Bbx.Features.Commits.ListCommits;
+using Bbx.Features.Commits.MergeBase;
+using Bbx.Features.Commits.UnapproveCommit;
+using Bbx.Features.Commits.UpdateCommitStatus;
+using Bbx.Features.Commits.ViewCommit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
 
 public static class CommitCommand
 {
-    public static Command Create()
+    public static Command Create(IServiceProvider services)
     {
         var workspaceOption = CommandOptions.CreateWorkspaceOption();
         var repoOption = CommandOptions.CreateRepoOption();
@@ -15,7 +27,6 @@ public static class CommitCommand
         command.AddGlobalOption(workspaceOption);
         command.AddGlobalOption(repoOption);
 
-        // bbx commit list
         var listCommand = new Command("list", "List commits");
         var branchOption = new Option<string?>("--branch", "Filter by branch name");
         var pathOption = new Option<string?>("--path", "Filter by file path");
@@ -23,263 +34,183 @@ public static class CommitCommand
         listCommand.AddOption(branchOption);
         listCommand.AddOption(pathOption);
         listCommand.AddOption(limitOption);
-        listCommand.SetHandler(async (string? workspace, string? repo, string? branch, string? path, int limit) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            var endpoint = $"/repositories/{workspace}/{repo}/commits";
-            if (!string.IsNullOrEmpty(branch))
-            {
-                endpoint = $"/repositories/{workspace}/{repo}/commits/{Uri.EscapeDataString(branch)}";
-            }
-
-            var queryParams = new List<string>();
-            if (!string.IsNullOrEmpty(path)) queryParams.Add($"path={Uri.EscapeDataString(path)}");
-            if (queryParams.Count > 0) endpoint += "?" + string.Join("&", queryParams);
-
-            var count = 0;
-            var commits = new List<object>();
-
-            await foreach (var commit in client.GetPaginatedAsync<JsonElement>(endpoint))
-            {
-                commits.Add(ExtractCommitSummary(commit));
-                if (++count >= limit) break;
-            }
-
-            var output = new { workspace, repository = repo, count = commits.Count, commits };
-            Console.WriteLine(JsonSerializer.Serialize(output, JsonOptions));
-        }, workspaceOption, repoOption, branchOption, pathOption, limitOption);
+        listCommand.SetHandler((string? workspace, string? repo, string? branch, string? path, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListCommitsHandler>()
+                    .HandleAsync(new ListCommitsRequest(workspace, repo, branch, path, limit), CancellationToken.None)),
+            workspaceOption, repoOption, branchOption, pathOption, limitOption);
         command.AddCommand(listCommand);
 
-        // bbx commit view
         var viewCommand = new Command("view", "View commit details");
         var hashArg = new Argument<string>("hash", "Commit hash");
         viewCommand.AddArgument(hashArg);
-        viewCommand.SetHandler(async (string? workspace, string? repo, string hash) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            try
-            {
-                var commit = await client.GetAsync<JsonElement>($"/repositories/{workspace}/{repo}/commit/{hash}");
-                Console.WriteLine(JsonSerializer.Serialize(commit, JsonOptions));
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, workspaceOption, repoOption, hashArg);
+        viewCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewCommitHandler>()
+                    .HandleAsync(new ViewCommitRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, hashArg);
         command.AddCommand(viewCommand);
 
-        // bbx commit diff
         var diffCommand = new Command("diff", "Show commit diff");
         var diffHashArg = new Argument<string>("hash", "Commit hash");
         diffCommand.AddArgument(diffHashArg);
-        diffCommand.SetHandler(async (string? workspace, string? repo, string hash) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            try
-            {
-                var diff = await client.GetStringAsync($"/repositories/{workspace}/{repo}/diff/{hash}");
-                Console.WriteLine(diff);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, workspaceOption, repoOption, diffHashArg);
+        diffCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunRawAsync(() =>
+                services.GetRequiredService<CommitDiffHandler>()
+                    .HandleAsync(new CommitDiffRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, diffHashArg);
         command.AddCommand(diffCommand);
 
-        // bbx commit patch
         var patchCommand = new Command("patch", "Show commit as patch");
         var patchHashArg = new Argument<string>("hash", "Commit hash");
         patchCommand.AddArgument(patchHashArg);
-        patchCommand.SetHandler(async (string? workspace, string? repo, string hash) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            try
-            {
-                var patch = await client.GetStringAsync($"/repositories/{workspace}/{repo}/patch/{hash}");
-                Console.WriteLine(patch);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, workspaceOption, repoOption, patchHashArg);
+        patchCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunRawAsync(() =>
+                services.GetRequiredService<CommitPatchHandler>()
+                    .HandleAsync(new CommitPatchRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, patchHashArg);
         command.AddCommand(patchCommand);
 
-        // bbx commit comments
         var commentsCommand = new Command("comments", "List commit comments");
         var commentsHashArg = new Argument<string>("hash", "Commit hash");
         commentsCommand.AddArgument(commentsHashArg);
-        commentsCommand.SetHandler(async (string? workspace, string? repo, string hash) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            var comments = new List<object>();
-
-            await foreach (var comment in client.GetPaginatedAsync<JsonElement>($"/repositories/{workspace}/{repo}/commit/{hash}/comments"))
-            {
-                comments.Add(new
-                {
-                    id = comment.TryGetProperty("id", out var id) ? id.GetInt32() : 0,
-                    user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
-                    content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
-                    created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null
-                });
-            }
-
-            Console.WriteLine(JsonSerializer.Serialize(new { commit = hash, count = comments.Count, comments }, JsonOptions));
-        }, workspaceOption, repoOption, commentsHashArg);
+        commentsCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListCommitCommentsHandler>()
+                    .HandleAsync(new ListCommitCommentsRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, commentsHashArg);
         command.AddCommand(commentsCommand);
 
-        // bbx commit statuses
         var statusesCommand = new Command("statuses", "List commit build statuses");
         var statusesHashArg = new Argument<string>("hash", "Commit hash");
         statusesCommand.AddArgument(statusesHashArg);
-        statusesCommand.SetHandler(async (string? workspace, string? repo, string hash) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            var statuses = new List<object>();
-
-            await foreach (var status in client.GetPaginatedAsync<JsonElement>($"/repositories/{workspace}/{repo}/commit/{hash}/statuses"))
-            {
-                statuses.Add(new
-                {
-                    key = status.TryGetProperty("key", out var k) ? k.GetString() : null,
-                    state = status.TryGetProperty("state", out var s) ? s.GetString() : null,
-                    name = status.TryGetProperty("name", out var n) ? n.GetString() : null,
-                    url = status.TryGetProperty("url", out var u) ? u.GetString() : null,
-                    description = status.TryGetProperty("description", out var d) ? d.GetString() : null,
-                    created_on = status.TryGetProperty("created_on", out var co) ? co.GetString() : null
-                });
-            }
-
-            Console.WriteLine(JsonSerializer.Serialize(new { commit = hash, count = statuses.Count, statuses }, JsonOptions));
-        }, workspaceOption, repoOption, statusesHashArg);
+        statusesCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListCommitStatusesHandler>()
+                    .HandleAsync(new ListCommitStatusesRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, statusesHashArg);
         command.AddCommand(statusesCommand);
 
-        // bbx commit pullrequests
+        command.AddCommand(CreateStatusCommand(services, workspaceOption, repoOption));
+
+        var filehistoryCommand = new Command("filehistory",
+            "List commits that touched a file (the commit hash is the starting point)");
+        var fhHashArg = new Argument<string>("hash", "Starting commit hash");
+        var fhPathArg = new Argument<string>("path", "File path");
+        var fhLimitOption = new Option<int>("--limit", () => 25, "Maximum entries to list");
+        filehistoryCommand.AddArgument(fhHashArg);
+        filehistoryCommand.AddArgument(fhPathArg);
+        filehistoryCommand.AddOption(fhLimitOption);
+        filehistoryCommand.SetHandler((string? workspace, string? repo, string hash, string path, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<FileHistoryHandler>()
+                    .HandleAsync(new FileHistoryRequest(workspace, repo, hash, path, limit), CancellationToken.None)),
+            workspaceOption, repoOption, fhHashArg, fhPathArg, fhLimitOption);
+        command.AddCommand(filehistoryCommand);
+
+        var mergeBaseCommand = new Command("merge-base",
+            "Find the merge-base commit for a spec (e.g., 'feature..main')");
+        var mbSpecArg = new Argument<string>("spec", "Commit spec, e.g. 'feature..main' or 'abc..def'");
+        mergeBaseCommand.AddArgument(mbSpecArg);
+        mergeBaseCommand.SetHandler((string? workspace, string? repo, string spec) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<MergeBaseHandler>()
+                    .HandleAsync(new MergeBaseRequest(workspace, repo, spec), CancellationToken.None)),
+            workspaceOption, repoOption, mbSpecArg);
+        command.AddCommand(mergeBaseCommand);
+
+        var approveCommand = new Command("approve", "Approve a commit");
+        var approveHashArg = new Argument<string>("hash", "Commit hash");
+        approveCommand.AddArgument(approveHashArg);
+        approveCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<ApproveCommitHandler>()
+                    .HandleAsync(new ApproveCommitRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, approveHashArg);
+        command.AddCommand(approveCommand);
+
+        var unapproveCommand = new Command("unapprove", "Remove approval from a commit");
+        var unapproveHashArg = new Argument<string>("hash", "Commit hash");
+        unapproveCommand.AddArgument(unapproveHashArg);
+        unapproveCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<UnapproveCommitHandler>()
+                    .HandleAsync(new UnapproveCommitRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, unapproveHashArg);
+        command.AddCommand(unapproveCommand);
+
+        var diffstatCommand = new Command("diffstat",
+            "Show per-file added/removed line counts for a spec (commit, branch, or 'src..dst')");
+        var dsSpecArg = new Argument<string>("spec", "Commit hash, branch, or 'src..dst' range");
+        var dsLimitOption = new Option<int>("--limit", () => 100, "Maximum file entries to list");
+        diffstatCommand.AddArgument(dsSpecArg);
+        diffstatCommand.AddOption(dsLimitOption);
+        diffstatCommand.SetHandler((string? workspace, string? repo, string spec, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CommitDiffstatHandler>()
+                    .HandleAsync(new CommitDiffstatRequest(workspace, repo, spec, limit), CancellationToken.None)),
+            workspaceOption, repoOption, dsSpecArg, dsLimitOption);
+        command.AddCommand(diffstatCommand);
+
         var prsCommand = new Command("pullrequests", "List pull requests for a commit");
         var prsHashArg = new Argument<string>("hash", "Commit hash");
         prsCommand.AddArgument(prsHashArg);
-        prsCommand.SetHandler(async (string? workspace, string? repo, string hash) =>
-        {
-            var config = CredentialManager.Load();
-            workspace ??= config.DefaultWorkspace;
-
-            if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
-            {
-                Console.Error.WriteLine("Error: Workspace and repository required.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            using var client = CreateClient(config);
-            var prs = new List<object>();
-
-            await foreach (var pr in client.GetPaginatedAsync<JsonElement>($"/repositories/{workspace}/{repo}/commit/{hash}/pullrequests"))
-            {
-                prs.Add(new
-                {
-                    id = pr.TryGetProperty("id", out var id) ? id.GetInt32() : 0,
-                    title = pr.TryGetProperty("title", out var t) ? t.GetString() : null,
-                    state = pr.TryGetProperty("state", out var s) ? s.GetString() : null
-                });
-            }
-
-            Console.WriteLine(JsonSerializer.Serialize(new { commit = hash, count = prs.Count, pull_requests = prs }, JsonOptions));
-        }, workspaceOption, repoOption, prsHashArg);
+        prsCommand.SetHandler((string? workspace, string? repo, string hash) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListCommitPullRequestsHandler>()
+                    .HandleAsync(new ListCommitPullRequestsRequest(workspace, repo, hash), CancellationToken.None)),
+            workspaceOption, repoOption, prsHashArg);
         command.AddCommand(prsCommand);
 
         return command;
     }
 
-    private static object ExtractCommitSummary(JsonElement commit)
+    private static Command CreateStatusCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string?> repoOption)
     {
-        return new
-        {
-            hash = commit.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
-            full_hash = commit.TryGetProperty("hash", out var fh) ? fh.GetString() : null,
-            message = commit.TryGetProperty("message", out var m) ? m.GetString()?.Split('\n')[0] : null,
-            author = commit.TryGetObject("author", out var a) && a.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() :
-                     commit.TryGetObject("author", out var a2) && a2.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
-            date = commit.TryGetProperty("date", out var d) ? d.GetString() : null
-        };
-    }
+        var statusCommand = new Command("status", "Create or update commit build statuses");
 
-    private static BitbucketClient CreateClient(BbxConfig config)
-    {
-        return new BitbucketClient(
-            accessToken: config.AccessToken,
-            appPassword: config.AppPassword,
-            username: config.Username);
-    }
+        var createCommand = new Command("create", "Create a build status on a commit");
+        var createHashArg = new Argument<string>("hash", "Commit hash");
+        var createKeyOption = new Option<string>("--key", "Build status key") { IsRequired = true };
+        var createStateOption = new Option<string>("--state",
+            "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)") { IsRequired = true };
+        var createUrlOption = new Option<string>("--url", "URL to the build (e.g., CI run)") { IsRequired = true };
+        var createNameOption = new Option<string?>("--name", "Human-readable name");
+        var createDescriptionOption = new Option<string?>("--description", "Description");
+        createCommand.AddArgument(createHashArg);
+        createCommand.AddOption(createKeyOption);
+        createCommand.AddOption(createStateOption);
+        createCommand.AddOption(createUrlOption);
+        createCommand.AddOption(createNameOption);
+        createCommand.AddOption(createDescriptionOption);
+        createCommand.SetHandler((string? workspace, string? repo, string hash, string key, string state, string url, string? name, string? description) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateCommitStatusHandler>()
+                    .HandleAsync(new CreateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CancellationToken.None)),
+            workspaceOption, repoOption, createHashArg, createKeyOption, createStateOption, createUrlOption, createNameOption, createDescriptionOption);
+        statusCommand.AddCommand(createCommand);
 
-    private static JsonSerializerOptions JsonOptions => new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true
-    };
+        var updateCommand = new Command("update", "Update an existing build status on a commit");
+        var updateHashArg = new Argument<string>("hash", "Commit hash");
+        var updateKeyOption = new Option<string>("--key", "Build status key") { IsRequired = true };
+        var updateStateOption = new Option<string?>("--state",
+            "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)");
+        var updateUrlOption = new Option<string?>("--url", "URL to the build");
+        var updateNameOption = new Option<string?>("--name", "Human-readable name");
+        var updateDescriptionOption = new Option<string?>("--description", "Description");
+        updateCommand.AddArgument(updateHashArg);
+        updateCommand.AddOption(updateKeyOption);
+        updateCommand.AddOption(updateStateOption);
+        updateCommand.AddOption(updateUrlOption);
+        updateCommand.AddOption(updateNameOption);
+        updateCommand.AddOption(updateDescriptionOption);
+        updateCommand.SetHandler((string? workspace, string? repo, string hash, string key, string? state, string? url, string? name, string? description) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateCommitStatusHandler>()
+                    .HandleAsync(new UpdateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CancellationToken.None)),
+            workspaceOption, repoOption, updateHashArg, updateKeyOption, updateStateOption, updateUrlOption, updateNameOption, updateDescriptionOption);
+        statusCommand.AddCommand(updateCommand);
+
+        return statusCommand;
+    }
 }

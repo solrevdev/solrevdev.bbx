@@ -13,33 +13,63 @@ dotnet tool install -g solrevdev.bbx
 
 ## Authentication
 
-Before using `bbx`, authenticate with your Bitbucket account using an [API token](https://bitbucket.org/account/settings/api-tokens/):
+`bbx` supports two authentication methods:
+
+- **OAuth 2.0 (recommended)** — interactive browser-based login, refreshes
+  automatically. Bitbucket retires app passwords on 2026-06-09, so OAuth
+  (or an API token) is the path forward.
+- **Atlassian API token** — fallback for CI / scripted setups where there
+  is no browser.
+
+### First-time setup with OAuth
+
+OAuth requires a one-time consumer registration in your workspace. Run:
 
 ```bash
-# Login with API token (recommended)
-bbx auth login --api-token
-
-# Set default workspace
-bbx auth set-workspace myworkspace
-
-# Check authentication status
-bbx auth status
-
-# View stored token (for debugging)
-bbx auth token
-
-# Logout and clear credentials
-bbx auth logout
+bbx auth setup-oauth          # prints the walkthrough
+bbx auth setup-oauth --open   # also opens the workspace API settings page
 ```
 
-> **Note:** App passwords were deprecated by Atlassian in September 2025 and will be
-> disabled June 2026. Use `--api-token` instead. The `--app-password` flag still works
-> for existing credentials but should not be used for new setups.
+The walkthrough tells you to create a private OAuth consumer with the
+callback URL `http://localhost:53682/callback` (this is fixed — match it
+exactly). Then run:
 
-### Creating an API Token
+```bash
+bbx auth login --oauth
+# or pass credentials non-interactively:
+bbx auth login --oauth --client-id <key> --client-secret <secret>
+```
 
-1. Go to **Bitbucket Settings > API tokens** (<https://bitbucket.org/account/settings/api-tokens/>)
-2. Create a new token with the scopes you need:
+`bbx auth login --oauth` opens your browser, captures the authorization
+code on the loopback listener, exchanges it for an access + refresh token,
+and stores both in `~/.config/bbx/config.json` (mode 600).
+
+You don't actually have to run `bbx auth login --oauth` explicitly the
+first time — any `bbx` command (e.g. `bbx repo list -w myworkspace`)
+auto-launches the OAuth flow if no credentials are stored, then continues
+with the original command. Set `BBX_NO_INTERACTIVE=1` (or run with stdin
+redirected) to opt out and get the existing not-authenticated error
+instead — useful for CI.
+
+Other OAuth subcommands:
+
+```bash
+bbx auth refresh    # force a refresh, print new expires_at
+bbx auth token      # print current access token (refreshing first if needed)
+```
+
+### Fallback: API token
+
+For CI / scripted environments without a browser, use an
+[Atlassian API token](https://bitbucket.org/account/settings/api-tokens/):
+
+```bash
+bbx auth login --api-token
+# Enter your Atlassian account email and the API token
+```
+
+Create the token at <https://bitbucket.org/account/settings/api-tokens/>
+with the scopes you need:
 
 | Scope | Permission | For |
 |-------|------------|-----|
@@ -50,7 +80,37 @@ bbx auth logout
 | Pipelines | Read, Write | CI/CD |
 | Snippets | Read, Write | Code snippets |
 
-3. Run `bbx auth login --api-token`, enter your Atlassian account email and paste the token
+A token missing a scope gets HTTP 403, and bbx names what is missing:
+
+```
+Error: Your credentials lack one or more required privilege scopes.
+(HTTP 403 Forbidden) Missing token scopes: admin:repository:bitbucket.
+```
+
+Deploy keys, branch restrictions, and branching-model settings all need the
+Admin scope on Repositories, not just Write.
+
+### Exit codes
+
+`0` on success, `1` on failure: a bad argument, missing credentials, or any
+API error. Data goes to stdout and errors to stderr, so a script can branch on
+the exit code and parse stdout without filtering:
+
+```bash
+if ! prs=$(bbx pr list -w myworkspace -r myrepo --state OPEN); then
+  echo "lookup failed" >&2
+  exit 1
+fi
+```
+
+### Common auth commands
+
+```bash
+bbx auth set-workspace myworkspace   # default workspace for -w
+bbx auth status                       # show auth method, expiry (OAuth), user
+bbx auth token                        # access token / username:api_token
+bbx auth logout                       # clear credentials and consumer secret
+```
 
 ## Command Syntax
 
@@ -99,6 +159,35 @@ bbx repo delete myrepo --yes -w myworkspace
 
 # View repository permissions
 bbx repo permissions myrepo -w myworkspace
+
+# Manage webhooks on a repo
+bbx repo hooks list -w myworkspace -r myrepo
+bbx repo hooks create -w myworkspace -r myrepo --url https://example.com/hook --events repo:push --events pullrequest:created
+bbx repo hooks view {uuid} -w myworkspace -r myrepo
+bbx repo hooks update {uuid} -w myworkspace -r myrepo --active false
+bbx repo hooks delete {uuid} -w myworkspace -r myrepo --yes
+
+# Manage default reviewers
+bbx repo default-reviewers list -w myworkspace -r myrepo
+bbx repo default-reviewers add -w myworkspace -r myrepo --target {account-id-or-uuid}
+bbx repo default-reviewers remove -w myworkspace -r myrepo --target {account-id-or-uuid} --yes
+bbx repo default-reviewers effective -w myworkspace -r myrepo
+
+# List forks and watchers
+bbx repo forks list -w myworkspace -r myrepo
+bbx repo watchers -w myworkspace -r myrepo
+
+# Inspect / update branching model
+bbx repo branching-model view -w myworkspace -r myrepo
+bbx repo branching-model settings -w myworkspace -r myrepo
+bbx repo branching-model update -w myworkspace -r myrepo \
+    --settings '{"development":{"name":"main","use_mainbranch":true}}'
+
+# Manage deploy keys
+bbx repo deploy-keys list -w myworkspace -r myrepo
+bbx repo deploy-keys add -w myworkspace -r myrepo --key "ssh-ed25519 AAAA..." --label prod
+bbx repo deploy-keys view 42 -w myworkspace -r myrepo
+bbx repo deploy-keys delete 42 -w myworkspace -r myrepo --yes
 ```
 
 ### Pull Requests
@@ -142,6 +231,24 @@ bbx pr activity 123 -w myworkspace -r myrepo
 
 # View PR commit statuses (CI/CD)
 bbx pr statuses 123 -w myworkspace -r myrepo
+
+# Show effective default reviewers (repo + project, inherited)
+bbx pr default-reviewers -w myworkspace -r myrepo
+
+# Manage PR tasks (review checklist items)
+bbx pr tasks list 123 -w myworkspace -r myrepo
+bbx pr tasks add 123 -w myworkspace -r myrepo --content "Please add a test"
+bbx pr tasks update 123 -w myworkspace -r myrepo --task-id 7 --content "Updated wording"
+bbx pr tasks complete 123 -w myworkspace -r myrepo --task-id 7
+bbx pr tasks delete 123 -w myworkspace -r myrepo --task-id 7 --yes
+
+# Request / unrequest changes
+bbx pr request-changes 123 -w myworkspace -r myrepo
+bbx pr unrequest-changes 123 -w myworkspace -r myrepo
+
+# List PR commits, fetch raw patch
+bbx pr commits 123 -w myworkspace -r myrepo
+bbx pr patch 123 -w myworkspace -r myrepo
 ```
 
 ### Branch Management
@@ -167,6 +274,15 @@ bbx branch restrictions list -w myworkspace -r myrepo
 
 # Add a branch restriction
 bbx branch restrictions add -w myworkspace -r myrepo --kind push --pattern main
+
+# Delete a branch restriction
+bbx branch restrictions delete 42 -w myworkspace -r myrepo --yes
+
+# Manage tags (refs/tags)
+bbx branch tag list -w myworkspace -r myrepo
+bbx branch tag view v1.0.0 -w myworkspace -r myrepo
+bbx branch tag create v1.0.0 -w myworkspace -r myrepo --target main --message "Release 1.0.0"
+bbx branch tag delete v1.0.0 -w myworkspace -r myrepo --yes
 ```
 
 ### Commits
@@ -193,8 +309,63 @@ bbx commit comments abc123 -w myworkspace -r myrepo
 # View commit build statuses
 bbx commit statuses abc123 -w myworkspace -r myrepo
 
+# Create / update a build status on a commit (CI integrations)
+bbx commit status create abc123 -w myworkspace -r myrepo \
+    --key my-ci --state INPROGRESS --url https://ci.example/run/42 \
+    --name "Build #42" --description "Running unit tests"
+bbx commit status update abc123 -w myworkspace -r myrepo \
+    --key my-ci --state SUCCESSFUL
+
 # List pull requests for a commit
 bbx commit pullrequests abc123 -w myworkspace -r myrepo
+
+# Approve / unapprove a commit
+bbx commit approve abc123 -w myworkspace -r myrepo
+bbx commit unapprove abc123 -w myworkspace -r myrepo
+
+# Per-file diffstat for a commit, branch, or range
+bbx commit diffstat abc123 -w myworkspace -r myrepo
+bbx commit diffstat feature..main -w myworkspace -r myrepo
+
+# File history starting at a commit
+bbx commit filehistory abc123 src/Program.cs -w myworkspace -r myrepo
+
+# Merge-base for a range spec
+bbx commit merge-base feature..main -w myworkspace -r myrepo
+```
+
+### Source / files
+
+```bash
+# List a directory at a ref
+bbx src ls -w myworkspace -r myrepo --ref main src/
+
+# Print a file at a ref
+bbx src cat -w myworkspace -r myrepo --ref main src/Program.cs
+
+# Commit one or more files in a single multipart request
+bbx src write -w myworkspace -r myrepo \
+    --branch feature-x --message "tweak config" \
+    --file ./local/path.json=config/path.json \
+    --file ./README.md=README.md \
+    --author "Jane Doe <jane@example.com>"
+```
+
+### Downloads
+
+```bash
+# List repo download artifacts
+bbx download list -w myworkspace -r myrepo
+
+# Upload (multipart)
+bbx download upload -w myworkspace -r myrepo --file ./dist/release.tar.gz
+
+# Get raw bytes to stdout, or save to a file
+bbx download get release.tar.gz -w myworkspace -r myrepo --output ./release.tar.gz
+bbx download get release.tar.gz -w myworkspace -r myrepo > release.tar.gz
+
+# Delete
+bbx download delete release.tar.gz -w myworkspace -r myrepo --yes
 ```
 
 ### Issues
@@ -236,8 +407,22 @@ bbx pipeline list -w myworkspace -r myrepo
 # View pipeline details
 bbx pipeline view {uuid} -w myworkspace -r myrepo
 
-# Trigger a pipeline
+# Trigger a pipeline on a branch
 bbx pipeline trigger -w myworkspace -r myrepo --branch main
+
+# Trigger a pipeline on a specific commit
+bbx pipeline trigger -w myworkspace -r myrepo --branch main --commit abc123
+
+# Trigger a custom pipeline (selector by pattern)
+bbx pipeline trigger -w myworkspace -r myrepo --branch main --pattern nightly
+
+# Pass variables in key=value form
+bbx pipeline trigger -w myworkspace -r myrepo --branch main \
+    --variable KEY1=value1 --variable KEY2=value2
+
+# Trigger the pull-request pipeline for an open PR
+# `--branch` here is the PR's source branch; Bitbucket fills in destination from the PR
+bbx pipeline trigger -w myworkspace -r myrepo --pull-request 123 --branch feature-x
 
 # Stop a running pipeline
 bbx pipeline stop {uuid} -w myworkspace -r myrepo
@@ -248,17 +433,38 @@ bbx pipeline logs {pipeline-uuid} {step-uuid} -w myworkspace -r myrepo
 # List pipeline steps
 bbx pipeline steps {uuid} -w myworkspace -r myrepo
 
-# Manage pipeline variables
-bbx pipeline variables list --workspace myworkspace --repo myrepo
+# Manage pipeline variables (repo-scoped key=value)
+bbx pipeline variables list -w myworkspace -r myrepo
+bbx pipeline variables add -w myworkspace -r myrepo --key DEPLOY_URL --value https://example.com
+bbx pipeline variables add -w myworkspace -r myrepo --key API_TOKEN --value sek --secured
+bbx pipeline variables delete {uuid} -w myworkspace -r myrepo --yes
 
-# Manage schedules
-bbx pipeline schedules list --workspace myworkspace --repo myrepo
+# Manage pipeline schedules
+bbx pipeline schedules list -w myworkspace -r myrepo
+bbx pipeline schedules create -w myworkspace -r myrepo \
+    --cron "0 0 * * *" --branch main --pattern "nightly"
+bbx pipeline schedules delete {uuid} -w myworkspace -r myrepo --yes
 
-# Manage caches
-bbx pipeline caches list --workspace myworkspace --repo myrepo
+# Manage pipeline caches
+bbx pipeline caches list -w myworkspace -r myrepo
+bbx pipeline caches clear node -w myworkspace -r myrepo --yes
 
 # Manage deployment environments
-bbx pipeline deployments list --workspace myworkspace --repo myrepo
+bbx pipeline deployments list -w myworkspace -r myrepo
+bbx pipeline deployments view production -w myworkspace -r myrepo
+
+# Inspect pipeline reports attached to a commit
+bbx pipeline reports list abc123 -w myworkspace -r myrepo
+bbx pipeline reports view abc123 {report-id} -w myworkspace -r myrepo
+bbx pipeline reports annotations abc123 {report-id} -w myworkspace -r myrepo
+
+# Test reports and test cases for a pipeline step
+bbx pipeline test-reports {pipeline-uuid} {step-uuid} -w myworkspace -r myrepo
+bbx pipeline test-cases {pipeline-uuid} {step-uuid} -w myworkspace -r myrepo
+
+# Pipelines OIDC discovery / JWKS (for federated CI authentication)
+bbx pipeline oidc config -w myworkspace -r myrepo
+bbx pipeline oidc keys -w myworkspace -r myrepo
 ```
 
 ### Snippets
@@ -279,37 +485,84 @@ bbx snippet update abc123 --title "New title"
 # Delete snippet
 bbx snippet delete abc123
 
-# List or get files in a snippet
+# List or get files in a snippet (use --raw to stream raw bytes for a specific file)
 bbx snippet files abc123
 bbx snippet files abc123 script.sh
+bbx snippet files abc123 script.sh --raw
 
-# Watch/unwatch a snippet or list watchers
+# Watch a snippet (default), list watchers, or stop watching
 bbx snippet watch abc123
+bbx snippet watch abc123 --list
+bbx snippet watch abc123 --unwatch
 
-# Manage snippet comments
+# Comments — list, add, or delete (flat-flag command)
 bbx snippet comments abc123
+bbx snippet comments abc123 --add "LGTM"
+bbx snippet comments abc123 --delete 42
 ```
 
 ### Workspaces
 
-```bash
-# List your workspaces
-bbx workspace list
+> **`bbx workspace list` no longer works.** Atlassian withdrew `/2.0/workspaces`
+> under CHANGE-2770, so the API answers HTTP 410 Gone. Nothing in bbx can
+> restore it. Name the workspace directly, or set a default once with
+> `bbx auth set-workspace <workspace>`.
 
+```bash
 # View workspace details
 bbx workspace view myworkspace
 
 # List workspace members
 bbx workspace members -w myworkspace
 
-# Manage projects (list, view, create, delete)
-bbx workspace projects -w myworkspace
+# Manage projects (CRUD)
+# `project` is canonical; `projects` (plural) is a soft-deprecated alias of the same group
+bbx workspace project list -w myworkspace
+bbx workspace project view PROJ -w myworkspace
+bbx workspace project create -w myworkspace --key PROJ --name "Project Name" --description "..." --private
+bbx workspace project delete PROJ -w myworkspace --yes
 
 # View workspace permissions
 bbx workspace permissions -w myworkspace
 
 # Manage webhooks
-bbx workspace hooks -w myworkspace
+bbx workspace hooks list -w myworkspace
+bbx workspace hooks view {uuid} -w myworkspace
+bbx workspace hooks create -w myworkspace --url https://example.com/hook --events repo:push --events pullrequest:created
+bbx workspace hooks update {uuid} -w myworkspace --active false
+bbx workspace hooks delete {uuid} -w myworkspace --yes
+
+# Per-project sub-APIs (default reviewers, branching model, deploy keys)
+bbx workspace project default-reviewers list -w myworkspace --project-key PROJ
+bbx workspace project default-reviewers add  -w myworkspace --project-key PROJ --target {account-id-or-uuid}
+bbx workspace project branching-model view   -w myworkspace --project-key PROJ
+bbx workspace project branching-model update -w myworkspace --project-key PROJ --settings '{"development":{"name":"main"}}'
+bbx workspace project deploy-keys list       -w myworkspace --project-key PROJ
+bbx workspace project deploy-keys add        -w myworkspace --project-key PROJ --key "ssh-ed25519 AAAA..." --label prod
+bbx workspace project deploy-keys delete 7   -w myworkspace --project-key PROJ --yes
+```
+
+### User account, permissions, SSH keys
+
+```bash
+# List your account email addresses
+bbx user emails
+
+# Show your workspace and repository permissions
+# Both return HTTP 410 Gone: Atlassian withdrew them under CHANGE-2770.
+bbx user permissions workspaces
+bbx user permissions repositories
+
+# View a profile. With no argument, reports the authenticated account.
+# Bitbucket no longer accepts usernames here, only a UUID or account ID.
+bbx user view
+bbx user view {uuid-or-account-id}
+
+# Manage your account SSH keys (defaults to the current user; use --user to target someone else)
+bbx user ssh-keys list
+bbx user ssh-keys add --key "ssh-ed25519 AAAA..." --label laptop
+bbx user ssh-keys view {uuid}
+bbx user ssh-keys delete {uuid} --yes
 ```
 
 ## LLM Integration
@@ -320,9 +573,19 @@ All commands output JSON to stdout, errors to stderr. This makes them ideal for 
 # Pipe to jq for pretty-printing
 bbx pr view 123 -w myworkspace -r myrepo | jq .
 
+# Compact mode for piping through jq -c or shell scripts
+bbx pr list -w myworkspace -r myrepo --state OPEN --json-compact \
+    | jq -c '.pull_requests[] | {id, title, author: .author.account_id}'
+
 # List commits for code review
 bbx commit list -w myworkspace -r myrepo --branch feature-x --limit 5
 ```
+
+**Agents driving `bbx` programmatically should read
+[`docs/llm-guide.md`](docs/llm-guide.md)** — a pattern-based reference
+documenting every command group, subcommand, common flag pattern,
+auth expectations, JSON shapes, and end-to-end composition recipes
+tuned for code agents.
 
 ## Global Options
 
@@ -334,6 +597,7 @@ global options and appear directly in subcommand help.
 |--------|-------|-------------|----------|
 | `--workspace` | `-w` | Bitbucket workspace (uses default if set) | repo, pr, branch, commit, issue |
 | `--repo` | `-r` | Repository slug | pr, branch, commit, issue |
+| `--json-compact` | — | Print JSON on a single line (no whitespace). Default: pretty-printed. Set `BBX_JSON_COMPACT=1` to enable globally. | all JSON-emitting commands |
 
 Other common options on subcommands:
 
@@ -342,6 +606,23 @@ Other common options on subcommands:
 | `--limit` | Maximum results to return (default: 25) |
 | `--state` | Filter by state (e.g., OPEN, MERGED, DECLINED) |
 | `--yes` | Skip confirmation prompts on destructive operations |
+
+### JSON output mode
+
+All commands that return data emit JSON to stdout (pretty-printed by default).
+Use `--json-compact` to switch to a single-line form, ideal for piping into
+`jq -c` or shell scripts:
+
+```bash
+# Default (pretty-printed)
+bbx repo list -w myworkspace --limit 1
+
+# One-line form
+bbx repo list -w myworkspace --limit 1 --json-compact | jq -c .repositories
+
+# Same effect via env var (useful in CI)
+BBX_JSON_COMPACT=1 bbx repo list -w myworkspace --limit 1
+```
 
 ## Configuration
 
@@ -364,6 +645,29 @@ dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- auth status
 dotnet pack src/Bbx/Bbx.csproj -c Release
 dotnet tool install -g --add-source ./src/Bbx/bin/Release solrevdev.bbx
 ```
+
+## Running the smoke script
+
+`scripts/smoke.sh` is a read-only integration smoke that exercises the
+auth, repo, pr, src, and hooks happy paths against a real sandbox
+workspace. It's intended as a hand-run sanity check before tagging a
+release — it's NOT wired into CI because it needs live OAuth or
+API-token credentials.
+
+```bash
+# One-time auth setup (skip if already authenticated)
+bbx auth login --oauth
+bbx auth set-workspace myworkspace
+
+# Run the smoke
+export BBX_SMOKE_WORKSPACE=myworkspace
+export BBX_SMOKE_REPO=myrepo
+./scripts/smoke.sh
+```
+
+Requires `jq` for output sanity checks. Each step uses
+`set -euo pipefail`, so the script exits non-zero on the first failure.
+No mutations are performed; running it against any sandbox is safe.
 
 ## License
 

@@ -9,49 +9,17 @@ namespace Bbx.Api;
 public class BitbucketClient : IDisposable
 {
     private readonly HttpClient _client;
+    private readonly IAuthProvider _auth;
 
-    /// <summary>
-    /// Held here rather than on <see cref="HttpClient.DefaultRequestHeaders"/>
-    /// so a request can deliberately go out without it. A default header cannot
-    /// be suppressed per request, which would leak credentials to a redirect
-    /// target on another origin.
-    /// </summary>
-    private readonly AuthenticationHeaderValue? _authorization;
-
-    private const string BaseUrl = "https://api.bitbucket.org/2.0/";
-
-    public BitbucketClient(string? accessToken = null, string? appPassword = null, string? username = null)
+    public BitbucketClient(HttpClient client, IAuthProvider auth)
     {
-        // Redirects are followed in-process (see GetAsync) so credentials can be
-        // re-applied; HttpClient drops them when it follows one itself.
-        _client = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
-        {
-            BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-
-        _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _client.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");
-
-        if (!string.IsNullOrEmpty(accessToken))
-        {
-            _authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        }
-        else if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(appPassword))
-        {
-            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{appPassword}"));
-            _authorization = new AuthenticationHeaderValue("Basic", credentials);
-        }
-
-    }
-
-    public BitbucketClient(BbxConfig config) : this(config.AccessToken, config.AppPassword, config.Username)
-    {
+        _client = client;
+        _auth = auth;
     }
 
     public async Task<T?> GetAsync<T>(string endpoint, CancellationToken ct = default)
     {
-        var response = await GetAsync(endpoint, accept: null, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -59,101 +27,31 @@ public class BitbucketClient : IDisposable
 
     public async Task<string> GetStringAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await GetAsync(endpoint, AnyMediaType, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct, AnyMediaType);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetRawAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await GetAsync(endpoint, AnyMediaType, ct);
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct, AnyMediaType);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
-    /// <summary>
-    /// Accept value for endpoints that do not serve JSON. The client sends
-    /// <c>Accept: application/json</c> by default, which some endpoints reject
-    /// with HTTP 406 rather than falling back to their native type. The pipeline
-    /// step log endpoint (<c>application/octet-stream</c>) is one of them.
-    /// </summary>
-    private const string AnyMediaType = "*/*";
-
-    private const int MaxRedirects = 5;
-
-    /// <summary>
-    /// GET, following redirects in-process so credentials survive them.
-    /// </summary>
-    /// <remarks>
-    /// HttpClient drops the Authorization header when it follows a redirect,
-    /// which turns an authenticated request into an anonymous one. The pull
-    /// request diff and patch endpoints 302 to the underlying commit-range
-    /// diff, so they failed with "You may not have access to this repository".
-    /// Credentials are re-applied only on the same origin, so a redirect out to
-    /// storage cannot leak them.
-    /// </remarks>
-    private async Task<HttpResponseMessage> GetAsync(string endpoint, string? accept, CancellationToken ct)
+    public async Task<byte[]> GetByteArrayAsync(string endpoint, CancellationToken ct = default)
     {
-        var current = new Uri(_client.BaseAddress!, NormalizeEndpoint(endpoint));
-        var response = await SendGetAsync(current, accept, applyAuth: true, ct);
-
-        var hops = 0;
-        while (IsRedirect(response) && hops++ < MaxRedirects)
-        {
-            var location = response.Headers.Location;
-            if (location is null) break;
-
-            var target = location.IsAbsoluteUri ? location : new Uri(current, location);
-            response.Dispose();
-
-            var sameOrigin = Uri.Compare(target, current, UriComponents.SchemeAndServer,
-                UriFormat.UriEscaped, StringComparison.OrdinalIgnoreCase) == 0;
-
-            current = target;
-            response = await SendGetAsync(target, accept, sameOrigin, ct);
-        }
-
-        return response;
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, ct, AnyMediaType);
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadAsByteArrayAsync(ct);
     }
-
-    private async Task<HttpResponseMessage> SendGetAsync(
-        Uri url, string? accept, bool applyAuth, CancellationToken ct)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (accept is not null)
-        {
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
-        }
-        if (applyAuth)
-        {
-            request.Headers.Authorization = _authorization;
-        }
-        return await _client.SendAsync(request, ct);
-    }
-
-    private async Task<HttpResponseMessage> SendAsync(
-        HttpMethod method, string endpoint, HttpContent? content, CancellationToken ct)
-    {
-        var request = new HttpRequestMessage(method, NormalizeEndpoint(endpoint))
-        {
-            Content = content,
-        };
-        request.Headers.Authorization = _authorization;
-        return await _client.SendAsync(request, ct);
-    }
-
-    private static bool IsRedirect(HttpResponseMessage response) => (int)response.StatusCode switch
-    {
-        301 or 302 or 303 or 307 or 308 => true,
-        _ => false,
-    };
 
     public async Task<T?> PostAsync<T>(string endpoint, object? body = null, CancellationToken ct = default)
     {
         var content = body != null
             ? new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json")
             : null;
-        var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
+        using var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -161,7 +59,7 @@ public class BitbucketClient : IDisposable
 
     public async Task<T?> PostMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
     {
-        var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
+        using var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -170,17 +68,17 @@ public class BitbucketClient : IDisposable
     public async Task<T?> PutAsync<T>(string endpoint, object body, CancellationToken ct = default)
     {
         var content = new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
-        var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
+        using var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
-        // A PUT that succeeds with 204 has no body. Deserializing "" throws,
-        // which is how `bbx snippet watch` failed against its 204.
+        // A PUT that succeeds with 204 has no body. Deserializing "" throws, which
+        // is how `bbx snippet watch` failed against its 204.
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 
     public async Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
     {
-        var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
+        using var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -188,7 +86,7 @@ public class BitbucketClient : IDisposable
 
     public async Task DeleteAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await SendAsync(HttpMethod.Delete, endpoint, null, ct);
+        using var response = await SendAsync(HttpMethod.Delete, endpoint, null, ct);
         await EnsureSuccessAsync(response);
     }
 
@@ -206,13 +104,86 @@ public class BitbucketClient : IDisposable
             }
 
             url = response.Next;
-            if (!string.IsNullOrEmpty(url) && url.StartsWith("http"))
-            {
-                // Extract relative path for subsequent requests
-                url = new Uri(url).PathAndQuery;
-            }
         }
     }
+
+    /// <summary>
+    /// Accept value for endpoints that do not serve JSON. The client sends
+    /// <c>Accept: application/json</c> as a default header, which some endpoints
+    /// reject with HTTP 406 rather than falling back to their native type. The
+    /// pipeline step log endpoint (<c>application/octet-stream</c>) is one.
+    /// Setting Accept on the request suppresses the default for that call.
+    /// </summary>
+    private const string AnyMediaType = "*/*";
+
+    private const int MaxRedirects = 5;
+
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpMethod method,
+        string endpoint,
+        HttpContent? content,
+        CancellationToken ct,
+        string? accept = null)
+    {
+        var current = new Uri(_client.BaseAddress!, NormalizeEndpoint(endpoint));
+        var response = await SendOnceAsync(method, current.AbsoluteUri, content, ct, accept);
+
+        // Redirects are followed here rather than by HttpClient because
+        // HttpClient drops the Authorization header when it follows one, which
+        // turns an authenticated request into an anonymous one. The pull request
+        // diff and patch endpoints 302 to the underlying commit-range diff, so
+        // they failed with "You may not have access to this repository".
+        // Only GET is followed: other verbs would need their body re-sent, and
+        // no Bitbucket endpoint we call redirects them.
+        var hops = 0;
+        while (IsRedirect(response) && method == HttpMethod.Get && hops++ < MaxRedirects)
+        {
+            var location = response.Headers.Location;
+            if (location is null) break;
+
+            var target = location.IsAbsoluteUri ? location : new Uri(current, location);
+            response.Dispose();
+
+            // Re-apply credentials only when staying on the same origin, so a
+            // redirect out to storage (downloads) cannot leak them.
+            var sameOrigin = Uri.Compare(target, current, UriComponents.SchemeAndServer,
+                UriFormat.UriEscaped, StringComparison.OrdinalIgnoreCase) == 0;
+
+            current = target;
+            response = await SendOnceAsync(HttpMethod.Get, target.AbsoluteUri, null, ct, accept, applyAuth: sameOrigin);
+        }
+
+        return response;
+    }
+
+    private async Task<HttpResponseMessage> SendOnceAsync(
+        HttpMethod method,
+        string url,
+        HttpContent? content,
+        CancellationToken ct,
+        string? accept,
+        bool applyAuth = true)
+    {
+        var request = new HttpRequestMessage(method, url)
+        {
+            Content = content,
+        };
+        if (accept is not null)
+        {
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+        }
+        if (applyAuth)
+        {
+            await _auth.ApplyAsync(request, ct);
+        }
+        return await _client.SendAsync(request, ct);
+    }
+
+    private static bool IsRedirect(HttpResponseMessage response) => (int)response.StatusCode switch
+    {
+        301 or 302 or 303 or 307 or 308 => true,
+        _ => false,
+    };
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response)
     {
@@ -228,8 +199,8 @@ public class BitbucketClient : IDisposable
             if (!string.IsNullOrWhiteSpace(error?.Error?.Message))
             {
                 // Keep the status alongside the API text. Bitbucket answers an
-                // unknown user selector with just the selector ("solrevdev"),
-                // which reads as noise without the 404.
+                // unknown username with just the username ("solrevdev"), which
+                // reads as noise without the 404.
                 errorMessage = $"{error!.Error!.Message} ({status})";
 
                 // A 403 names the scopes the token is missing. Say which, so the
@@ -268,7 +239,11 @@ public class BitbucketClient : IDisposable
         return endpoint.TrimStart('/');
     }
 
-    public void Dispose() => _client.Dispose();
+    public void Dispose()
+    {
+        // The HttpClient is owned by the DI container (singleton); do not
+        // dispose it here.
+    }
 }
 
 public class PaginatedResponse<T>

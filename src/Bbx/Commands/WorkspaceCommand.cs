@@ -1,671 +1,407 @@
 using System.CommandLine;
-using System.Text.Json;
-using Bbx.Api;
-using Bbx.Auth;
+using Bbx.Features.Workspaces.ListWorkspaceMembers;
+using Bbx.Features.Workspaces.ListWorkspacePermissions;
+using Bbx.Features.Workspaces.ListWorkspaces;
+using Bbx.Features.Workspaces.Projects.BranchingModel.UpdateProjectBranchingModelSettings;
+using Bbx.Features.Workspaces.Projects.BranchingModel.ViewProjectBranchingModel;
+using Bbx.Features.Workspaces.Projects.CreateProject;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.AddProjectDefaultReviewer;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.ListProjectDefaultReviewers;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.RemoveProjectDefaultReviewer;
+using Bbx.Features.Workspaces.Projects.DeleteProject;
+using Bbx.Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey;
+using Bbx.Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey;
+using Bbx.Features.Workspaces.Projects.DeployKeys.ListProjectDeployKeys;
+using Bbx.Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey;
+using Bbx.Features.Workspaces.Projects.ListProjects;
+using Bbx.Features.Workspaces.Projects.ViewProject;
+using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
+using Bbx.Features.Workspaces.Hooks.UpdateWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.ViewWorkspaceHook;
+using Bbx.Features.Workspaces.ViewWorkspace;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
 
 public static class WorkspaceCommand
 {
-    public static Command Create()
+    public static Command Create(IServiceProvider services)
     {
         var command = new Command("workspace", "Manage Bitbucket workspaces");
 
-        command.AddCommand(CreateListCommand());
-        command.AddCommand(CreateViewCommand());
-        command.AddCommand(CreateMembersCommand());
-        command.AddCommand(CreateProjectsCommand());
-        command.AddCommand(CreatePermissionsCommand());
-        command.AddCommand(CreateHooksCommand());
+        command.AddCommand(CreateListCommand(services));
+        command.AddCommand(CreateViewCommand(services));
+        command.AddCommand(CreateMembersCommand(services));
+        command.AddCommand(CreatePermissionsCommand(services));
+        command.AddCommand(CreateHooksCommand(services));
+        command.AddCommand(CreateProjectCommand(services));
 
         return command;
     }
 
-    private static Command CreateListCommand()
+    private static Command CreateProjectCommand(IServiceProvider services)
+    {
+        // Phase 4 consolidation: `project` is canonical. The flat-flag
+        // `projects` (plural) group from Phase 0.5 and the per-verb `project`
+        // (singular) group added in Phase 3 are now one subcommand graph
+        // covering both the project CRUD (list/view/create/delete) and the
+        // per-project sub-APIs (default-reviewers, branching-model,
+        // deploy-keys). `projects` (plural) is kept as a soft-deprecated
+        // alias so existing scripts that wrote `bbx workspace projects …`
+        // continue to work; new docs use the singular.
+        var projectCommand = new Command("project",
+            "Manage workspace projects (CRUD + per-project sub-APIs)");
+        projectCommand.AddAlias("projects");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (defaults to configured)");
+        projectCommand.AddGlobalOption(workspaceOption);
+
+        projectCommand.AddCommand(CreateProjectListCommand(services, workspaceOption));
+        projectCommand.AddCommand(CreateProjectViewCommand(services, workspaceOption));
+        projectCommand.AddCommand(CreateProjectCreateCommand(services, workspaceOption));
+        projectCommand.AddCommand(CreateProjectDeleteCommand(services, workspaceOption));
+
+        var projectKeyOption = new Option<string>("--project-key", "Project key") { IsRequired = true };
+        projectCommand.AddCommand(CreateProjectDefaultReviewersCommand(services, workspaceOption, projectKeyOption));
+        projectCommand.AddCommand(CreateProjectBranchingModelCommand(services, workspaceOption, projectKeyOption));
+        projectCommand.AddCommand(CreateProjectDeployKeysCommand(services, workspaceOption, projectKeyOption));
+
+        return projectCommand;
+    }
+
+    private static Command CreateProjectListCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var listCommand = new Command("list", "List workspace projects");
+        var limitOption = new Option<int>(["--limit", "-l"], () => 25, "Maximum projects to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectsHandler>()
+                    .HandleAsync(new ListProjectsRequest(workspace, limit), CancellationToken.None)),
+            workspaceOption, limitOption);
+        return listCommand;
+    }
+
+    private static Command CreateProjectViewCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var viewCommand = new Command("view", "View a workspace project");
+        var keyArg = new Argument<string>("project-key", "Project key");
+        viewCommand.AddArgument(keyArg);
+        viewCommand.SetHandler((string? workspace, string key) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectHandler>()
+                    .HandleAsync(new ViewProjectRequest(workspace, key), CancellationToken.None)),
+            workspaceOption, keyArg);
+        return viewCommand;
+    }
+
+    private static Command CreateProjectCreateCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var createCommand = new Command("create", "Create a workspace project");
+        var keyOption = new Option<string>(["--key", "-k"], "Project key") { IsRequired = true };
+        var nameOption = new Option<string>(["--name", "-n"], "Project name") { IsRequired = true };
+        var descriptionOption = new Option<string?>(["--description", "-d"], "Project description");
+        var privateOption = new Option<bool>(["--private", "-p"], () => true, "Make project private");
+        createCommand.AddOption(keyOption);
+        createCommand.AddOption(nameOption);
+        createCommand.AddOption(descriptionOption);
+        createCommand.AddOption(privateOption);
+        createCommand.SetHandler((string? workspace, string key, string name, string? description, bool isPrivate) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateProjectHandler>()
+                    .HandleAsync(new CreateProjectRequest(workspace, key, name, description, isPrivate), CancellationToken.None)),
+            workspaceOption, keyOption, nameOption, descriptionOption, privateOption);
+        return createCommand;
+    }
+
+    private static Command CreateProjectDeleteCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var deleteCommand = new Command("delete", "Delete a workspace project");
+        var keyArg = new Argument<string>("project-key", "Project key");
+        var yesOption = new Option<bool>(["--yes", "-y"], () => false, "Skip confirmation");
+        deleteCommand.AddArgument(keyArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string key, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete project '{key}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteProjectHandler>()
+                    .HandleAsync(new DeleteProjectRequest(workspace, key), CancellationToken.None));
+        }, workspaceOption, keyArg, yesOption);
+        return deleteCommand;
+    }
+
+    private static Command CreateProjectDefaultReviewersCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var drCommand = new Command("default-reviewers", "Manage project-level default reviewers");
+        // The handlers bind this option, so it has to be registered too. Without
+        // that the project key parsed as null and every request went to
+        // /workspaces/{ws}/projects//default-reviewers.
+        drCommand.AddGlobalOption(projectKeyOption);
+
+        var listCommand = new Command("list", "List project default reviewers");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum reviewers to list");
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string projectKey, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectDefaultReviewersHandler>()
+                    .HandleAsync(new ListProjectDefaultReviewersRequest(workspace, projectKey, limit), CancellationToken.None)),
+            workspaceOption, projectKeyOption, listLimitOption);
+        drCommand.AddCommand(listCommand);
+
+        var addCommand = new Command("add", "Add a project default reviewer");
+        var addTargetOption = new Option<string>("--target", "Account ID or UUID of the user") { IsRequired = true };
+        addCommand.AddOption(addTargetOption);
+        addCommand.SetHandler((string? workspace, string projectKey, string target) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddProjectDefaultReviewerHandler>()
+                    .HandleAsync(new AddProjectDefaultReviewerRequest(workspace, projectKey, target), CancellationToken.None)),
+            workspaceOption, projectKeyOption, addTargetOption);
+        drCommand.AddCommand(addCommand);
+
+        var removeCommand = new Command("remove", "Remove a project default reviewer");
+        var removeTargetOption = new Option<string>("--target", "Account ID or UUID of the user") { IsRequired = true };
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        removeCommand.AddOption(removeTargetOption);
+        removeCommand.AddOption(yesOption);
+        removeCommand.SetHandler(async (string? workspace, string projectKey, string target, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Remove default reviewer '{target}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveProjectDefaultReviewerHandler>()
+                    .HandleAsync(new RemoveProjectDefaultReviewerRequest(workspace, projectKey, target), CancellationToken.None));
+        }, workspaceOption, projectKeyOption, removeTargetOption, yesOption);
+        drCommand.AddCommand(removeCommand);
+
+        return drCommand;
+    }
+
+    private static Command CreateProjectBranchingModelCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var bmCommand = new Command("branching-model",
+            "Inspect or update the project branching-model defaults");
+        bmCommand.AddGlobalOption(projectKeyOption);
+
+        var viewCommand = new Command("view", "Show the project branching-model defaults");
+        viewCommand.SetHandler((string? workspace, string projectKey) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectBranchingModelHandler>()
+                    .HandleAsync(new ViewProjectBranchingModelRequest(workspace, projectKey), CancellationToken.None)),
+            workspaceOption, projectKeyOption);
+        bmCommand.AddCommand(viewCommand);
+
+        var updateCommand = new Command("update",
+            "Replace project branching-model settings (PUT raw JSON payload to /branching-model/settings)");
+        var settingsJsonOption = new Option<string>("--settings", "JSON payload") { IsRequired = true };
+        updateCommand.AddOption(settingsJsonOption);
+        updateCommand.SetHandler((string? workspace, string projectKey, string settingsJson) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateProjectBranchingModelSettingsHandler>()
+                    .HandleAsync(new UpdateProjectBranchingModelSettingsRequest(workspace, projectKey, settingsJson), CancellationToken.None)),
+            workspaceOption, projectKeyOption, settingsJsonOption);
+        bmCommand.AddCommand(updateCommand);
+
+        return bmCommand;
+    }
+
+    private static Command CreateProjectDeployKeysCommand(IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var dkCommand = new Command("deploy-keys", "Manage project-level deploy keys");
+        dkCommand.AddGlobalOption(projectKeyOption);
+
+        var listCommand = new Command("list", "List project deploy keys");
+        var listLimitOption = new Option<int>("--limit", () => 25, "Maximum keys to list");
+        listCommand.AddOption(listLimitOption);
+        listCommand.SetHandler((string? workspace, string projectKey, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectDeployKeysHandler>()
+                    .HandleAsync(new ListProjectDeployKeysRequest(workspace, projectKey, limit), CancellationToken.None)),
+            workspaceOption, projectKeyOption, listLimitOption);
+        dkCommand.AddCommand(listCommand);
+
+        var viewCommand = new Command("view", "View a project deploy key");
+        var viewIdArg = new Argument<int>("key-id", "Deploy key ID");
+        viewCommand.AddArgument(viewIdArg);
+        viewCommand.SetHandler((string? workspace, string projectKey, int keyId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectDeployKeyHandler>()
+                    .HandleAsync(new ViewProjectDeployKeyRequest(workspace, projectKey, keyId), CancellationToken.None)),
+            workspaceOption, projectKeyOption, viewIdArg);
+        dkCommand.AddCommand(viewCommand);
+
+        var addCommand = new Command("add", "Add a project deploy key");
+        var addKeyOption = new Option<string>("--key", "Public SSH key body") { IsRequired = true };
+        var addLabelOption = new Option<string?>("--label", "Friendly label");
+        addCommand.AddOption(addKeyOption);
+        addCommand.AddOption(addLabelOption);
+        addCommand.SetHandler((string? workspace, string projectKey, string key, string? label) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddProjectDeployKeyHandler>()
+                    .HandleAsync(new AddProjectDeployKeyRequest(workspace, projectKey, key, label), CancellationToken.None)),
+            workspaceOption, projectKeyOption, addKeyOption, addLabelOption);
+        dkCommand.AddCommand(addCommand);
+
+        var deleteCommand = new Command("delete", "Delete a project deploy key");
+        var deleteIdArg = new Argument<int>("key-id", "Deploy key ID");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteIdArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string projectKey, int keyId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete deploy key #{keyId}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteProjectDeployKeyHandler>()
+                    .HandleAsync(new DeleteProjectDeployKeyRequest(workspace, projectKey, keyId), CancellationToken.None));
+        }, workspaceOption, projectKeyOption, deleteIdArg, yesOption);
+        dkCommand.AddCommand(deleteCommand);
+
+        return dkCommand;
+    }
+
+    private static Command CreateListCommand(IServiceProvider services)
     {
         var command = new Command("list", "List workspaces the user belongs to");
-
-        var roleOption = new Option<string?>(
-            ["--role", "-r"],
-            "Filter by role: owner, collaborator, member");
-
-        var limitOption = new Option<int>(
-            ["--limit", "-l"],
-            () => 25,
-            "Maximum number of workspaces to return");
+        var roleOption = new Option<string?>(["--role", "-r"], "Filter by role: owner, collaborator, member");
+        var limitOption = new Option<int>(["--limit", "-l"], () => 25, "Maximum number of workspaces to return");
 
         command.AddOption(roleOption);
         command.AddOption(limitOption);
 
-        command.SetHandler(async (role, limit) =>
-        {
-            var credentials = CredentialManager.Load();
-            if (credentials?.AccessToken is null && credentials?.AppPassword is null)
-            {
-                Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login' first.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var client = new BitbucketClient(credentials);
-
-            try
-            {
-                var endpoint = "workspaces";
-                if (!string.IsNullOrEmpty(role))
-                {
-                    endpoint += $"?role={role}";
-                }
-
-                var workspaces = new List<object>();
-                await foreach (var ws in client.GetPaginatedAsync<JsonElement>(endpoint))
-                {
-                    workspaces.Add(new
-                    {
-                        slug = ws.TryGetProperty("slug", out var s) ? s.GetString() : null,
-                        name = ws.TryGetProperty("name", out var n) ? n.GetString() : null,
-                        uuid = ws.TryGetProperty("uuid", out var u) ? u.GetString() : null,
-                        is_private = ws.TryGetProperty("is_private", out var p) && p.GetBoolean(),
-                        created_on = ws.TryGetProperty("created_on", out var c) ? c.GetString() : null
-                    });
-
-                    if (workspaces.Count >= limit) break;
-                }
-
-                Console.WriteLine(JsonSerializer.Serialize(new { workspaces, count = workspaces.Count },
-                    new JsonSerializerOptions { WriteIndented = true }));
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, roleOption, limitOption);
-
+        command.SetHandler((string? role, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspacesHandler>()
+                    .HandleAsync(new ListWorkspacesRequest(role, limit), CancellationToken.None)),
+            roleOption, limitOption);
         return command;
     }
 
-    private static Command CreateViewCommand()
+    private static Command CreateViewCommand(IServiceProvider services)
     {
         var command = new Command("view", "View workspace details");
-
         var workspaceArg = new Argument<string?>("workspace", () => null, "Workspace slug (uses default if not specified)");
-
         command.AddArgument(workspaceArg);
 
-        command.SetHandler(async (workspace) =>
-        {
-            var credentials = CredentialManager.Load();
-            if (credentials?.AccessToken is null && credentials?.AppPassword is null)
-            {
-                Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login' first.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            workspace ??= credentials.DefaultWorkspace;
-            if (string.IsNullOrEmpty(workspace))
-            {
-                Console.Error.WriteLine("Error: Workspace required. Provide as argument or set default with 'bbx auth set-workspace'.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var client = new BitbucketClient(credentials);
-
-            try
-            {
-                var ws = await client.GetAsync<JsonElement>($"workspaces/{workspace}");
-
-                var result = new
-                {
-                    slug = ws.TryGetProperty("slug", out var s) ? s.GetString() : null,
-                    name = ws.TryGetProperty("name", out var n) ? n.GetString() : null,
-                    uuid = ws.TryGetProperty("uuid", out var u) ? u.GetString() : null,
-                    is_private = ws.TryGetProperty("is_private", out var p) && p.GetBoolean(),
-                    created_on = ws.TryGetProperty("created_on", out var c) ? c.GetString() : null,
-                    links = ws.TryGetProperty("links", out var l) ? new
-                    {
-                        html = l.TryGetObject("html", out var h) && h.TryGetProperty("href", out var href) ? href.GetString() : null,
-                        avatar = l.TryGetObject("avatar", out var a) && a.TryGetProperty("href", out var ahref) ? ahref.GetString() : null
-                    } : null
-                };
-
-                Console.WriteLine(JsonSerializer.Serialize(result,
-                    new JsonSerializerOptions { WriteIndented = true }));
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, workspaceArg);
-
+        command.SetHandler((string? workspace) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceHandler>()
+                    .HandleAsync(new ViewWorkspaceRequest(workspace), CancellationToken.None)),
+            workspaceArg);
         return command;
     }
 
-    private static Command CreateMembersCommand()
+    private static Command CreateMembersCommand(IServiceProvider services)
     {
         var command = new Command("members", "List workspace members");
-
-        var workspaceOption = new Option<string?>(
-            ["--workspace", "-w"],
-            "Workspace slug (uses default if not specified)");
-
-        var limitOption = new Option<int>(
-            ["--limit", "-l"],
-            () => 50,
-            "Maximum number of members to return");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
+        var limitOption = new Option<int>(["--limit", "-l"], () => 50, "Maximum number of members to return");
 
         command.AddOption(workspaceOption);
         command.AddOption(limitOption);
 
-        command.SetHandler(async (workspace, limit) =>
-        {
-            var credentials = CredentialManager.Load();
-            if (credentials?.AccessToken is null && credentials?.AppPassword is null)
-            {
-                Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login' first.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            workspace ??= credentials.DefaultWorkspace;
-            if (string.IsNullOrEmpty(workspace))
-            {
-                Console.Error.WriteLine("Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var client = new BitbucketClient(credentials);
-
-            try
-            {
-                var members = new List<object>();
-                await foreach (var member in client.GetPaginatedAsync<JsonElement>($"workspaces/{workspace}/members"))
-                {
-                    var user = member.TryGetProperty("user", out var u) ? u : member;
-
-                    members.Add(new
-                    {
-                        display_name = user.TryGetProperty("display_name", out var d) ? d.GetString() : null,
-                        username = user.TryGetProperty("username", out var un) ? un.GetString() : null,
-                        account_id = user.TryGetProperty("account_id", out var a) ? a.GetString() : null,
-                        uuid = user.TryGetProperty("uuid", out var uuid) ? uuid.GetString() : null
-                    });
-
-                    if (members.Count >= limit) break;
-                }
-
-                Console.WriteLine(JsonSerializer.Serialize(new { members, count = members.Count },
-                    new JsonSerializerOptions { WriteIndented = true }));
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, workspaceOption, limitOption);
-
+        command.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspaceMembersHandler>()
+                    .HandleAsync(new ListWorkspaceMembersRequest(workspace, limit), CancellationToken.None)),
+            workspaceOption, limitOption);
         return command;
     }
 
-    private static Command CreateProjectsCommand()
-    {
-        var command = new Command("projects", "Manage workspace projects");
-
-        var workspaceOption = new Option<string?>(
-            ["--workspace", "-w"],
-            "Workspace slug (uses default if not specified)");
-
-        var viewOption = new Option<string?>(
-            ["--view", "-v"],
-            "View specific project by key");
-
-        var createOption = new Option<string?>(
-            ["--create", "-c"],
-            "Create new project with this name");
-
-        var keyOption = new Option<string?>(
-            ["--key", "-k"],
-            "Project key (required for create, used for operations)");
-
-        var descriptionOption = new Option<string?>(
-            ["--description", "-d"],
-            "Project description (for create)");
-
-        var privateOption = new Option<bool?>(
-            ["--private", "-p"],
-            "Make project private (for create)");
-
-        var deleteOption = new Option<bool>(
-            ["--delete"],
-            () => false,
-            "Delete the project specified by --key");
-
-        var yesOption = new Option<bool>(
-            ["--yes", "-y"],
-            () => false,
-            "Skip confirmation prompt for delete");
-
-        var limitOption = new Option<int>(
-            ["--limit", "-l"],
-            () => 25,
-            "Maximum number of projects to return");
-
-        command.AddOption(workspaceOption);
-        command.AddOption(viewOption);
-        command.AddOption(createOption);
-        command.AddOption(keyOption);
-        command.AddOption(descriptionOption);
-        command.AddOption(privateOption);
-        command.AddOption(deleteOption);
-        command.AddOption(yesOption);
-        command.AddOption(limitOption);
-
-        command.SetHandler(async (context) =>
-        {
-            var workspace = context.ParseResult.GetValueForOption(workspaceOption);
-            var view = context.ParseResult.GetValueForOption(viewOption);
-            var create = context.ParseResult.GetValueForOption(createOption);
-            var key = context.ParseResult.GetValueForOption(keyOption);
-            var description = context.ParseResult.GetValueForOption(descriptionOption);
-            var isPrivate = context.ParseResult.GetValueForOption(privateOption);
-            var delete = context.ParseResult.GetValueForOption(deleteOption);
-            var yes = context.ParseResult.GetValueForOption(yesOption);
-            var limit = context.ParseResult.GetValueForOption(limitOption);
-
-            var credentials = CredentialManager.Load();
-            if (credentials?.AccessToken is null && credentials?.AppPassword is null)
-            {
-                Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login' first.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            workspace ??= credentials.DefaultWorkspace;
-            if (string.IsNullOrEmpty(workspace))
-            {
-                Console.Error.WriteLine("Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var client = new BitbucketClient(credentials);
-
-            try
-            {
-                if (!string.IsNullOrEmpty(view))
-                {
-                    // View specific project
-                    var project = await client.GetAsync<JsonElement>($"workspaces/{workspace}/projects/{view}");
-
-                    var result = new
-                    {
-                        key = project.TryGetProperty("key", out var k) ? k.GetString() : null,
-                        name = project.TryGetProperty("name", out var n) ? n.GetString() : null,
-                        description = project.TryGetProperty("description", out var d) ? d.GetString() : null,
-                        uuid = project.TryGetProperty("uuid", out var u) ? u.GetString() : null,
-                        is_private = project.TryGetProperty("is_private", out var p) && p.GetBoolean(),
-                        created_on = project.TryGetProperty("created_on", out var c) ? c.GetString() : null,
-                        updated_on = project.TryGetProperty("updated_on", out var up) ? up.GetString() : null
-                    };
-
-                    Console.WriteLine(JsonSerializer.Serialize(result,
-                        new JsonSerializerOptions { WriteIndented = true }));
-                }
-                else if (!string.IsNullOrEmpty(create))
-                {
-                    // Create new project
-                    if (string.IsNullOrEmpty(key))
-                    {
-                        Console.Error.WriteLine("Error: --key is required when creating a project.");
-                        Environment.ExitCode = 1;
-                        return;
-                    }
-
-                    var payload = new Dictionary<string, object>
-                    {
-                        ["name"] = create,
-                        ["key"] = key,
-                        ["is_private"] = isPrivate ?? true
-                    };
-
-                    if (!string.IsNullOrEmpty(description))
-                    {
-                        payload["description"] = description;
-                    }
-
-                    var project = await client.PostAsync<JsonElement>($"workspaces/{workspace}/projects", payload);
-
-                    Console.WriteLine(JsonSerializer.Serialize(new
-                    {
-                        key = project.TryGetProperty("key", out var k) ? k.GetString() : null,
-                        name = project.TryGetProperty("name", out var n) ? n.GetString() : null,
-                        created_on = project.TryGetProperty("created_on", out var c) ? c.GetString() : null
-                    }, new JsonSerializerOptions { WriteIndented = true }));
-                }
-                else if (delete)
-                {
-                    // Delete project
-                    if (string.IsNullOrEmpty(key))
-                    {
-                        Console.Error.WriteLine("Error: --key is required when deleting a project.");
-                        Environment.ExitCode = 1;
-                        return;
-                    }
-
-                    if (!yes)
-                    {
-                        Console.Error.Write($"Delete project '{key}'? [y/N]: ");
-                        var response = Console.ReadLine()?.Trim().ToLower();
-                        if (response != "y" && response != "yes")
-                        {
-                            Console.Error.WriteLine("Cancelled.");
-                            return;
-                        }
-                    }
-
-                    await client.DeleteAsync($"workspaces/{workspace}/projects/{key}");
-                    Console.WriteLine(JsonSerializer.Serialize(new { deleted = true, project_key = key },
-                        new JsonSerializerOptions { WriteIndented = true }));
-                }
-                else
-                {
-                    // List projects
-                    var projects = new List<object>();
-                    await foreach (var project in client.GetPaginatedAsync<JsonElement>($"workspaces/{workspace}/projects"))
-                    {
-                        projects.Add(new
-                        {
-                            key = project.TryGetProperty("key", out var k) ? k.GetString() : null,
-                            name = project.TryGetProperty("name", out var n) ? n.GetString() : null,
-                            description = project.TryGetProperty("description", out var d) ? d.GetString() : null,
-                            is_private = project.TryGetProperty("is_private", out var p) && p.GetBoolean(),
-                            created_on = project.TryGetProperty("created_on", out var c) ? c.GetString() : null
-                        });
-
-                        if (projects.Count >= limit) break;
-                    }
-
-                    Console.WriteLine(JsonSerializer.Serialize(new { projects, count = projects.Count },
-                        new JsonSerializerOptions { WriteIndented = true }));
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        });
-
-        return command;
-    }
-
-    private static Command CreatePermissionsCommand()
+    private static Command CreatePermissionsCommand(IServiceProvider services)
     {
         var command = new Command("permissions", "View workspace permissions");
-
-        var workspaceOption = new Option<string?>(
-            ["--workspace", "-w"],
-            "Workspace slug (uses default if not specified)");
-
-        var limitOption = new Option<int>(
-            ["--limit", "-l"],
-            () => 50,
-            "Maximum number of permissions to return");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
+        var limitOption = new Option<int>(["--limit", "-l"], () => 50, "Maximum number of permissions to return");
 
         command.AddOption(workspaceOption);
         command.AddOption(limitOption);
 
-        command.SetHandler(async (workspace, limit) =>
-        {
-            var credentials = CredentialManager.Load();
-            if (credentials?.AccessToken is null && credentials?.AppPassword is null)
-            {
-                Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login' first.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            workspace ??= credentials.DefaultWorkspace;
-            if (string.IsNullOrEmpty(workspace))
-            {
-                Console.Error.WriteLine("Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var client = new BitbucketClient(credentials);
-
-            try
-            {
-                var permissions = new List<object>();
-                await foreach (var perm in client.GetPaginatedAsync<JsonElement>($"workspaces/{workspace}/permissions"))
-                {
-                    permissions.Add(new
-                    {
-                        permission = perm.TryGetProperty("permission", out var p) ? p.GetString() : null,
-                        user = perm.TryGetProperty("user", out var u) ? new
-                        {
-                            display_name = u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
-                            username = u.TryGetProperty("username", out var un) ? un.GetString() : null,
-                            account_id = u.TryGetProperty("account_id", out var a) ? a.GetString() : null
-                        } : null,
-                        workspace = perm.TryGetObject("workspace", out var w) && w.TryGetProperty("slug", out var s) ? s.GetString() : null
-                    });
-
-                    if (permissions.Count >= limit) break;
-                }
-
-                Console.WriteLine(JsonSerializer.Serialize(new { permissions, count = permissions.Count },
-                    new JsonSerializerOptions { WriteIndented = true }));
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        }, workspaceOption, limitOption);
-
+        command.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspacePermissionsHandler>()
+                    .HandleAsync(new ListWorkspacePermissionsRequest(workspace, limit), CancellationToken.None)),
+            workspaceOption, limitOption);
         return command;
     }
 
-    private static Command CreateHooksCommand()
+    private static Command CreateHooksCommand(IServiceProvider services)
     {
-        var command = new Command("hooks", "Manage workspace webhooks");
+        var hooksCommand = new Command("hooks", "Manage workspace webhooks");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug (uses default if not specified)");
+        hooksCommand.AddGlobalOption(workspaceOption);
 
-        var workspaceOption = new Option<string?>(
-            ["--workspace", "-w"],
-            "Workspace slug (uses default if not specified)");
+        var listCommand = new Command("list", "List workspace webhooks");
+        var limitOption = new Option<int>("--limit", () => 25, "Maximum webhooks to list");
+        listCommand.AddOption(limitOption);
+        listCommand.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspaceHooksHandler>()
+                    .HandleAsync(new ListWorkspaceHooksRequest(workspace, limit), CancellationToken.None)),
+            workspaceOption, limitOption);
+        hooksCommand.AddCommand(listCommand);
 
-        var viewOption = new Option<string?>(
-            ["--view", "-v"],
-            "View specific webhook by UUID");
+        var viewCommand = new Command("view", "View a workspace webhook");
+        var viewUidArg = new Argument<string>("uid", "Webhook UUID");
+        viewCommand.AddArgument(viewUidArg);
+        viewCommand.SetHandler((string? workspace, string uid) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceHookHandler>()
+                    .HandleAsync(new ViewWorkspaceHookRequest(workspace, uid), CancellationToken.None)),
+            workspaceOption, viewUidArg);
+        hooksCommand.AddCommand(viewCommand);
 
-        var createOption = new Option<string?>(
-            ["--create", "-c"],
-            "Create webhook with this URL");
+        var createCommand = new Command("create", "Create a workspace webhook");
+        var urlOption = new Option<string>("--url", "Webhook target URL") { IsRequired = true };
+        var descriptionOption = new Option<string?>("--description", "Webhook description");
+        var eventsOption = new Option<string[]?>("--events", "Events to trigger webhook (default: repo:push)");
+        var activeOption = new Option<bool>("--active", () => true, "Whether the webhook is active");
+        createCommand.AddOption(urlOption);
+        createCommand.AddOption(descriptionOption);
+        createCommand.AddOption(eventsOption);
+        createCommand.AddOption(activeOption);
+        createCommand.SetHandler((string? workspace, string url, string? description, string[]? events, bool active) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<CreateWorkspaceHookHandler>()
+                    .HandleAsync(new CreateWorkspaceHookRequest(workspace, url, description, events, active), CancellationToken.None)),
+            workspaceOption, urlOption, descriptionOption, eventsOption, activeOption);
+        hooksCommand.AddCommand(createCommand);
 
-        var descriptionOption = new Option<string?>(
-            ["--description", "-d"],
-            "Webhook description");
+        var updateCommand = new Command("update", "Update a workspace webhook");
+        var updateUidArg = new Argument<string>("uid", "Webhook UUID");
+        var updateUrlOption = new Option<string?>("--url", "Webhook target URL");
+        var updateDescriptionOption = new Option<string?>("--description", "Webhook description");
+        var updateEventsOption = new Option<string[]?>("--events", "Events to trigger webhook");
+        var updateActiveOption = new Option<bool?>("--active", "Whether the webhook is active");
+        updateCommand.AddArgument(updateUidArg);
+        updateCommand.AddOption(updateUrlOption);
+        updateCommand.AddOption(updateDescriptionOption);
+        updateCommand.AddOption(updateEventsOption);
+        updateCommand.AddOption(updateActiveOption);
+        updateCommand.SetHandler((string? workspace, string uid, string? url, string? description, string[]? events, bool? active) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateWorkspaceHookHandler>()
+                    .HandleAsync(new UpdateWorkspaceHookRequest(workspace, uid, url, description, events, active), CancellationToken.None)),
+            workspaceOption, updateUidArg, updateUrlOption, updateDescriptionOption, updateEventsOption, updateActiveOption);
+        hooksCommand.AddCommand(updateCommand);
 
-        var eventsOption = new Option<string[]?>(
-            ["--events", "-e"],
-            "Events to trigger webhook (e.g., repo:push, pullrequest:created)");
-
-        var activeOption = new Option<bool?>(
-            ["--active", "-a"],
-            "Whether webhook is active");
-
-        var deleteOption = new Option<string?>(
-            ["--delete"],
-            "Delete webhook by UUID");
-
-        var yesOption = new Option<bool>(
-            ["--yes", "-y"],
-            () => false,
-            "Skip confirmation prompt for delete");
-
-        var limitOption = new Option<int>(
-            ["--limit", "-l"],
-            () => 25,
-            "Maximum number of webhooks to return");
-
-        command.AddOption(workspaceOption);
-        command.AddOption(viewOption);
-        command.AddOption(createOption);
-        command.AddOption(descriptionOption);
-        command.AddOption(eventsOption);
-        command.AddOption(activeOption);
-        command.AddOption(deleteOption);
-        command.AddOption(yesOption);
-        command.AddOption(limitOption);
-
-        command.SetHandler(async (context) =>
+        var deleteCommand = new Command("delete", "Delete a workspace webhook");
+        var deleteUidArg = new Argument<string>("uid", "Webhook UUID");
+        var yesOption = new Option<bool>("--yes", "Skip confirmation");
+        deleteCommand.AddArgument(deleteUidArg);
+        deleteCommand.AddOption(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string uid, bool yes) =>
         {
-            var workspace = context.ParseResult.GetValueForOption(workspaceOption);
-            var view = context.ParseResult.GetValueForOption(viewOption);
-            var create = context.ParseResult.GetValueForOption(createOption);
-            var description = context.ParseResult.GetValueForOption(descriptionOption);
-            var events = context.ParseResult.GetValueForOption(eventsOption);
-            var active = context.ParseResult.GetValueForOption(activeOption);
-            var deleteUuid = context.ParseResult.GetValueForOption(deleteOption);
-            var yes = context.ParseResult.GetValueForOption(yesOption);
-            var limit = context.ParseResult.GetValueForOption(limitOption);
-
-            var credentials = CredentialManager.Load();
-            if (credentials?.AccessToken is null && credentials?.AppPassword is null)
-            {
-                Console.Error.WriteLine("Error: Not authenticated. Run 'bbx auth login' first.");
-                Environment.ExitCode = 1;
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete webhook '{uid}'? [y/N]: "))
                 return;
-            }
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteWorkspaceHookHandler>()
+                    .HandleAsync(new DeleteWorkspaceHookRequest(workspace, uid), CancellationToken.None));
+        }, workspaceOption, deleteUidArg, yesOption);
+        hooksCommand.AddCommand(deleteCommand);
 
-            workspace ??= credentials.DefaultWorkspace;
-            if (string.IsNullOrEmpty(workspace))
-            {
-                Console.Error.WriteLine("Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var client = new BitbucketClient(credentials);
-
-            try
-            {
-                if (!string.IsNullOrEmpty(view))
-                {
-                    // View specific webhook
-                    var hook = await client.GetAsync<JsonElement>($"workspaces/{workspace}/hooks/{view}");
-
-                    var hookEvents = new List<string>();
-                    if (hook.TryGetProperty("events", out var e) && e.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var ev in e.EnumerateArray())
-                        {
-                            if (ev.GetString() is string evStr)
-                                hookEvents.Add(evStr);
-                        }
-                    }
-
-                    var result = new
-                    {
-                        uuid = hook.TryGetProperty("uuid", out var u) ? u.GetString() : null,
-                        description = hook.TryGetProperty("description", out var d) ? d.GetString() : null,
-                        url = hook.TryGetProperty("url", out var url) ? url.GetString() : null,
-                        active = hook.TryGetProperty("active", out var a) && a.GetBoolean(),
-                        events = hookEvents,
-                        created_at = hook.TryGetProperty("created_at", out var c) ? c.GetString() : null
-                    };
-
-                    Console.WriteLine(JsonSerializer.Serialize(result,
-                        new JsonSerializerOptions { WriteIndented = true }));
-                }
-                else if (!string.IsNullOrEmpty(create))
-                {
-                    // Create webhook
-                    var payload = new Dictionary<string, object>
-                    {
-                        ["url"] = create,
-                        ["active"] = active ?? true,
-                        ["events"] = events ?? new[] { "repo:push" }
-                    };
-
-                    if (!string.IsNullOrEmpty(description))
-                    {
-                        payload["description"] = description;
-                    }
-
-                    var hook = await client.PostAsync<JsonElement>($"workspaces/{workspace}/hooks", payload);
-
-                    Console.WriteLine(JsonSerializer.Serialize(new
-                    {
-                        uuid = hook.TryGetProperty("uuid", out var u) ? u.GetString() : null,
-                        url = hook.TryGetProperty("url", out var url) ? url.GetString() : null,
-                        active = hook.TryGetProperty("active", out var a) && a.GetBoolean(),
-                        created_at = hook.TryGetProperty("created_at", out var c) ? c.GetString() : null
-                    }, new JsonSerializerOptions { WriteIndented = true }));
-                }
-                else if (!string.IsNullOrEmpty(deleteUuid))
-                {
-                    // Delete webhook
-                    if (!yes)
-                    {
-                        Console.Error.Write($"Delete webhook '{deleteUuid}'? [y/N]: ");
-                        var response = Console.ReadLine()?.Trim().ToLower();
-                        if (response != "y" && response != "yes")
-                        {
-                            Console.Error.WriteLine("Cancelled.");
-                            return;
-                        }
-                    }
-
-                    await client.DeleteAsync($"workspaces/{workspace}/hooks/{deleteUuid}");
-                    Console.WriteLine(JsonSerializer.Serialize(new { deleted = true, uuid = deleteUuid },
-                        new JsonSerializerOptions { WriteIndented = true }));
-                }
-                else
-                {
-                    // List webhooks
-                    var hooks = new List<object>();
-                    await foreach (var hook in client.GetPaginatedAsync<JsonElement>($"workspaces/{workspace}/hooks"))
-                    {
-                        var hookEvents = new List<string>();
-                        if (hook.TryGetProperty("events", out var ev) && ev.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var evt in ev.EnumerateArray())
-                            {
-                                if (evt.GetString() is string evStr)
-                                    hookEvents.Add(evStr);
-                            }
-                        }
-
-                        hooks.Add(new
-                        {
-                            uuid = hook.TryGetProperty("uuid", out var u) ? u.GetString() : null,
-                            description = hook.TryGetProperty("description", out var d) ? d.GetString() : null,
-                            url = hook.TryGetProperty("url", out var url) ? url.GetString() : null,
-                            active = hook.TryGetProperty("active", out var a) && a.GetBoolean(),
-                            events = hookEvents
-                        });
-
-                        if (hooks.Count >= limit) break;
-                    }
-
-                    Console.WriteLine(JsonSerializer.Serialize(new { hooks, count = hooks.Count },
-                        new JsonSerializerOptions { WriteIndented = true }));
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
-        });
-
-        return command;
+        return hooksCommand;
     }
 }

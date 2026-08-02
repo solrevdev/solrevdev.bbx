@@ -3,32 +3,55 @@ using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using System.Text;
 using Bbx.Commands;
+using Bbx.Composition;
 
 namespace Bbx;
 
 public class Program
 {
+    // internal set so tests can substitute a provider; Main is the only writer in production.
+    public static IServiceProvider Services { get; internal set; } = null!;
+
     public static async Task<int> Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
 
+        // `--json-compact` is a global formatting toggle. It's stripped here
+        // before System.CommandLine sees the args so every group inherits
+        // it transparently — same effect as setting BBX_JSON_COMPACT=1.
+        var compactEnv = Environment.GetEnvironmentVariable("BBX_JSON_COMPACT");
+        var compactFromEnv = !string.IsNullOrEmpty(compactEnv)
+            && (compactEnv == "1" || string.Equals(compactEnv, "true", StringComparison.OrdinalIgnoreCase));
+        var compactFromArg = args.Any(a => a == "--json-compact");
+        JsonOptions.UseCompact = compactFromArg || compactFromEnv;
+        if (compactFromArg)
+            args = args.Where(a => a != "--json-compact").ToArray();
+
+        Services = ServiceRegistration.Build();
+
         var rootCommand = new RootCommand("Bitbucket Cloud CLI for LLM integration")
         {
-            Name = "bbx"
+            Name = "bbx",
         };
+        // Registered for --help discoverability only; the option is already
+        // consumed above before InvokeAsync runs.
+        rootCommand.AddGlobalOption(new Option<bool>(
+            "--json-compact",
+            "Print JSON on a single line (no whitespace). Default: pretty-printed. Env: BBX_JSON_COMPACT=1."));
 
-        // Add all command groups
-        rootCommand.AddCommand(AuthCommand.Create());
-        rootCommand.AddCommand(RepoCommand.Create());
-        rootCommand.AddCommand(PrCommand.Create());
-        rootCommand.AddCommand(BranchCommand.Create());
-        rootCommand.AddCommand(CommitCommand.Create());
-        rootCommand.AddCommand(IssueCommand.Create());
-        rootCommand.AddCommand(PipelineCommand.Create());
-        rootCommand.AddCommand(SnippetCommand.Create());
-        rootCommand.AddCommand(WorkspaceCommand.Create());
+        rootCommand.AddCommand(AuthCommand.Create(Services));
+        rootCommand.AddCommand(RepoCommand.Create(Services));
+        rootCommand.AddCommand(PrCommand.Create(Services));
+        rootCommand.AddCommand(BranchCommand.Create(Services));
+        rootCommand.AddCommand(CommitCommand.Create(Services));
+        rootCommand.AddCommand(SrcCommand.Create(Services));
+        rootCommand.AddCommand(DownloadCommand.Create(Services));
+        rootCommand.AddCommand(IssueCommand.Create(Services));
+        rootCommand.AddCommand(PipelineCommand.Create(Services));
+        rootCommand.AddCommand(SnippetCommand.Create(Services));
+        rootCommand.AddCommand(WorkspaceCommand.Create(Services));
+        rootCommand.AddCommand(UserCommand.Create(Services));
 
-        // Version command
         var versionCommand = new Command("version", "Show version information");
         versionCommand.SetHandler(() =>
         {
@@ -37,14 +60,9 @@ public class Program
         });
         rootCommand.AddCommand(versionCommand);
 
-        // A value returned from Main overrides Environment.ExitCode, and
-        // InvokeAsync reports 0 whenever a handler returned normally. Handlers
-        // catch their own errors and set Environment.ExitCode, so returning
-        // InvokeAsync's result alone made every failed command exit 0 and look
-        // successful to a script or an agent.
-        // Several handlers have no try/catch of their own, and the default
-        // pipeline answers an escaped exception with a full stack trace. Report
-        // the message instead; the exit code stays 1 either way.
+        // CommandRunner catches the expected failures, but anything else that
+        // escapes a handler would otherwise print a full stack trace. Report the
+        // message instead; the exit code stays 1 either way.
         var parser = new CommandLineBuilder(rootCommand)
             .UseDefaults()
             .UseExceptionHandler((exception, context) =>
@@ -54,6 +72,11 @@ public class Program
             })
             .Build();
 
+        // A value returned from Main overrides Environment.ExitCode, and
+        // InvokeAsync reports 0 whenever a handler returned normally. Handlers
+        // catch their own errors and set Environment.ExitCode, so returning
+        // InvokeAsync's result alone made every failed command exit 0 and look
+        // successful to a script or an agent.
         var exitCode = await parser.InvokeAsync(args);
         return exitCode != 0 ? exitCode : Environment.ExitCode;
     }
