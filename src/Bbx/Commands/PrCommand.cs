@@ -142,7 +142,8 @@ public static class PrCommand
         // bbx pr merge
         var mergeCommand = new Command("merge", "Merge a pull request");
         var mergeIdArg = new Argument<int>("id", "Pull request ID");
-        var strategyOption = new Option<string>("--strategy", () => "merge", "Merge strategy (merge, squash, fast_forward)");
+        var strategyOption = new Option<string>("--strategy", () => "merge_commit",
+            "Merge strategy (merge_commit, squash, fast_forward). 'merge' is accepted for merge_commit.");
         var messageOption = new Option<string?>("--message", "Merge commit message");
         var closeSourceMergeOption = new Option<bool>("--close-source-branch", "Close source branch after merge");
         mergeCommand.AddArgument(mergeIdArg);
@@ -165,7 +166,7 @@ public static class PrCommand
             var body = new Dictionary<string, object>
             {
                 ["type"] = "pullrequest",
-                ["merge_strategy"] = strategy,
+                ["merge_strategy"] = NormalizeMergeStrategy(strategy),
                 ["close_source_branch"] = closeSource
             };
             if (!string.IsNullOrEmpty(message)) body["message"] = message;
@@ -470,5 +471,18 @@ public static class PrCommand
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         WriteIndented = true
+    };
+
+    /// <summary>
+    /// Bitbucket accepts merge_commit, squash and fast_forward. "merge" is what
+    /// the UI calls a merge commit and was this command's default, so it was
+    /// rejected with "merge_strategy: Select a valid choice".
+    /// </summary>
+    internal static string NormalizeMergeStrategy(string? strategy) => strategy?.Trim().ToLowerInvariant() switch
+    {
+        null or "" or "merge" or "merge_commit" => "merge_commit",
+        "squash" => "squash",
+        "fast_forward" or "fast-forward" or "ff" => "fast_forward",
+        var other => other,
     };
 }

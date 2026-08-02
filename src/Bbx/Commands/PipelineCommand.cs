@@ -764,16 +764,19 @@ public static class PipelineCommand
 
             try
             {
+                // "type" and "selector" are both required. Without the
+                // discriminator Bitbucket answers "An invalid field was found in
+                // the JSON payload", and without a selector it does not know
+                // which pipeline definition to run.
                 var target = new Dictionary<string, object>
                 {
+                    ["type"] = "pipeline_ref_target",
                     ["ref_type"] = "branch",
-                    ["ref_name"] = branch
+                    ["ref_name"] = branch,
+                    ["selector"] = string.IsNullOrEmpty(pattern)
+                        ? new { type = "branches", pattern = "default" }
+                        : new { type = "custom", pattern }
                 };
-
-                if (!string.IsNullOrEmpty(pattern))
-                {
-                    target["selector"] = new { type = "custom", pattern };
-                }
 
                 var body = new
                 {

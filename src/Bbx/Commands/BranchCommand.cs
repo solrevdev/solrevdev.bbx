@@ -226,11 +226,15 @@ public static class BranchCommand
             }
 
             using var client = CreateClient(config);
+            // Always glob. Bitbucket rejects a pattern sent with any other
+            // match kind ("pattern is only valid when branch_match_kind is
+            // glob"), and branching_model expects a branch_type instead. An
+            // exact branch name is a valid glob.
             var body = new
             {
                 kind,
                 pattern,
-                branch_match_kind = pattern.Contains('*') ? "glob" : "branching_model"
+                branch_match_kind = "glob"
             };
 
             try

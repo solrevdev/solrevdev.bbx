@@ -173,7 +173,9 @@ public class BitbucketClient : IDisposable
         var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<T>(json, JsonOptions);
+        // A PUT that succeeds with 204 has no body. Deserializing "" throws,
+        // which is how `bbx snippet watch` failed against its 204.
+        return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 
     public async Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
