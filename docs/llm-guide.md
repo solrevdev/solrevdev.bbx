@@ -28,19 +28,21 @@ relevant table.
   `"Error: "`).
 - **No interactive prompts by default for an agent.** Set
   `BBX_NO_INTERACTIVE=1` or redirect stdin to disable the first-run
-  OAuth auto-launch and the `--yes`-less confirmation prompts.
+  credential prompt and the `--yes`-less confirmation prompts.
 
 ---
 
 ## 2. Authentication contract
 
-`bbx` supports two auth methods. Agents typically use API tokens for
-CI; OAuth is the interactive default for humans.
+`bbx` authenticates with Atlassian API tokens and nothing else.
 
 | Method | Wire shape | Setup |
 |---|---|---|
-| OAuth 2.0 | `Authorization: Bearer <access>` (refreshed automatically) | `bbx auth login --oauth` (interactive) or first-run auto-launch |
-| Atlassian API token | `Authorization: Basic <base64(email:token)>` | `bbx auth login --api-token` (prompts for email + token) |
+| Atlassian API token | `Authorization: Basic <base64(email:token)>` | `bbx auth login` (prompts for email + token) |
+
+Scopes are chosen when the token is created. A call that needs a scope the
+token lacks returns HTTP 403 naming the missing scope, so an agent can report
+it rather than retrying.
 
 Credentials live in `~/.config/bbx/config.json` (mode 600). The same
 config file is read at every command invocation; nothing is held in
@@ -50,7 +52,7 @@ memory between runs.
 
 ```bash
 # 1. Authenticate (one-time, on a build agent with no browser)
-printf 'bot@example.com\nATATT3xFfGF0xxxx\n' | bbx auth login --api-token
+printf 'bot@example.com\nATATT3xFfGF0xxxx\n' | bbx auth login
 
 # 2. Pin the default workspace so -w can be omitted
 bbx auth set-workspace myworkspace
@@ -59,11 +61,11 @@ bbx auth set-workspace myworkspace
 bbx auth status              # plain-text output; exit code is the contract
 ```
 
-### Recipe — opt out of auto-launch
+### Recipe — opt out of prompting
 
-Set `BBX_NO_INTERACTIVE=1`. Any command that needs credentials but
-finds none will now print `Error: Not authenticated. …` and exit `1`
-instead of starting the OAuth flow.
+Set `BBX_NO_INTERACTIVE=1`. Any command that needs credentials but finds
+none prints `Error: Not authenticated. …` and exits `1` instead of
+prompting for a token.
 
 ---
 
@@ -129,12 +131,9 @@ they're available on `repo` / `pr` / `branch` / `commit` / `issue`.
 
 | Verb | Endpoint | Flags / args |
 |---|---|---|
-| `login --oauth` | `https://bitbucket.org/site/oauth2/{authorize,access_token}` | `--client-id`, `--client-secret`, `--port` (default 53682), `--no-browser`, `--scopes` |
-| `login --api-token` | (validation via `user`) | prompts for email + token |
-| `setup-oauth` | none — prints walkthrough | `--open` |
-| `refresh` | `oauth2/access_token` | (none) |
+| `login` | (validation via `user`) | `--email`, `--token`; prompts for whatever is omitted |
 | `status` | `user` | plain-text output, not JSON |
-| `token` | (local) | prints current access token / `email:token` |
+| `token` | (local) | prints `email:token` for `curl -u` |
 | `logout` | (local) | clears all stored credentials |
 | `set-workspace <slug>` | (local) | sets `DefaultWorkspace` in config |
 
@@ -363,10 +362,11 @@ bbx src write -w myworkspace -r myrepo \
 
 ## 6. Errors and retries
 
-- **`Error: Not authenticated. Run 'bbx auth login' first.`** — config
-  is missing or empty. With `BBX_NO_INTERACTIVE=1` you'll see this
-  even if a browser is available. Fix: run `bbx auth login --oauth`
-  (or `--api-token`) once.
+- **`Error: Not authenticated. Run: bbx auth login`** — config is missing
+  or empty. Fix: run `bbx auth login` once, or write the config file
+  directly in CI.
+- **`Error: … Missing token scopes: <scope>.`** — the token is valid but
+  lacks a scope. Do not retry; the token has to be re-issued.
 - **`Error: Workspace required. …`** — no `-w` and no default. Fix
   permanently with `bbx auth set-workspace <slug>`.
 - **`Error: Workspace and repository required.`** — `pr`/`branch`/
@@ -376,9 +376,8 @@ bbx src write -w myworkspace -r myrepo \
 - HTTP 429 / 5xx are NOT auto-retried in `bbx`. An agent should
   backoff and retry from its own loop.
 
-OAuth refresh failures (e.g. revoked consumer) surface as a
-`HttpRequestException` from the next API call. The fix is the same:
-re-run `bbx auth login --oauth`.
+A revoked or expired token surfaces as an HTTP 401 on the next call. The
+fix is to re-run `bbx auth login`.
 
 ---
 

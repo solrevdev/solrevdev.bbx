@@ -1,20 +1,8 @@
 # Publish NuGet (bbx)
 #
-# v2.0.0 readiness (2026-05-17): this branch (feat/oauth-and-api-coverage)
-# is the first "post-OAuth, no --app-password" release. Key changes vs.
-# v1.x:
-#   - OAuth 2.0 (loopback authorization-code) is the primary auth method
-#     and first-run auto-launches when no credentials are stored.
-#   - `bbx auth login --app-password` is gone (Bitbucket retires app
-#     passwords 2026-06-09). `--api-token` remains as the documented
-#     fallback for CI / scripts.
-#   - `BbxConfig.AppPassword` and the legacy migration branch in
-#     CredentialManager are deleted; pre-Phase-0 configs no longer
-#     auto-migrate. See CHANGELOG.md for the full v2.0.0 notes.
-#
-# Cutting v2.0.0 from this branch requires a `major` bump via
-# workflow_dispatch (inputs.bump=major) — the per-commit `push` trigger
-# defaults to `patch`, which is wrong for a breaking release.
+# A push to master that touches src/Bbx/** publishes a PATCH bump. Use
+# workflow_dispatch with bump=major or minor for anything larger; a breaking
+# release cut from a plain push would ship under the wrong version.
 name: Publish NuGet (bbx)
 
 on:

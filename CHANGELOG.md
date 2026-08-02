@@ -11,98 +11,57 @@ Versioning follows [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.P
 
 (none.)
 
-## [2.0.0] — first stable release after the OAuth + coverage rewrite
+## [2.0.0] — API tokens, wider coverage, a test suite
 
-This is the first stable release of `solrevdev.bbx` following the
-`feat/oauth-and-api-coverage` work. It is a **breaking release** vs the
-unreleased 1.x prototype:
-
-- `bbx auth login --app-password` is gone. Bitbucket retires app
-  passwords on **2026-06-09**; the flag and code path are deleted
-  rather than carried as a deprecation warning. Use `--oauth`
-  (recommended) or `--api-token` (CI / scripted) instead.
-- `BbxConfig.AppPassword` and the legacy migration branch in
-  `CredentialManager.TryMigrate` are removed. Configs written by any
-  v1 prototype that still hold an `AppPassword` field no longer
-  auto-migrate; users re-authenticate to rewrite the file in the new
-  shape.
-- `bbx workspace hooks` moved from the flat-flag form
-  (`--view <uuid>` / `--create <url>` / `--delete <uuid>`) to per-verb
-  subcommands (`list` / `view` / `create` / `update` / `delete`),
-  matching `bbx repo hooks`.
-- `bbx workspace projects` (plural) moved from the flat-flag form
-  (`--view` / `--create` / `--delete` / `--key`) to per-verb
-  subcommands and is now an alias of `bbx workspace project` (singular)
-  — both names point at the same subcommand graph covering CRUD plus
-  the per-project sub-APIs.
-
-### Added
-
-- **OAuth 2.0 (authorization-code via loopback)** as the primary auth
-  method. `bbx auth login --oauth` runs a one-shot `HttpListener` on
-  `http://localhost:53682/callback`, opens the user's browser, captures
-  the callback, exchanges for tokens, and persists to
-  `~/.config/bbx/config.json` (mode 600). Refresh handles rotation with
-  a 60-second safety margin and a `SemaphoreSlim` guard.
-- **First-run auto-launch**: any authenticated command that finds no
-  credentials triggers the OAuth flow itself (skip with
-  `BBX_NO_INTERACTIVE=1` or redirected stdin).
-- `bbx auth setup-oauth` — print (and optionally open) the OAuth
-  consumer-registration walkthrough.
-- `bbx auth refresh` — force a token refresh and print the new expiry.
-- `bbx auth set-workspace <slug>` — set the default workspace used when
-  `-w` is omitted.
-- **Endpoint coverage** for: repository webhooks; source / files
-  (`bbx src {ls,cat,write}`); tags (`bbx branch tag …`); downloads
-  (`bbx download …`); commit build-status create/update; default
-  reviewers (repo + project + effective); PR tasks / request-changes /
-  commits / patch; repo forks / watchers / branching-model / deploy
-  keys; commit filehistory / merge-base / approve / diffstat / reports;
-  pipeline reports / test reports / test cases / OIDC config /
-  pipeline pull-request triggers; user emails / permissions / view /
-  SSH keys; project default reviewers / branching-model / deploy keys;
-  workspace hooks per-verb shape.
-- `--json-compact` global option (and `BBX_JSON_COMPACT=1` env var) for
-  single-line JSON output, ideal for `bbx … | jq -c` pipelines.
-- `scripts/smoke.sh` — read-only integration smoke against a sandbox
-  workspace.
-- `docs/llm-guide.md` — pattern-based reference aimed at code agents
-  driving `bbx` non-interactively.
-
-### Changed
-
-- `BitbucketClient` now routes every request through a `SendAsync` core
-  and an `IAuthProvider`, so OAuth refresh-and-rotate works without
-  touching every command site. `HttpClient` is a DI singleton.
-- Project layout moved to feature slices (`Features/<Group>/<Verb>/`
-  with request + handler) plus a single
-  `Composition/ServiceRegistration.cs`. Each `Commands/*.cs` is
-  System.CommandLine wiring only.
-- `BbxConfig` gained `AuthMethod`, `AccessToken`, `RefreshToken`,
-  `TokenExpiry` (now `DateTimeOffset?`), `OAuthClientId`,
-  `OAuthClientSecret`, `ApiToken`. `Username` is the Atlassian email
-  for API-token logins.
-- Tests: an xUnit project (`tests/Bbx.Tests/`) covers credentials,
-  the HTTP client, auth providers, OAuth flow, and per-handler unit
-  tests (161 tests at v2.0.0 cut).
+First stable release. Breaking against the unreleased 1.x prototype.
 
 ### Removed
 
-- `bbx auth login --app-password` flag and the
-  `BitbucketClient(string?, string?, string?)` ctor it relied on.
-- `BbxConfig.AppPassword` field + legacy migration branch.
-- All Phase 0 internal shims (`CredentialManager` static API, the
-  `BitbucketClient(BbxConfig)` ctor, per-command `CreateClient` helpers).
+- **OAuth.** `bbx auth login --oauth`, `bbx auth setup-oauth` and
+  `bbx auth refresh` are gone, along with the stored consumer and tokens.
+  Bitbucket's OAuth is bring-your-own-consumer: every user had to create a
+  private consumer, set a callback URL and copy a key and secret before
+  logging in once. That is more work than pasting an API token and needs
+  workspace admin rights. Anyone who logged in with OAuth must run
+  `bbx auth login` again.
+- **App passwords.** Bitbucket retires them on 2026-06-09.
+- `bbx workspace list` and `bbx user permissions {workspaces,repositories}`
+  still exist but return HTTP 410: Atlassian withdrew the underlying
+  endpoints under CHANGE-2770.
 
-### Deferred to a post-publish commit
+### Added
 
-- `Commands/IssueCommand.cs` + `Features/Issues/*` — Bitbucket shuts
-  the Issues API down on **2026-08-20**. The deprecation warning
-  shipped earlier stays in place; the command group will be deleted
-  in a separate post-publish commit on or just after that date.
-- A spike (`spike/oauth-dynamic-port`) to test whether Bitbucket
-  accepts variable-port loopback redirects — useful only if the fixed
-  port 53682 ever conflicts. See plan §4.2.
+- Coverage for source files (`src`), downloads, tags, deploy keys, default
+  reviewers, branching models, PR tasks, commit statuses, pipeline reports
+  and test cases, OIDC, workspace hooks and workspace projects.
+- `--json-compact` (and `BBX_JSON_COMPACT=1`) for single-line JSON.
+- A test project: 190 tests over a fake HTTP handler, wired into CI.
 
-[Unreleased]: https://github.com/solrevdev/solrevdev.bbx/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/solrevdev/solrevdev.bbx/releases/tag/v2.0.0
+### Fixed
+
+- `bbx pipeline logs` returned HTTP 406. Non-JSON GETs now send
+  `Accept: */*`; the log endpoint serves `application/octet-stream` and
+  refused to fall back.
+- `bbx pr diff` and `bbx pr patch` always failed with "You may not have
+  access to this repository". Those endpoints redirect, and HttpClient drops
+  the `Authorization` header when it follows a redirect. Redirects are now
+  followed in-process, re-applying credentials on the same origin only.
+- `bbx branch tag list` crashed on a lightweight tag: `TryGetProperty`
+  reports success for a JSON `null` and reading through it throws. Fixed
+  there and at 41 other nested lookups.
+- **Every failed command exited 0.** A value returned from `Main` overrides
+  `Environment.ExitCode`.
+- 403 responses said only "HTTP 403 Forbidden". They now name the missing
+  scope and where to re-issue the token.
+- `bbx pr merge` rejected its own default strategy (`merge`; the wire value
+  is `merge_commit`).
+- `bbx pipeline schedules create` and `bbx branch restrictions add` sent
+  payloads Bitbucket rejected.
+- `bbx snippet files` used an endpoint that does not exist; `bbx snippet
+  watch` crashed on a 204.
+- `bbx workspace project default-reviewers|deploy-keys|branching-model` had
+  no way to name the project: `--project-key` was bound but never
+  registered.
+- `pipeline` gained the `-w`/`-r` aliases every other group had.
+- Logging in no longer overwrites a default workspace you chose with your
+  account name.
