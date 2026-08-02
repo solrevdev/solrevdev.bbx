@@ -31,6 +31,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -49,9 +50,9 @@ public static class BranchCommand
                 branches.Add(new
                 {
                     name = branch.TryGetProperty("name", out var n) ? n.GetString() : null,
-                    target = branch.TryGetProperty("target", out var t) && t.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
-                    author = branch.TryGetProperty("target", out var t2) && t2.TryGetProperty("author", out var a) && a.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
-                    date = branch.TryGetProperty("target", out var t3) && t3.TryGetProperty("date", out var d) ? d.GetString() : null
+                    target = branch.TryGetObject("target", out var t) && t.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
+                    author = branch.TryGetObject("target", out var t2) && t2.TryGetObject("author", out var a) && a.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
+                    date = branch.TryGetObject("target", out var t3) && t3.TryGetProperty("date", out var d) ? d.GetString() : null
                 });
                 if (++count >= limit) break;
             }
@@ -73,6 +74,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -85,6 +87,7 @@ public static class BranchCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, nameArg);
         command.AddCommand(viewCommand);
@@ -103,6 +106,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -121,6 +125,7 @@ public static class BranchCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, createNameArg, targetOption);
         command.AddCommand(createCommand);
@@ -139,6 +144,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -161,6 +167,7 @@ public static class BranchCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, deleteNameArg, yesOption);
         command.AddCommand(deleteCommand);
@@ -178,6 +185,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -213,6 +221,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -232,6 +241,7 @@ public static class BranchCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, kindOption, patternOption);
         restrictionsCommand.AddCommand(restrictionsAddCommand);
@@ -248,6 +258,7 @@ public static class BranchCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -260,6 +271,7 @@ public static class BranchCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, restrictionIdArg);
         restrictionsCommand.AddCommand(restrictionsDeleteCommand);

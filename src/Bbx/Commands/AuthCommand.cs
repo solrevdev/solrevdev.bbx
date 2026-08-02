@@ -29,6 +29,7 @@ public static class AuthCommand
                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
                 {
                     Console.Error.WriteLine("Error: Email and API token required");
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -52,6 +53,7 @@ public static class AuthCommand
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"Error: Authentication failed - {ex.Message}");
+                    Environment.ExitCode = 1;
                 }
             }
             else if (useAppPassword)
@@ -64,6 +66,7 @@ public static class AuthCommand
                 if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
                 {
                     Console.Error.WriteLine("Error: Username and password required");
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -87,6 +90,7 @@ public static class AuthCommand
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"Error: Authentication failed - {ex.Message}");
+                    Environment.ExitCode = 1;
                 }
             }
             else
@@ -131,6 +135,7 @@ public static class AuthCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error checking status: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         });
         command.AddCommand(statusCommand);
@@ -155,6 +160,7 @@ public static class AuthCommand
                 Console.WriteLine($"{config.Username}:{config.AppPassword}");
             else
                 Console.Error.WriteLine("Not authenticated");
+                Environment.ExitCode = 1;
         });
         command.AddCommand(tokenCommand);
 

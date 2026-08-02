@@ -29,8 +29,8 @@ public static class PipelineCommand
     {
         var command = new Command("list", "List pipelines for a repository");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var statusOption = new Option<string?>("--status", "Filter by status (PENDING, BUILDING, COMPLETED, HALTED, FAILED, SUCCESSFUL, STOPPED)");
         var sortOption = new Option<string>("--sort", () => "-created_on", "Sort field (prefix with - for descending)");
         var limitOption = new Option<int>("--limit", () => 25, "Maximum number of pipelines to return");
@@ -103,8 +103,8 @@ public static class PipelineCommand
     {
         var command = new Command("view", "View details of a specific pipeline");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
 
         command.AddOption(workspaceOption);
@@ -160,8 +160,8 @@ public static class PipelineCommand
     {
         var command = new Command("trigger", "Trigger a new pipeline run");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var branchOption = new Option<string>("--branch", () => "main", "Branch to run pipeline on");
         var commitOption = new Option<string?>("--commit", "Specific commit hash to run on");
         var patternOption = new Option<string?>("--pattern", "Custom pipeline pattern to run");
@@ -250,8 +250,8 @@ public static class PipelineCommand
     {
         var command = new Command("stop", "Stop a running pipeline");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID to stop");
         var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
 
@@ -317,8 +317,8 @@ public static class PipelineCommand
     {
         var command = new Command("logs", "View logs for a pipeline step");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
         var stepArg = new Argument<string>("step-uuid", "Step UUID");
         var followOption = new Option<bool>("--follow", "Follow log output (not yet implemented)");
@@ -376,8 +376,8 @@ public static class PipelineCommand
     {
         var command = new Command("steps", "List steps for a pipeline");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var pipelineArg = new Argument<string>("pipeline-uuid", "Pipeline UUID");
 
         command.AddOption(workspaceOption);
@@ -446,8 +446,8 @@ public static class PipelineCommand
     {
         var command = new Command("list", "List pipeline variables");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
 
         command.AddOption(workspaceOption);
         command.AddOption(repoOption);
@@ -510,8 +510,8 @@ public static class PipelineCommand
     {
         var command = new Command("add", "Add a pipeline variable");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var keyOption = new Option<string>("--key", "Variable key") { IsRequired = true };
         var valueOption = new Option<string>("--value", "Variable value") { IsRequired = true };
         var securedOption = new Option<bool>("--secured", "Mark as secured (value hidden)");
@@ -581,8 +581,8 @@ public static class PipelineCommand
     {
         var command = new Command("delete", "Delete a pipeline variable");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var uuidArg = new Argument<string>("uuid", "Variable UUID to delete");
         var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
 
@@ -659,8 +659,8 @@ public static class PipelineCommand
     {
         var command = new Command("list", "List pipeline schedules");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
 
         command.AddOption(workspaceOption);
         command.AddOption(repoOption);
@@ -728,8 +728,8 @@ public static class PipelineCommand
     {
         var command = new Command("create", "Create a pipeline schedule");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var cronOption = new Option<string>("--cron", "Cron expression (e.g., '0 0 * * *')") { IsRequired = true };
         var branchOption = new Option<string>("--branch", () => "main", "Target branch");
         var patternOption = new Option<string?>("--pattern", "Custom pipeline pattern");
@@ -813,8 +813,8 @@ public static class PipelineCommand
     {
         var command = new Command("delete", "Delete a pipeline schedule");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var uuidArg = new Argument<string>("uuid", "Schedule UUID to delete");
         var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
 
@@ -890,8 +890,8 @@ public static class PipelineCommand
     {
         var command = new Command("list", "List pipeline caches");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
 
         command.AddOption(workspaceOption);
         command.AddOption(repoOption);
@@ -954,8 +954,8 @@ public static class PipelineCommand
     {
         var command = new Command("clear", "Clear a pipeline cache");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var nameArg = new Argument<string>("name", "Cache name to clear");
         var yesOption = new Option<bool>("--yes", "Skip confirmation prompt");
 
@@ -1031,8 +1031,8 @@ public static class PipelineCommand
     {
         var command = new Command("list", "List deployment environments");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
 
         command.AddOption(workspaceOption);
         command.AddOption(repoOption);
@@ -1096,8 +1096,8 @@ public static class PipelineCommand
     {
         var command = new Command("view", "View deployment environment details");
 
-        var workspaceOption = new Option<string?>("--workspace", "Workspace slug");
-        var repoOption = new Option<string?>("--repo", "Repository slug");
+        var workspaceOption = new Option<string?>(["--workspace", "-w"], "Workspace slug");
+        var repoOption = new Option<string?>(["--repo", "-r"], "Repository slug");
         var envArg = new Argument<string>("environment", "Environment UUID or name");
 
         command.AddOption(workspaceOption);
@@ -1239,7 +1239,7 @@ public static class PipelineCommand
                 name = GetStringProperty(repo, "name"),
                 full_name = GetStringProperty(repo, "full_name")
             } : null,
-            links = p.TryGetProperty("links", out var links) && links.TryGetProperty("html", out var html) 
+            links = p.TryGetObject("links", out var links) && links.TryGetProperty("html", out var html) 
                 ? GetStringProperty(html, "href") : null
         };
     }

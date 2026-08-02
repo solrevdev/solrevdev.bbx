@@ -126,8 +126,8 @@ public static class WorkspaceCommand
                     created_on = ws.TryGetProperty("created_on", out var c) ? c.GetString() : null,
                     links = ws.TryGetProperty("links", out var l) ? new
                     {
-                        html = l.TryGetProperty("html", out var h) && h.TryGetProperty("href", out var href) ? href.GetString() : null,
-                        avatar = l.TryGetProperty("avatar", out var a) && a.TryGetProperty("href", out var ahref) ? ahref.GetString() : null
+                        html = l.TryGetObject("html", out var h) && h.TryGetProperty("href", out var href) ? href.GetString() : null,
+                        avatar = l.TryGetObject("avatar", out var a) && a.TryGetProperty("href", out var ahref) ? ahref.GetString() : null
                     } : null
                 };
 
@@ -453,7 +453,7 @@ public static class WorkspaceCommand
                             username = u.TryGetProperty("username", out var un) ? un.GetString() : null,
                             account_id = u.TryGetProperty("account_id", out var a) ? a.GetString() : null
                         } : null,
-                        workspace = perm.TryGetProperty("workspace", out var w) && w.TryGetProperty("slug", out var s) ? s.GetString() : null
+                        workspace = perm.TryGetObject("workspace", out var w) && w.TryGetProperty("slug", out var s) ? s.GetString() : null
                     });
 
                     if (permissions.Count >= limit) break;

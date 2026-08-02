@@ -84,7 +84,7 @@ public static class SnippetCommand
                         scm = snippet.TryGetProperty("scm", out var s) ? s.GetString() : "git",
                         created_on = snippet.TryGetProperty("created_on", out var c) ? c.GetString() : null,
                         updated_on = snippet.TryGetProperty("updated_on", out var u) ? u.GetString() : null,
-                        owner = snippet.TryGetProperty("owner", out var o) && o.TryGetProperty("display_name", out var d) ? d.GetString() : null
+                        owner = snippet.TryGetObject("owner", out var o) && o.TryGetProperty("display_name", out var d) ? d.GetString() : null
                     });
 
                     if (snippets.Count >= limit) break;
@@ -251,7 +251,7 @@ public static class SnippetCommand
                     title = snippet.TryGetProperty("title", out var t) ? t.GetString() : null,
                     is_private = snippet.TryGetProperty("is_private", out var p) && p.GetBoolean(),
                     created_on = snippet.TryGetProperty("created_on", out var c) ? c.GetString() : null,
-                    links = snippet.TryGetProperty("links", out var l) && l.TryGetProperty("html", out var h) && h.TryGetProperty("href", out var href)
+                    links = snippet.TryGetObject("links", out var l) && l.TryGetObject("html", out var h) && h.TryGetProperty("href", out var href)
                         ? href.GetString() : null
                 };
 
@@ -671,7 +671,7 @@ public static class SnippetCommand
                     Console.WriteLine(JsonSerializer.Serialize(new
                     {
                         id = comment.GetProperty("id").GetInt32(),
-                        content = comment.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
+                        content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
                         created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null
                     }, new JsonSerializerOptions { WriteIndented = true }));
                 }
@@ -690,8 +690,8 @@ public static class SnippetCommand
                         comments.Add(new
                         {
                             id = comment.GetProperty("id").GetInt32(),
-                            content = comment.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
-                            user = comment.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
+                            content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
+                            user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
                             created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null
                         });
                     }

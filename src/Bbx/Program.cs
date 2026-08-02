@@ -1,4 +1,6 @@
 using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Parsing;
 using System.Text;
 using Bbx.Commands;
 
@@ -35,6 +37,24 @@ public class Program
         });
         rootCommand.AddCommand(versionCommand);
 
-        return await rootCommand.InvokeAsync(args);
+        // A value returned from Main overrides Environment.ExitCode, and
+        // InvokeAsync reports 0 whenever a handler returned normally. Handlers
+        // catch their own errors and set Environment.ExitCode, so returning
+        // InvokeAsync's result alone made every failed command exit 0 and look
+        // successful to a script or an agent.
+        // Several handlers have no try/catch of their own, and the default
+        // pipeline answers an escaped exception with a full stack trace. Report
+        // the message instead; the exit code stays 1 either way.
+        var parser = new CommandLineBuilder(rootCommand)
+            .UseDefaults()
+            .UseExceptionHandler((exception, context) =>
+            {
+                Console.Error.WriteLine($"Error: {exception.Message}");
+                context.ExitCode = 1;
+            })
+            .Build();
+
+        var exitCode = await parser.InvokeAsync(args);
+        return exitCode != 0 ? exitCode : Environment.ExitCode;
     }
 }

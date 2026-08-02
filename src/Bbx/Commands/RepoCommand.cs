@@ -27,6 +27,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(workspace))
             {
                 Console.Error.WriteLine("Error: Workspace required. Use --workspace or run: bbx auth set-workspace <workspace>");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -79,6 +80,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(ws) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Invalid repository path. Use workspace/repo or set workspace.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -91,6 +93,7 @@ public static class RepoCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoArg);
         command.AddCommand(viewCommand);
@@ -115,6 +118,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(workspace))
             {
                 Console.Error.WriteLine("Error: Workspace required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -139,6 +143,7 @@ public static class RepoCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, nameArg, privateOption, projectOption, descOption, forkPolicyOption);
         command.AddCommand(createCommand);
@@ -157,6 +162,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(ws) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Invalid repository path.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -179,6 +185,7 @@ public static class RepoCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, deleteRepoArg, yesOption);
         command.AddCommand(deleteCommand);
@@ -199,6 +206,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(ws) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Invalid repository path.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -215,6 +223,7 @@ public static class RepoCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, forkRepoArg, forkNameOption, forkWorkspaceOption);
         command.AddCommand(forkCommand);
@@ -233,6 +242,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(ws) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Invalid repository path.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -240,7 +250,7 @@ public static class RepoCommand
             try
             {
                 var result = await client.GetAsync<JsonElement>($"/repositories/{ws}/{repo}");
-                if (result.TryGetProperty("links", out var links) && links.TryGetProperty("clone", out var cloneLinks))
+                if (result.TryGetObject("links", out var links) && links.TryGetProperty("clone", out var cloneLinks))
                 {
                     foreach (var link in cloneLinks.EnumerateArray())
                     {
@@ -254,10 +264,12 @@ public static class RepoCommand
                     }
                 }
                 Console.Error.WriteLine("Error: Clone URL not found");
+                Environment.ExitCode = 1;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, cloneRepoArg, sshOption);
         command.AddCommand(cloneCommand);
@@ -274,6 +286,7 @@ public static class RepoCommand
             if (string.IsNullOrEmpty(ws) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Invalid repository path.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -296,6 +309,7 @@ public static class RepoCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, permRepoArg);
         command.AddCommand(permissionsCommand);

@@ -31,6 +31,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -71,6 +72,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -83,6 +85,7 @@ public static class CommitCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, hashArg);
         command.AddCommand(viewCommand);
@@ -99,6 +102,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -111,6 +115,7 @@ public static class CommitCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, diffHashArg);
         command.AddCommand(diffCommand);
@@ -127,6 +132,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -139,6 +145,7 @@ public static class CommitCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, patchHashArg);
         command.AddCommand(patchCommand);
@@ -155,6 +162,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -166,8 +174,8 @@ public static class CommitCommand
                 comments.Add(new
                 {
                     id = comment.TryGetProperty("id", out var id) ? id.GetInt32() : 0,
-                    user = comment.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
-                    content = comment.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
+                    user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
+                    content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
                     created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null
                 });
             }
@@ -188,6 +196,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -223,6 +232,7 @@ public static class CommitCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -253,8 +263,8 @@ public static class CommitCommand
             hash = commit.TryGetProperty("hash", out var h) ? h.GetString()?[..12] : null,
             full_hash = commit.TryGetProperty("hash", out var fh) ? fh.GetString() : null,
             message = commit.TryGetProperty("message", out var m) ? m.GetString()?.Split('\n')[0] : null,
-            author = commit.TryGetProperty("author", out var a) && a.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() :
-                     commit.TryGetProperty("author", out var a2) && a2.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
+            author = commit.TryGetObject("author", out var a) && a.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() :
+                     commit.TryGetObject("author", out var a2) && a2.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
             date = commit.TryGetProperty("date", out var d) ? d.GetString() : null
         };
     }

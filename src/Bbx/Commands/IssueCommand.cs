@@ -34,6 +34,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -71,6 +72,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -83,6 +85,7 @@ public static class IssueCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, idArg);
         command.AddCommand(viewCommand);
@@ -106,6 +109,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -126,6 +130,7 @@ public static class IssueCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, titleOption, contentOption, kindOption, priorityCreateOption);
         command.AddCommand(createCommand);
@@ -151,6 +156,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -169,6 +175,7 @@ public static class IssueCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, updateIdArg, updateTitleOption, updateStateOption, updatePriorityOption, updateAssigneeOption);
         command.AddCommand(updateCommand);
@@ -188,6 +195,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -210,6 +218,7 @@ public static class IssueCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, deleteIdArg, yesOption);
         command.AddCommand(deleteCommand);
@@ -227,6 +236,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -238,8 +248,8 @@ public static class IssueCommand
                 comments.Add(new
                 {
                     id = comment.TryGetProperty("id", out var cid) ? cid.GetInt32() : 0,
-                    user = comment.TryGetProperty("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
-                    content = comment.TryGetProperty("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
+                    user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
+                    content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
                     created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null
                 });
             }
@@ -263,6 +273,7 @@ public static class IssueCommand
             if (string.IsNullOrEmpty(workspace) || string.IsNullOrEmpty(repo))
             {
                 Console.Error.WriteLine("Error: Workspace and repository required.");
+                Environment.ExitCode = 1;
                 return;
             }
 
@@ -277,6 +288,7 @@ public static class IssueCommand
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error: {ex.Message}");
+                Environment.ExitCode = 1;
             }
         }, workspaceOption, repoOption, commentIdArg, commentBodyOption);
         command.AddCommand(commentCommand);
@@ -302,8 +314,8 @@ public static class IssueCommand
             state = issue.TryGetProperty("state", out var s) ? s.GetString() : null,
             kind = issue.TryGetProperty("kind", out var k) ? k.GetString() : null,
             priority = issue.TryGetProperty("priority", out var p) ? p.GetString() : null,
-            reporter = issue.TryGetProperty("reporter", out var r) && r.TryGetProperty("display_name", out var rdn) ? rdn.GetString() : null,
-            assignee = issue.TryGetProperty("assignee", out var a) && a.TryGetProperty("display_name", out var adn) ? adn.GetString() : null,
+            reporter = issue.TryGetObject("reporter", out var r) && r.TryGetProperty("display_name", out var rdn) ? rdn.GetString() : null,
+            assignee = issue.TryGetObject("assignee", out var a) && a.TryGetProperty("display_name", out var adn) ? adn.GetString() : null,
             created_on = issue.TryGetProperty("created_on", out var co) ? co.GetString() : null,
             updated_on = issue.TryGetProperty("updated_on", out var uo) ? uo.GetString() : null
         };
