@@ -7,7 +7,8 @@ namespace Bbx;
 
 public class Program
 {
-    public static IServiceProvider Services { get; private set; } = null!;
+    // internal set so tests can substitute a provider; Main is the only writer in production.
+    public static IServiceProvider Services { get; internal set; } = null!;
 
     public static async Task<int> Main(string[] args)
     {
@@ -57,6 +58,12 @@ public class Program
         });
         rootCommand.AddCommand(versionCommand);
 
-        return await rootCommand.InvokeAsync(args);
+        // A value returned from Main overrides Environment.ExitCode, and
+        // InvokeAsync reports 0 whenever a handler returned normally. Handlers
+        // catch their own errors and set Environment.ExitCode, so returning
+        // InvokeAsync's result alone made every failed command exit 0 and look
+        // successful to a script or an agent.
+        var exitCode = await rootCommand.InvokeAsync(args);
+        return exitCode != 0 ? exitCode : Environment.ExitCode;
     }
 }

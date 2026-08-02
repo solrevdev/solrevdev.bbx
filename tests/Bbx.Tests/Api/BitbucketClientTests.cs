@@ -123,6 +123,46 @@ public class BitbucketClientTests
             .WithMessage("solrevdev (HTTP 404 Not Found)");
     }
 
+    // Regression: error.detail is a string for most errors but an object for
+    // scope failures. Typing it as string made the whole payload fail to
+    // deserialize, so every 403 was reported as a bare "HTTP 403 Forbidden".
+    [Fact]
+    public async Task Scope_errors_name_the_missing_scopes()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.Forbidden, """
+            {"type":"error","error":{
+              "message":"Your credentials lack one or more required privilege scopes.",
+              "detail":{"required":["admin:repository:bitbucket","read:repository:bitbucket"],
+                        "granted":["read:repository:bitbucket"]}}}
+            """);
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo/deploy-keys");
+
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("*lack one or more required privilege scopes*HTTP 403*")
+            .And.Message.Should()
+                .Contain("Missing token scopes: admin:repository:bitbucket")
+                .And.NotContain("read:repository:bitbucket.", "already granted scopes are not missing");
+    }
+
+    [Fact]
+    public async Task String_valued_detail_still_deserializes()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.NotFound,
+            """{"type":"error","error":{"message":"Not found","detail":"no such repository"}}""");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo");
+        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("Not found (HTTP 404 Not Found)");
+    }
+
     [Fact]
     public async Task Deprecation_errors_point_at_the_changelog_entry()
     {

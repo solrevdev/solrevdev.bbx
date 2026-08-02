@@ -201,6 +201,14 @@ public class BitbucketClient : IDisposable
                 // reads as noise without the 404.
                 errorMessage = $"{error!.Error!.Message} ({status})";
 
+                // A 403 names the scopes the token is missing. Say which, so the
+                // fix is "re-issue the token with these" rather than guesswork.
+                var missing = error.Error.MissingScopes().ToList();
+                if (missing.Count > 0)
+                {
+                    errorMessage += $" Missing token scopes: {string.Join(", ", missing)}.";
+                }
+
                 // Deprecation errors carry the changelog entry that explains them.
                 var announcement = error.Error.Data?.AnnouncementUrl;
                 if (!string.IsNullOrWhiteSpace(announcement))
@@ -254,9 +262,40 @@ public class BitbucketError
 public class BitbucketErrorDetail
 {
     public string? Message { get; set; }
-    public string? Detail { get; set; }
+
+    /// <summary>
+    /// Free-form. A string for most errors, but an object carrying
+    /// <c>required</c> and <c>granted</c> arrays for scope failures, so this
+    /// cannot be typed as a string: doing so made the whole payload fail to
+    /// deserialize and reduced every 403 to a bare "HTTP 403 Forbidden".
+    /// </summary>
+    public JsonElement? Detail { get; set; }
+
     public string? Id { get; set; }
     public BitbucketErrorData? Data { get; set; }
+
+    /// <summary>
+    /// The scopes a 403 says the credentials are missing, if it named any.
+    /// </summary>
+    public IEnumerable<string> MissingScopes()
+    {
+        if (Detail is not { ValueKind: JsonValueKind.Object } detail
+            || !detail.TryGetProperty("required", out var required)
+            || required.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var granted = detail.TryGetProperty("granted", out var g) && g.ValueKind == JsonValueKind.Array
+            ? g.EnumerateArray().Select(x => x.GetString()).ToHashSet()
+            : [];
+
+        return required.EnumerateArray()
+            .Select(x => x.GetString())
+            .Where(x => x is not null && !granted.Contains(x))
+            .Select(x => x!)
+            .ToList();
+    }
 }
 
 public class BitbucketErrorData
