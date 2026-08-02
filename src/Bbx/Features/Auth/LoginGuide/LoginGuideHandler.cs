@@ -6,7 +6,7 @@ public sealed class LoginGuideHandler
     {
         Console.WriteLine("Choose an authentication method:");
         Console.WriteLine();
-        Console.WriteLine("  --oauth       OAuth 2.0 via browser (recommended)");
+        Console.WriteLine("  --oauth       OAuth 2.0 via browser (the default in an interactive shell)");
         Console.WriteLine("                bbx auth login --oauth");
         Console.WriteLine("                First time? Run: bbx auth setup-oauth");
         Console.WriteLine();

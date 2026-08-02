@@ -34,7 +34,7 @@ public static class AuthCommand
     {
         var loginCommand = new Command("login", "Authenticate with Bitbucket");
 
-        var oauthOption = new Option<bool>("--oauth", "Use OAuth 2.0 authorization-code flow (recommended)");
+        var oauthOption = new Option<bool>("--oauth", "Use OAuth 2.0 authorization-code flow (the default in an interactive shell)");
         var apiTokenOption = new Option<bool>("--api-token", "Use Atlassian API token authentication (fallback for CI / scripts)");
         var clientIdOption = new Option<string?>("--client-id", "OAuth consumer client_id (only with --oauth)");
         var clientSecretOption = new Option<string?>("--client-secret", "OAuth consumer client_secret (only with --oauth)");
@@ -60,7 +60,11 @@ public static class AuthCommand
             var noBrowser = context.ParseResult.GetValueForOption(noBrowserOption);
             var scopes = context.ParseResult.GetValueForOption(scopesOption);
 
-            if (useOauth)
+            // OAuth is the default when neither method is named, matching the
+            // first-run auto-launch and `gh auth login`. A browser flow cannot
+            // work with no TTY, so a non-interactive shell still gets the guide
+            // and has to choose a method explicitly.
+            if (useOauth || (!useApiToken && AuthGate.IsInteractive()))
             {
                 await CommandRunner.RunActionNoGateAsync(() =>
                     services.GetRequiredService<LoginOAuthHandler>()
