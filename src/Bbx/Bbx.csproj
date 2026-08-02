@@ -6,25 +6,49 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
+    <!-- Run on a newer major runtime than the asset was built for, so the tool
+         still works on a machine that has only the latest .NET installed. -->
+    <RollForward>Major</RollForward>
+
     <!-- dotnet tool packaging -->
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>bbx</ToolCommandName>
     <PackageId>solrevdev.bbx</PackageId>
 
-    <!-- CI auto-bumps this -->
-    <Version>1.0.0</Version>
+    <!-- CI bumps this. A breaking release needs a major bump via
+         workflow_dispatch; a plain push to master only bumps the patch. -->
+    <Version>2.0.0</Version>
 
     <!-- NuGet metadata -->
     <Authors>solrevdev</Authors>
-    <PackageDescription>Bitbucket Cloud CLI for LLM integration. Manage repositories, pull requests, branches, commits, pipelines, and more via command line. JSON output optimized for AI/LLM consumption.</PackageDescription>
-    <PackageTags>Bitbucket;CLI;dotnet-tool;git;devops;LLM;API;pull-requests;pipelines;bitbucket-api;ci-cd</PackageTags>
+    <Company>solrevdev</Company>
+    <Product>bbx</Product>
+    <Copyright>Copyright (c) solrevdev</Copyright>
+    <Title>bbx — Bitbucket Cloud CLI</Title>
+    <PackageDescription>gh for Bitbucket Cloud. A .NET global tool for the Bitbucket Cloud API v2: repositories, pull requests, branches, tags, commits, source files, downloads, pipelines, snippets, workspaces and projects. JSON on stdout and meaningful exit codes, so scripts and LLM agents can consume it.</PackageDescription>
+    <PackageTags>bitbucket;cli;dotnet-tool;git;devops;llm;ai;api;pull-requests;pipelines;bitbucket-api;ci-cd</PackageTags>
     <RepositoryUrl>https://github.com/solrevdev/solrevdev.bbx</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/solrevdev/solrevdev.bbx</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReadmeFile>PACKAGE.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>See https://github.com/solrevdev/solrevdev.bbx/blob/master/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- Ship symbols so stack traces from a published build are readable. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
 
     <!-- where pack puts .nupkg -->
     <PackageOutputPath>../../nupkg</PackageOutputPath>
+  </PropertyGroup>
+
+  <!-- Reproducible builds on CI only: setting this locally breaks debugging. -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>
@@ -42,6 +66,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <!-- NuGet.org strips raw HTML, so the package gets its own readme rather
+         than the GitHub one with its collapsible sections. -->
+    <None Include="PACKAGE.md" Pack="true" PackagePath="\" />
+    <None Include="../../docs/assets/branding/bbx-icon-128.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 </Project>
