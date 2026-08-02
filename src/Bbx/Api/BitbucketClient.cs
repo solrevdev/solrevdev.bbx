@@ -48,16 +48,29 @@ public class BitbucketClient : IDisposable
 
     public async Task<string> GetStringAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.GetAsync(NormalizeEndpoint(endpoint), ct);
+        var response = await GetNonJsonAsync(endpoint, ct);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetRawAsync(string endpoint, CancellationToken ct = default)
     {
-        var response = await _client.GetAsync(NormalizeEndpoint(endpoint), ct);
+        var response = await GetNonJsonAsync(endpoint, ct);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadAsStringAsync(ct);
+    }
+
+    /// <summary>
+    /// GET an endpoint that does not serve JSON. The client sends
+    /// <c>Accept: application/json</c> by default, which some endpoints reject
+    /// with HTTP 406 rather than falling back to their native type. The pipeline
+    /// step log endpoint (<c>application/octet-stream</c>) is one of them.
+    /// </summary>
+    private async Task<HttpResponseMessage> GetNonJsonAsync(string endpoint, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, NormalizeEndpoint(endpoint));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        return await _client.SendAsync(request, ct);
     }
 
     public async Task<T?> PostAsync<T>(string endpoint, object? body = null, CancellationToken ct = default)
