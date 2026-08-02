@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Tags.ListTags;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Tags;
 
@@ -18,7 +18,7 @@ public class ListTagsHandlerTests
 
         await handler.HandleAsync(
             new ListTagsRequest("ws", "myrepo", 10, "-name", "name~\"v1\""),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var uri = http.Calls.Single().RequestUri!;
         uri.AbsolutePath.Should().Be("/2.0/repositories/ws/myrepo/refs/tags");
@@ -31,7 +31,7 @@ public class ListTagsHandlerTests
         var handler = BuildHandler(out _, seed: null);
 
         var act = async () => await handler.HandleAsync(
-            new ListTagsRequest(null, null, 25, null, null), CancellationToken.None);
+            new ListTagsRequest(null, null, 25, null, null), TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>();
     }
@@ -50,7 +50,7 @@ public class ListTagsHandlerTests
             """);
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListTagsRequest("ws", "myrepo", 2, null, null), CancellationToken.None);
+            new ListTagsRequest("ws", "myrepo", 2, null, null), TestContext.Current.CancellationToken);
 
         ((int)result.count).Should().Be(2);
     }

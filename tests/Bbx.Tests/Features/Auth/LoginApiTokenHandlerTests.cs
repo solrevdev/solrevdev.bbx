@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
+using AwesomeAssertions;
 using Bbx.Auth;
 using Bbx.Features.Auth.LoginApiToken;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Auth;
 
@@ -24,7 +24,7 @@ public class LoginApiTokenHandlerTests
         var handler = new LoginApiTokenHandler(new CredentialManager(store), TestHttpClientFactory.Create(http));
 
         var message = await handler.HandleAsync(
-            new LoginApiTokenRequest("jane@example.com", "ATATTsecret"), CancellationToken.None);
+            new LoginApiTokenRequest("jane@example.com", "ATATTsecret"), TestContext.Current.CancellationToken);
 
         message.Should().Contain("Jane Doe");
         var auth = http.Calls.Single().Headers.Authorization;
@@ -52,7 +52,7 @@ public class LoginApiTokenHandlerTests
         var handler = new LoginApiTokenHandler(new CredentialManager(store), TestHttpClientFactory.Create(VerifiedUser()));
 
         await handler.HandleAsync(
-            new LoginApiTokenRequest("jane@example.com", "ATATTnew"), CancellationToken.None);
+            new LoginApiTokenRequest("jane@example.com", "ATATTnew"), TestContext.Current.CancellationToken);
 
         store.Load().DefaultWorkspace.Should().Be("acme-team");
         store.Load().ApiToken.Should().Be("ATATTnew");
@@ -65,7 +65,7 @@ public class LoginApiTokenHandlerTests
         var handler = new LoginApiTokenHandler(new CredentialManager(store), TestHttpClientFactory.Create(VerifiedUser()));
 
         await handler.HandleAsync(
-            new LoginApiTokenRequest("jane@example.com", "ATATT"), CancellationToken.None);
+            new LoginApiTokenRequest("jane@example.com", "ATATT"), TestContext.Current.CancellationToken);
 
         store.Load().DefaultWorkspace.Should().Be("jane");
     }
@@ -79,7 +79,7 @@ public class LoginApiTokenHandlerTests
         var handler = new LoginApiTokenHandler(new CredentialManager(store), TestHttpClientFactory.Create(http));
 
         var act = async () => await handler.HandleAsync(
-            new LoginApiTokenRequest("jane@example.com", "bad"), CancellationToken.None);
+            new LoginApiTokenRequest("jane@example.com", "bad"), TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>().WithMessage("*Authentication failed*");
         store.SaveCount.Should().Be(0);

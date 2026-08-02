@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Api;
 
@@ -18,7 +18,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        await client.GetAsync<JsonElement>("/user");
+        await client.GetAsync<JsonElement>("/user", TestContext.Current.CancellationToken);
 
         handler.Calls.Should().ContainSingle();
         handler.Calls[0].RequestUri.Should().Be(new Uri("https://api.bitbucket.org/2.0/user"));
@@ -33,7 +33,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        await client.GetAsync<JsonElement>("repositories/ws/repo");
+        await client.GetAsync<JsonElement>("repositories/ws/repo", TestContext.Current.CancellationToken);
 
         handler.Calls[0].RequestUri.Should().Be(new Uri("https://api.bitbucket.org/2.0/repositories/ws/repo"));
     }
@@ -47,7 +47,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "ATATT3xFfGF0"));
 
-        await client.GetAsync<JsonElement>("user");
+        await client.GetAsync<JsonElement>("user", TestContext.Current.CancellationToken);
 
         var auth = handler.Calls[0].Headers.Authorization;
         auth.Should().NotBeNull();
@@ -65,7 +65,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        await client.GetAsync<JsonElement>("user");
+        await client.GetAsync<JsonElement>("user", TestContext.Current.CancellationToken);
 
         handler.Calls[0].Headers.Authorization.Should().BeNull();
     }
@@ -82,7 +82,7 @@ public class BitbucketClientTests
         var client = new BitbucketClient(http, new NullAuthProvider());
 
         var names = new List<string?>();
-        await foreach (var element in client.GetPaginatedAsync<JsonElement>("repositories/ws"))
+        await foreach (var element in client.GetPaginatedAsync<JsonElement>("repositories/ws", TestContext.Current.CancellationToken))
         {
             names.Add(element.GetProperty("name").GetString());
         }
@@ -102,7 +102,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/missing");
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/missing", TestContext.Current.CancellationToken);
         (await act.Should().ThrowAsync<HttpRequestException>())
             .WithMessage("Repository not found (HTTP 404 Not Found)");
     }
@@ -118,7 +118,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetAsync<JsonElement>("users/solrevdev");
+        var act = async () => await client.GetAsync<JsonElement>("users/solrevdev", TestContext.Current.CancellationToken);
         (await act.Should().ThrowAsync<HttpRequestException>())
             .WithMessage("solrevdev (HTTP 404 Not Found)");
     }
@@ -140,7 +140,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo/deploy-keys");
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo/deploy-keys", TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<HttpRequestException>())
             .WithMessage("*lack one or more required privilege scopes*HTTP 403*")
@@ -160,7 +160,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo");
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo", TestContext.Current.CancellationToken);
         (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("Not found (HTTP 404 Not Found)");
     }
 
@@ -176,7 +176,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetAsync<JsonElement>("workspaces");
+        var act = async () => await client.GetAsync<JsonElement>("workspaces", TestContext.Current.CancellationToken);
         (await act.Should().ThrowAsync<HttpRequestException>())
             .WithMessage("*CHANGE-2770*HTTP 410*See https://developer.atlassian.com/*");
     }
@@ -190,7 +190,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        await client.GetAsync<JsonElement>("user");
+        await client.GetAsync<JsonElement>("user", TestContext.Current.CancellationToken);
 
         handler.Calls[0].Headers.Accept.Select(a => a.MediaType).Should().Equal("application/json");
     }
@@ -212,9 +212,9 @@ public class BitbucketClientTests
         var endpoint = "repositories/ws/repo/pipelines/{p}/steps/{s}/log";
         switch (flavour)
         {
-            case "raw": await client.GetRawAsync(endpoint); break;
-            case "string": await client.GetStringAsync(endpoint); break;
-            default: await client.GetByteArrayAsync(endpoint); break;
+            case "raw": await client.GetRawAsync(endpoint, TestContext.Current.CancellationToken); break;
+            case "string": await client.GetStringAsync(endpoint, TestContext.Current.CancellationToken); break;
+            default: await client.GetByteArrayAsync(endpoint, TestContext.Current.CancellationToken); break;
         }
 
         handler.Calls[0].Headers.Accept.Select(a => a.MediaType).Should().Equal("*/*");
@@ -239,7 +239,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "token"));
 
-        var body = await client.GetStringAsync("repositories/ws/repo/pullrequests/1/diff");
+        var body = await client.GetStringAsync("repositories/ws/repo/pullrequests/1/diff", TestContext.Current.CancellationToken);
 
         body.Should().Be("diff --git a/x b/x");
         handler.Calls.Should().HaveCount(2);
@@ -263,7 +263,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "token"));
 
-        await client.GetByteArrayAsync("repositories/ws/repo/downloads/artifact.zip");
+        await client.GetByteArrayAsync("repositories/ws/repo/downloads/artifact.zip", TestContext.Current.CancellationToken);
 
         handler.Calls.Should().HaveCount(2);
         handler.Calls[1].RequestUri!.Host.Should().Be("bbuseruploads.s3.amazonaws.com");
@@ -287,7 +287,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetStringAsync("loop");
+        var act = async () => await client.GetStringAsync("loop", TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<HttpRequestException>();
         handler.Calls.Should().HaveCountLessThan(10);
@@ -302,7 +302,7 @@ public class BitbucketClientTests
         using var http = TestHttpClientFactory.Create(handler);
         var client = new BitbucketClient(http, new NullAuthProvider());
 
-        var act = async () => await client.GetAsync<JsonElement>("anything");
+        var act = async () => await client.GetAsync<JsonElement>("anything", TestContext.Current.CancellationToken);
         (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("HTTP 500 Internal Server Error");
     }
 }

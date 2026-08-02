@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.Tasks.ListPullRequestTasks;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests.Tasks;
 
@@ -22,7 +22,7 @@ public class ListPullRequestTasksHandlerTests
             """);
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListPullRequestTasksRequest("ws", "myrepo", 42, 50), CancellationToken.None);
+            new ListPullRequestTasksRequest("ws", "myrepo", 42, 50), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pullrequests/42/tasks");

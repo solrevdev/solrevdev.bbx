@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.DefaultReviewers.RemoveDefaultReviewer;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos.DefaultReviewers;
 
@@ -17,7 +17,7 @@ public class RemoveDefaultReviewerHandlerTests
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         var msg = await handler.HandleAsync(
-            new RemoveDefaultReviewerRequest("ws", "myrepo", "{abc}"), CancellationToken.None);
+            new RemoveDefaultReviewerRequest("ws", "myrepo", "{abc}"), TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
         call.Method.Should().Be(HttpMethod.Delete);

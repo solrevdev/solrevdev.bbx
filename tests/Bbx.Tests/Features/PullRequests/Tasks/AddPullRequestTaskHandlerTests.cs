@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.Tasks.AddPullRequestTask;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests.Tasks;
 
@@ -19,7 +19,7 @@ public class AddPullRequestTaskHandlerTests
             """{"id":7,"state":"UNRESOLVED","content":{"raw":"please check"}}""");
 
         await handler.HandleAsync(
-            new AddPullRequestTaskRequest("ws", "myrepo", 42, "please check"), CancellationToken.None);
+            new AddPullRequestTaskRequest("ws", "myrepo", 42, "please check"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pullrequests/42/tasks");
@@ -34,7 +34,7 @@ public class AddPullRequestTaskHandlerTests
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
 
         var act = async () => await handler.HandleAsync(
-            new AddPullRequestTaskRequest("ws", "myrepo", 42, ""), CancellationToken.None);
+            new AddPullRequestTaskRequest("ws", "myrepo", 42, ""), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*--content*");

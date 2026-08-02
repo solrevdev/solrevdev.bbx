@@ -1,11 +1,11 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Branches.AddBranchRestriction;
 using Bbx.Features.Pipelines.CreatePipelineSchedule;
 using Bbx.Features.Snippets.SnippetWatch;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Branches;
 
@@ -31,7 +31,7 @@ public class BranchRestrictionAndScheduleTests
         var handler = new AddBranchRestrictionHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new AddBranchRestrictionRequest("ws", "repo", "push", pattern), CancellationToken.None);
+            new AddBranchRestrictionRequest("ws", "repo", "push", pattern), TestContext.Current.CancellationToken);
 
         var body = http.CallBodies.Single()!;
         body.Should().Contain("\"branch_match_kind\": \"glob\"");
@@ -49,7 +49,7 @@ public class BranchRestrictionAndScheduleTests
 
         await handler.HandleAsync(
             new CreatePipelineScheduleRequest("ws", "repo", "0 0 1 * * ? *", "master", null, true),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = http.CallBodies.Single()!;
         body.Should().Contain("\"type\": \"pipeline_ref_target\"");
@@ -67,7 +67,7 @@ public class BranchRestrictionAndScheduleTests
 
         await handler.HandleAsync(
             new CreatePipelineScheduleRequest("ws", "repo", "0 0 1 * * ? *", "master", "nightly", true),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = http.CallBodies.Single()!;
         body.Should().Contain("\"type\": \"custom\"").And.Contain("\"pattern\": \"nightly\"");
@@ -83,7 +83,7 @@ public class BranchRestrictionAndScheduleTests
         var handler = new SnippetWatchHandler(Client(http), Creds());
 
         var result = await handler.HandleAsync(
-            new SnippetWatchRequest("ws", "abc123", List: false, Unwatch: false), CancellationToken.None);
+            new SnippetWatchRequest("ws", "abc123", List: false, Unwatch: false), TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         http.Calls.Single().Method.Should().Be(HttpMethod.Put);

@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.ListForks;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos;
 
@@ -21,7 +21,7 @@ public class ListForksHandlerTests
         var handler = new ListForksHandler(client, credentials);
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListForksRequest("ws", "myrepo", 25), CancellationToken.None);
+            new ListForksRequest("ws", "myrepo", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/forks");
@@ -37,7 +37,7 @@ public class ListForksHandlerTests
         var handler = new ListForksHandler(client, credentials);
 
         var act = async () => await handler.HandleAsync(
-            new ListForksRequest(null, null, 25), CancellationToken.None);
+            new ListForksRequest(null, null, 25), TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>();
     }

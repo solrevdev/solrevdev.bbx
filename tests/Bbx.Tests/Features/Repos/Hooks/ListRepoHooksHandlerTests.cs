@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.Hooks.ListRepoHooks;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos.Hooks;
 
@@ -16,7 +16,7 @@ public class ListRepoHooksHandlerTests
             seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "default-ws" });
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
 
-        await handler.HandleAsync(new ListRepoHooksRequest(null, "myrepo", 25), CancellationToken.None);
+        await handler.HandleAsync(new ListRepoHooksRequest(null, "myrepo", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/default-ws/myrepo/hooks");
@@ -28,7 +28,7 @@ public class ListRepoHooksHandlerTests
         var handler = BuildHandler(out _,
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
 
-        var act = async () => await handler.HandleAsync(new ListRepoHooksRequest("ws", null, 25), CancellationToken.None);
+        var act = async () => await handler.HandleAsync(new ListRepoHooksRequest("ws", null, 25), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("Error: Workspace and repository required.*");
@@ -47,7 +47,7 @@ public class ListRepoHooksHandlerTests
             ],"next":null}
             """);
 
-        var result = (dynamic)await handler.HandleAsync(new ListRepoHooksRequest("ws", "myrepo", 2), CancellationToken.None);
+        var result = (dynamic)await handler.HandleAsync(new ListRepoHooksRequest("ws", "myrepo", 2), TestContext.Current.CancellationToken);
 
         ((string)result.workspace).Should().Be("ws");
         ((string)result.repository).Should().Be("myrepo");

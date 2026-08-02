@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Commits.CreateCommitStatus;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Commits;
 
@@ -21,7 +21,7 @@ public class CreateCommitStatusHandlerTests
         await handler.HandleAsync(
             new CreateCommitStatusRequest("ws", "myrepo", "abc123", "ci",
                 "successful", "https://ci/run/1", "Build #1", "All green"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/commit/abc123/statuses/build");
@@ -41,7 +41,7 @@ public class CreateCommitStatusHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new CreateCommitStatusRequest("ws", "myrepo", "abc", "k", "BOGUS", "https://x", null, null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*--state must be one of*");
@@ -55,7 +55,7 @@ public class CreateCommitStatusHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new CreateCommitStatusRequest("ws", "myrepo", "abc", "", "SUCCESSFUL", "https://x", null, null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*--key*");

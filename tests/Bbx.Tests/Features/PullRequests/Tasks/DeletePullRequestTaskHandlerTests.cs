@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.Tasks.DeletePullRequestTask;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests.Tasks;
 
@@ -17,7 +17,7 @@ public class DeletePullRequestTaskHandlerTests
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         await handler.HandleAsync(
-            new DeletePullRequestTaskRequest("ws", "myrepo", 42, 7), CancellationToken.None);
+            new DeletePullRequestTaskRequest("ws", "myrepo", 42, 7), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

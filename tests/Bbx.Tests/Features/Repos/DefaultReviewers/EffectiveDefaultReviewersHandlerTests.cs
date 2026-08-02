@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos.DefaultReviewers;
 
@@ -22,7 +22,7 @@ public class EffectiveDefaultReviewersHandlerTests
             """);
 
         var result = (dynamic)await handler.HandleAsync(
-            new EffectiveDefaultReviewersRequest("ws", "myrepo", 25), CancellationToken.None);
+            new EffectiveDefaultReviewersRequest("ws", "myrepo", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/effective-default-reviewers");
@@ -41,7 +41,7 @@ public class EffectiveDefaultReviewersHandlerTests
             """);
 
         var result = (dynamic)await handler.HandleAsync(
-            new EffectiveDefaultReviewersRequest("ws", "myrepo", 1), CancellationToken.None);
+            new EffectiveDefaultReviewersRequest("ws", "myrepo", 1), TestContext.Current.CancellationToken);
 
         ((int)result.count).Should().Be(1);
     }

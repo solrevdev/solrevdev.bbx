@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Downloads.UploadDownload;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Downloads;
 
@@ -15,7 +15,7 @@ public class UploadDownloadHandlerTests
         var local = Path.GetTempFileName();
         try
         {
-            await File.WriteAllBytesAsync(local, new byte[] { 1, 2, 3, 4, 5 });
+            await File.WriteAllBytesAsync(local, new byte[] { 1, 2, 3, 4, 5 }, TestContext.Current.CancellationToken);
 
             var http = new FakeHttpMessageHandler();
             http.Enqueue(HttpStatusCode.Created, "");
@@ -26,7 +26,7 @@ public class UploadDownloadHandlerTests
 
             var result = (dynamic)await handler.HandleAsync(
                 new UploadDownloadRequest("ws", "myrepo", local, "release-v1.bin"),
-                CancellationToken.None);
+                TestContext.Current.CancellationToken);
 
             http.Calls.Single().RequestUri!.AbsoluteUri
                 .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/downloads");
@@ -52,7 +52,7 @@ public class UploadDownloadHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new UploadDownloadRequest("ws", "myrepo", "/does/not/exist", null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("Error: File not found:*");

@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Tags.DeleteTag;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Tags;
 
@@ -17,7 +17,7 @@ public class DeleteTagHandlerTests
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         var message = await handler.HandleAsync(
-            new DeleteTagRequest("ws", "myrepo", "v1.0.0"), CancellationToken.None);
+            new DeleteTagRequest("ws", "myrepo", "v1.0.0"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

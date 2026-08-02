@@ -1,6 +1,6 @@
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Composition;
-using FluentAssertions;
 
 namespace Bbx.Tests.Composition;
 

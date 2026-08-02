@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Source.LsSource;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Source;
 
@@ -16,7 +16,7 @@ public class LsSourceHandlerTests
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
 
-        await handler.HandleAsync(new LsSourceRequest("ws", "myrepo", "main", null, 100), CancellationToken.None);
+        await handler.HandleAsync(new LsSourceRequest("ws", "myrepo", "main", null, 100), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/src/main/");
@@ -31,7 +31,7 @@ public class LsSourceHandlerTests
 
         await handler.HandleAsync(
             new LsSourceRequest("ws", "myrepo", "feature/x", "src/file with spaces", 100),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Branch name and each path segment escaped; slashes inside path are preserved.
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -52,7 +52,7 @@ public class LsSourceHandlerTests
             """);
 
         var result = (dynamic)await handler.HandleAsync(
-            new LsSourceRequest("ws", "myrepo", "main", null, 2), CancellationToken.None);
+            new LsSourceRequest("ws", "myrepo", "main", null, 2), TestContext.Current.CancellationToken);
 
         ((int)result.count).Should().Be(2);
         ((string)result.@ref).Should().Be("main");
@@ -64,7 +64,7 @@ public class LsSourceHandlerTests
         var handler = BuildHandler(out _, seed: null);
 
         var act = async () => await handler.HandleAsync(
-            new LsSourceRequest(null, null, "main", null, 100), CancellationToken.None);
+            new LsSourceRequest(null, null, "main", null, 100), TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>();
     }

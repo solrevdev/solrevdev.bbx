@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.PullRequestPatch;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests;
 
@@ -20,7 +20,7 @@ public class PullRequestPatchHandlerTests
         var handler = new PullRequestPatchHandler(client, credentials);
 
         var body = await handler.HandleAsync(
-            new PullRequestPatchRequest("ws", "myrepo", 42), CancellationToken.None);
+            new PullRequestPatchRequest("ws", "myrepo", 42), TestContext.Current.CancellationToken);
 
         body.Should().StartWith("From abcdef");
         http.Calls.Single().RequestUri!.AbsoluteUri

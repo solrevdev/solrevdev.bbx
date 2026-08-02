@@ -1,6 +1,6 @@
+using AwesomeAssertions;
 using Bbx.Auth;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Auth;
 

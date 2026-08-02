@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Downloads.DeleteDownload;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Downloads;
 
@@ -20,7 +20,7 @@ public class DeleteDownloadHandlerTests
         var handler = new DeleteDownloadHandler(client, credentials);
 
         var msg = await handler.HandleAsync(
-            new DeleteDownloadRequest("ws", "myrepo", "release.bin"), CancellationToken.None);
+            new DeleteDownloadRequest("ws", "myrepo", "release.bin"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

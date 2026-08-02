@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.MergePullRequest;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests;
 
@@ -40,7 +40,7 @@ public class MergePullRequestHandlerTests
         var handler = new MergePullRequestHandler(client, Creds());
 
         await handler.HandleAsync(
-            new MergePullRequestRequest("ws", "repo", 1, "merge", null, false), CancellationToken.None);
+            new MergePullRequestRequest("ws", "repo", 1, "merge", null, false), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsolutePath
             .Should().Be("/2.0/repositories/ws/repo/pullrequests/1/merge");

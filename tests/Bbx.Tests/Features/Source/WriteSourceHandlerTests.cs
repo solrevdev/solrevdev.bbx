@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Source.WriteSource;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Source;
 
@@ -16,7 +16,7 @@ public class WriteSourceHandlerTests
         var local = Path.GetTempFileName();
         try
         {
-            await File.WriteAllTextAsync(local, "hello world", Encoding.UTF8);
+            await File.WriteAllTextAsync(local, "hello world", Encoding.UTF8, TestContext.Current.CancellationToken);
 
             var handler = BuildHandler(out var http,
                 seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
@@ -25,7 +25,7 @@ public class WriteSourceHandlerTests
             await handler.HandleAsync(
                 new WriteSourceRequest("ws", "myrepo", "main", "add file",
                     new[] { $"{local}=path/to/file.txt" }, "Jane <jane@example.com>"),
-                CancellationToken.None);
+                TestContext.Current.CancellationToken);
 
             var call = http.Calls.Single();
             call.Method.Should().Be(HttpMethod.Post);
@@ -55,7 +55,7 @@ public class WriteSourceHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new WriteSourceRequest("ws", "myrepo", "main", "msg", Array.Empty<string>(), null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*--file*");
@@ -70,7 +70,7 @@ public class WriteSourceHandlerTests
         var act = async () => await handler.HandleAsync(
             new WriteSourceRequest("ws", "myrepo", "main", "msg",
                 new[] { "/this/does/not/exist=foo.txt" }, null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("Error: File not found:*");

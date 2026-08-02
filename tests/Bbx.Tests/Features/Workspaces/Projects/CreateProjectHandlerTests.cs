@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Projects.CreateProject;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Projects;
 
@@ -20,7 +20,7 @@ public class CreateProjectHandlerTests
 
         await handler.HandleAsync(
             new CreateProjectRequest("ws", "PROJ", "Project", "desc", true),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/projects");
@@ -41,7 +41,7 @@ public class CreateProjectHandlerTests
 
         await handler.HandleAsync(
             new CreateProjectRequest("ws", "PROJ", "Project", null, false),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var bodyJson = JsonDocument.Parse(http.CallBodies.Single()!);
         bodyJson.RootElement.TryGetProperty("description", out _).Should().BeFalse();

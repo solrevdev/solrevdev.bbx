@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Hooks;
 
@@ -20,7 +20,7 @@ public class CreateWorkspaceHookHandlerTests
 
         await handler.HandleAsync(
             new CreateWorkspaceHookRequest("ws", "https://e", "d", null, true),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/hooks");
@@ -43,7 +43,7 @@ public class CreateWorkspaceHookHandlerTests
         await handler.HandleAsync(
             new CreateWorkspaceHookRequest("ws", "https://e", null,
                 new[] { "pullrequest:created", "pullrequest:approved" }, false),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var bodyJson = JsonDocument.Parse(http.CallBodies.Single()!);
         bodyJson.RootElement.GetProperty("events").EnumerateArray().Select(e => e.GetString())

@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Pipelines.TriggerPipeline;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Pipelines;
 
@@ -19,7 +19,7 @@ public class TriggerPipelineHandlerTests
 
         await handler.HandleAsync(
             new TriggerPipelineRequest("ws", "myrepo", "main", null, null, null, []),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = JsonDocument.Parse(http.CallBodies.Single()!);
         var target = body.RootElement.GetProperty("target");
@@ -38,7 +38,7 @@ public class TriggerPipelineHandlerTests
 
         await handler.HandleAsync(
             new TriggerPipelineRequest("ws", "myrepo", "feature-x", null, null, "123", []),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = JsonDocument.Parse(http.CallBodies.Single()!);
         var target = body.RootElement.GetProperty("target");
@@ -57,7 +57,7 @@ public class TriggerPipelineHandlerTests
 
         await handler.HandleAsync(
             new TriggerPipelineRequest("ws", "myrepo", "feature-x", null, "custom-step", "123", []),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = JsonDocument.Parse(http.CallBodies.Single()!);
         var selector = body.RootElement.GetProperty("target").GetProperty("selector");

@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Commits.UpdateCommitStatus;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Commits;
 
@@ -21,7 +21,7 @@ public class UpdateCommitStatusHandlerTests
         await handler.HandleAsync(
             new UpdateCommitStatusRequest("ws", "myrepo", "abc123", "ci",
                 "successful", null, null, null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
         call.Method.Should().Be(HttpMethod.Put);
@@ -41,7 +41,7 @@ public class UpdateCommitStatusHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new UpdateCommitStatusRequest("ws", "myrepo", "abc", "ci", null, null, null, null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*Provide at least one*");

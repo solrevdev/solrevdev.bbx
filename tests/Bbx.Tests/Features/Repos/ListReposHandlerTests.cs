@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.ListRepos;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos;
 
@@ -16,7 +16,7 @@ public class ListReposHandlerTests
             seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "default-ws" });
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
 
-        await handler.HandleAsync(new ListReposRequest(null, 25, null), CancellationToken.None);
+        await handler.HandleAsync(new ListReposRequest(null, 25, null), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/default-ws");
@@ -27,7 +27,7 @@ public class ListReposHandlerTests
     {
         var handler = BuildHandler(out _, seed: null);
 
-        var act = async () => await handler.HandleAsync(new ListReposRequest(null, 25, null), CancellationToken.None);
+        var act = async () => await handler.HandleAsync(new ListReposRequest(null, 25, null), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("Error: Workspace required.*");
@@ -40,7 +40,7 @@ public class ListReposHandlerTests
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
 
-        await handler.HandleAsync(new ListReposRequest("ws", 5, "name~\"api\""), CancellationToken.None);
+        await handler.HandleAsync(new ListReposRequest("ws", 5, "name~\"api\""), TestContext.Current.CancellationToken);
 
         // Uri.EscapeDataString leaves `~` alone (RFC 3986 unreserved) and escapes the quotes.
         http.Calls.Single().RequestUri!.Query
@@ -60,7 +60,7 @@ public class ListReposHandlerTests
             ],"next":null}
             """);
 
-        var result = (dynamic)await handler.HandleAsync(new ListReposRequest("ws", 2, null), CancellationToken.None);
+        var result = (dynamic)await handler.HandleAsync(new ListReposRequest("ws", 2, null), TestContext.Current.CancellationToken);
 
         ((string)result.workspace).Should().Be("ws");
         ((int)result.count).Should().Be(2);

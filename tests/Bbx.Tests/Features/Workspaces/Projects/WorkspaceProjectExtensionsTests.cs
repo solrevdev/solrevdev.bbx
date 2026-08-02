@@ -1,4 +1,5 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Projects.BranchingModel.UpdateProjectBranchingModelSettings;
@@ -10,7 +11,6 @@ using Bbx.Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.DeployKeys.ListProjectDeployKeys;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Projects;
 
@@ -32,7 +32,7 @@ public class WorkspaceProjectExtensionsTests
         var handler = new ListProjectDefaultReviewersHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new ListProjectDefaultReviewersRequest("ws", "PROJ", 25), CancellationToken.None);
+            new ListProjectDefaultReviewersRequest("ws", "PROJ", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/projects/PROJ/default-reviewers");
@@ -46,7 +46,7 @@ public class WorkspaceProjectExtensionsTests
         var handler = new AddProjectDefaultReviewerHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new AddProjectDefaultReviewerRequest("ws", "PROJ", "{abc}"), CancellationToken.None);
+            new AddProjectDefaultReviewerRequest("ws", "PROJ", "{abc}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Put);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -60,7 +60,7 @@ public class WorkspaceProjectExtensionsTests
         var handler = new RemoveProjectDefaultReviewerHandler(Client(http), Creds());
 
         var act = async () => await handler.HandleAsync(
-            new RemoveProjectDefaultReviewerRequest("ws", "PROJ", ""), CancellationToken.None);
+            new RemoveProjectDefaultReviewerRequest("ws", "PROJ", ""), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*--target*");
@@ -74,7 +74,7 @@ public class WorkspaceProjectExtensionsTests
         var handler = new ViewProjectBranchingModelHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new ViewProjectBranchingModelRequest("ws", "PROJ"), CancellationToken.None);
+            new ViewProjectBranchingModelRequest("ws", "PROJ"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/projects/PROJ/branching-model");
@@ -90,7 +90,7 @@ public class WorkspaceProjectExtensionsTests
         await handler.HandleAsync(
             new UpdateProjectBranchingModelSettingsRequest("ws", "PROJ",
                 """{"development":{"name":"main"}}"""),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Put);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -106,7 +106,7 @@ public class WorkspaceProjectExtensionsTests
         var handler = new ListProjectDeployKeysHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new ListProjectDeployKeysRequest("ws", "PROJ", 25), CancellationToken.None);
+            new ListProjectDeployKeysRequest("ws", "PROJ", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/projects/PROJ/deploy-keys");
@@ -121,7 +121,7 @@ public class WorkspaceProjectExtensionsTests
 
         await handler.HandleAsync(
             new AddProjectDeployKeyRequest("ws", "PROJ", "ssh-ed25519 AAAA", "prod"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Post);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -136,7 +136,7 @@ public class WorkspaceProjectExtensionsTests
         var handler = new DeleteProjectDeployKeyHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new DeleteProjectDeployKeyRequest("ws", "PROJ", 7), CancellationToken.None);
+            new DeleteProjectDeployKeyRequest("ws", "PROJ", 7), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

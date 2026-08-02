@@ -1,5 +1,5 @@
+using AwesomeAssertions;
 using Bbx.Auth;
-using FluentAssertions;
 
 namespace Bbx.Tests.Auth;
 
@@ -11,7 +11,7 @@ public class NullAuthProviderTests
         var provider = new NullAuthProvider();
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
 
-        await provider.ApplyAsync(request, CancellationToken.None);
+        await provider.ApplyAsync(request, TestContext.Current.CancellationToken);
 
         request.Headers.Authorization.Should().BeNull();
     }

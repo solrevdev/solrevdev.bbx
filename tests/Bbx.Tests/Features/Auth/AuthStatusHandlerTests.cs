@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Auth.Status;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Auth;
 
@@ -29,7 +29,7 @@ public class AuthStatusHandlerTests
 
         var handler = new AuthStatusHandler(client, creds);
         var (stdout, _) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthStatusRequest(), CancellationToken.None));
+            handler.HandleAsync(new AuthStatusRequest(), TestContext.Current.CancellationToken));
 
         stdout.Should().Contain("Not authenticated");
         fakeHttp.Calls.Should().BeEmpty();
@@ -54,7 +54,7 @@ public class AuthStatusHandlerTests
 
         var handler = new AuthStatusHandler(client, creds);
         var (stdout, _) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthStatusRequest(), CancellationToken.None));
+            handler.HandleAsync(new AuthStatusRequest(), TestContext.Current.CancellationToken));
 
         stdout.Should().Contain("Auth method: api-token");
         stdout.Should().NotContain("Expires at:");
@@ -71,7 +71,7 @@ public class AuthStatusHandlerTests
 
         var handler = new AuthStatusHandler(client, creds);
         var (stdout, _) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthStatusRequest(), CancellationToken.None));
+            handler.HandleAsync(new AuthStatusRequest(), TestContext.Current.CancellationToken));
 
         stdout.Should().Contain("Not authenticated");
         fakeHttp.Calls.Should().BeEmpty();

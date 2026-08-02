@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Downloads.GetDownload;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Downloads;
 
@@ -23,7 +23,7 @@ public class GetDownloadHandlerTests
         var handler = new GetDownloadHandler(client, credentials);
 
         var bytes = await handler.HandleAsync(
-            new GetDownloadRequest("ws", "myrepo", "release.bin", null), CancellationToken.None);
+            new GetDownloadRequest("ws", "myrepo", "release.bin", null), TestContext.Current.CancellationToken);
 
         bytes.Should().Equal(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -40,7 +40,7 @@ public class GetDownloadHandlerTests
         var handler = new GetDownloadHandler(client, credentials);
 
         var act = async () => await handler.HandleAsync(
-            new GetDownloadRequest("ws", "myrepo", "", null), CancellationToken.None);
+            new GetDownloadRequest("ws", "myrepo", "", null), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*<filename>*");

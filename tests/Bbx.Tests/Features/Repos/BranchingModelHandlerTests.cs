@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.BranchingModel.UpdateBranchingModelSettings;
 using Bbx.Features.Repos.BranchingModel.ViewBranchingModel;
 using Bbx.Features.Repos.BranchingModel.ViewBranchingModelSettings;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos;
 
@@ -22,7 +22,7 @@ public class BranchingModelHandlerTests
             new CredentialManager(new InMemoryCredentialStore(
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
-        await handler.HandleAsync(new ViewBranchingModelRequest("ws", "myrepo"), CancellationToken.None);
+        await handler.HandleAsync(new ViewBranchingModelRequest("ws", "myrepo"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/branching-model");
@@ -38,7 +38,7 @@ public class BranchingModelHandlerTests
             new CredentialManager(new InMemoryCredentialStore(
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
-        await handler.HandleAsync(new ViewBranchingModelSettingsRequest("ws", "myrepo"), CancellationToken.None);
+        await handler.HandleAsync(new ViewBranchingModelSettingsRequest("ws", "myrepo"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/branching-model/settings");
@@ -57,7 +57,7 @@ public class BranchingModelHandlerTests
         await handler.HandleAsync(
             new UpdateBranchingModelSettingsRequest("ws", "myrepo",
                 """{"development":{"name":"main","use_mainbranch":true}}"""),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Put);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -77,7 +77,7 @@ public class BranchingModelHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new UpdateBranchingModelSettingsRequest("ws", "myrepo", "{not json"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*not valid JSON*");

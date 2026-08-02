@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Projects.ViewProject;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Projects;
 
@@ -18,7 +18,7 @@ public class ViewProjectHandlerTests
             """{"key":"P/1","name":"Slash Key","is_private":true,"created_on":"2026-01-01"}""");
 
         var result = (dynamic)await handler.HandleAsync(
-            new ViewProjectRequest("ws", "P/1"), CancellationToken.None);
+            new ViewProjectRequest("ws", "P/1"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/projects/P%2F1");

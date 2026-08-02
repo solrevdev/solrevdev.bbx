@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.ListPullRequestCommits;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests;
 
@@ -25,7 +25,7 @@ public class ListPullRequestCommitsHandlerTests
         var handler = new ListPullRequestCommitsHandler(client, credentials);
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListPullRequestCommitsRequest("ws", "myrepo", 42, 50), CancellationToken.None);
+            new ListPullRequestCommitsRequest("ws", "myrepo", 42, 50), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pullrequests/42/commits");

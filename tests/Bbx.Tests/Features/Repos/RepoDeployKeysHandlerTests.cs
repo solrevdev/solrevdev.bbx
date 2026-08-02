@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.DeployKeys.AddRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.DeleteRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.ListRepoDeployKeys;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos;
 
@@ -24,7 +24,7 @@ public class RepoDeployKeysHandlerTests
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListRepoDeployKeysRequest("ws", "myrepo", 25), CancellationToken.None);
+            new ListRepoDeployKeysRequest("ws", "myrepo", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/deploy-keys");
@@ -43,7 +43,7 @@ public class RepoDeployKeysHandlerTests
 
         await handler.HandleAsync(
             new AddRepoDeployKeyRequest("ws", "myrepo", "ssh-ed25519 AAAA", "prod"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = JsonDocument.Parse(http.CallBodies.Single()!);
         body.RootElement.GetProperty("key").GetString().Should().Be("ssh-ed25519 AAAA");
@@ -60,7 +60,7 @@ public class RepoDeployKeysHandlerTests
             new CredentialManager(new InMemoryCredentialStore(
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
-        await handler.HandleAsync(new DeleteRepoDeployKeyRequest("ws", "myrepo", 7), CancellationToken.None);
+        await handler.HandleAsync(new DeleteRepoDeployKeyRequest("ws", "myrepo", 7), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

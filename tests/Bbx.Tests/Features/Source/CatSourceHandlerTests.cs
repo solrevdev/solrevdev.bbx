@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Source.CatSource;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Source;
 
@@ -17,7 +17,7 @@ public class CatSourceHandlerTests
         http.Enqueue(HttpStatusCode.OK, "hello world\nline two\n", "text/plain");
 
         var body = await handler.HandleAsync(
-            new CatSourceRequest("ws", "myrepo", "main", "/README.md"), CancellationToken.None);
+            new CatSourceRequest("ws", "myrepo", "main", "/README.md"), TestContext.Current.CancellationToken);
 
         body.Should().Be("hello world\nline two\n");
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -31,7 +31,7 @@ public class CatSourceHandlerTests
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
 
         var act = async () => await handler.HandleAsync(
-            new CatSourceRequest("ws", "myrepo", "main", ""), CancellationToken.None);
+            new CatSourceRequest("ws", "myrepo", "main", ""), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*<path> is required*");

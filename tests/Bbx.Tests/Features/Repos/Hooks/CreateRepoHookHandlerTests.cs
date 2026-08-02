@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.Hooks.CreateRepoHook;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos.Hooks;
 
@@ -20,7 +20,7 @@ public class CreateRepoHookHandlerTests
 
         await handler.HandleAsync(
             new CreateRepoHookRequest("ws", "myrepo", "https://example/h", "d", null, true),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/hooks");
@@ -43,7 +43,7 @@ public class CreateRepoHookHandlerTests
         await handler.HandleAsync(
             new CreateRepoHookRequest("ws", "myrepo", "https://e", null,
                 new[] { "pullrequest:created", "pullrequest:approved" }, false),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var bodyJson = JsonDocument.Parse(http.CallBodies.Single()!);
         bodyJson.RootElement.GetProperty("events").EnumerateArray().Select(e => e.GetString())

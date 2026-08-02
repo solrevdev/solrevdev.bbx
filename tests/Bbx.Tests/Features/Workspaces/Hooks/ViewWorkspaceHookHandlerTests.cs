@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Hooks.ViewWorkspaceHook;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Hooks;
 
@@ -18,7 +18,7 @@ public class ViewWorkspaceHookHandlerTests
             """{"uuid":"{abc}","description":"d","url":"https://e","active":true,"events":["repo:push"],"created_at":"2026-01-01"}""");
 
         var result = (dynamic)await handler.HandleAsync(
-            new ViewWorkspaceHookRequest("ws", "{abc}"), CancellationToken.None);
+            new ViewWorkspaceHookRequest("ws", "{abc}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/hooks/%7Babc%7D");

@@ -1,10 +1,10 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.RequestChanges;
 using Bbx.Features.PullRequests.UnrequestChanges;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests;
 
@@ -21,7 +21,7 @@ public class RequestChangesHandlerTests
         var handler = new RequestChangesHandler(client, credentials);
 
         var msg = await handler.HandleAsync(
-            new RequestChangesRequest("ws", "myrepo", 42), CancellationToken.None);
+            new RequestChangesRequest("ws", "myrepo", 42), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Post);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -39,7 +39,7 @@ public class RequestChangesHandlerTests
             new InMemoryCredentialStore(new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" }));
         var handler = new UnrequestChangesHandler(client, credentials);
 
-        await handler.HandleAsync(new UnrequestChangesRequest("ws", "myrepo", 42), CancellationToken.None);
+        await handler.HandleAsync(new UnrequestChangesRequest("ws", "myrepo", 42), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

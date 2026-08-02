@@ -1,6 +1,6 @@
 using System.Text;
+using AwesomeAssertions;
 using Bbx.Auth;
-using FluentAssertions;
 
 namespace Bbx.Tests.Auth;
 
@@ -12,7 +12,7 @@ public class BasicAuthProviderTests
         var provider = new BasicAuthProvider("jane@example.com", "ATATT3xFfGF0");
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
 
-        await provider.ApplyAsync(request, CancellationToken.None);
+        await provider.ApplyAsync(request, TestContext.Current.CancellationToken);
 
         request.Headers.Authorization.Should().NotBeNull();
         request.Headers.Authorization!.Scheme.Should().Be("Basic");

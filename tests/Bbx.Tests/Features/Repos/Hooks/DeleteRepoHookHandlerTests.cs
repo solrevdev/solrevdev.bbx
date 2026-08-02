@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.Hooks.DeleteRepoHook;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos.Hooks;
 
@@ -17,7 +17,7 @@ public class DeleteRepoHookHandlerTests
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         var message = await handler.HandleAsync(
-            new DeleteRepoHookRequest("ws", "myrepo", "{u1}"), CancellationToken.None);
+            new DeleteRepoHookRequest("ws", "myrepo", "{u1}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -31,7 +31,7 @@ public class DeleteRepoHookHandlerTests
         var handler = BuildHandler(out _, seed: null);
 
         var act = async () => await handler.HandleAsync(
-            new DeleteRepoHookRequest(null, null, "{u1}"), CancellationToken.None);
+            new DeleteRepoHookRequest(null, null, "{u1}"), TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>();
     }

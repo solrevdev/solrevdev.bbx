@@ -1,4 +1,5 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Commits.ApproveCommit;
@@ -7,7 +8,6 @@ using Bbx.Features.Commits.FileHistory;
 using Bbx.Features.Commits.MergeBase;
 using Bbx.Features.Commits.UnapproveCommit;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Commits;
 
@@ -25,7 +25,7 @@ public class CommitExtensionsHandlerTests
 
         await handler.HandleAsync(
             new FileHistoryRequest("ws", "myrepo", "abcdef", "src/file with space.cs", 25),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/filehistory/abcdef/src/file%20with%20space.cs");
@@ -41,7 +41,7 @@ public class CommitExtensionsHandlerTests
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
         var act = async () => await handler.HandleAsync(
-            new FileHistoryRequest("ws", "myrepo", "abc", "", 25), CancellationToken.None);
+            new FileHistoryRequest("ws", "myrepo", "abc", "", 25), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*<path>*");
@@ -57,7 +57,7 @@ public class CommitExtensionsHandlerTests
             new CredentialManager(new InMemoryCredentialStore(
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
-        await handler.HandleAsync(new MergeBaseRequest("ws", "myrepo", "feature..main"), CancellationToken.None);
+        await handler.HandleAsync(new MergeBaseRequest("ws", "myrepo", "feature..main"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/merge-base/feature..main");
@@ -73,7 +73,7 @@ public class CommitExtensionsHandlerTests
             new CredentialManager(new InMemoryCredentialStore(
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
-        await handler.HandleAsync(new ApproveCommitRequest("ws", "myrepo", "abcdef"), CancellationToken.None);
+        await handler.HandleAsync(new ApproveCommitRequest("ws", "myrepo", "abcdef"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Post);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -90,7 +90,7 @@ public class CommitExtensionsHandlerTests
             new CredentialManager(new InMemoryCredentialStore(
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
-        await handler.HandleAsync(new UnapproveCommitRequest("ws", "myrepo", "abcdef"), CancellationToken.None);
+        await handler.HandleAsync(new UnapproveCommitRequest("ws", "myrepo", "abcdef"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -112,7 +112,7 @@ public class CommitExtensionsHandlerTests
                 new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" })));
 
         var result = (dynamic)await handler.HandleAsync(
-            new CommitDiffstatRequest("ws", "myrepo", "feature..main", 100), CancellationToken.None);
+            new CommitDiffstatRequest("ws", "myrepo", "feature..main", 100), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/diffstat/feature..main");

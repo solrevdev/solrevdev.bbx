@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Projects.DeleteProject;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Projects;
 
@@ -17,7 +17,7 @@ public class DeleteProjectHandlerTests
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         var message = await handler.HandleAsync(
-            new DeleteProjectRequest("ws", "P/1"), CancellationToken.None);
+            new DeleteProjectRequest("ws", "P/1"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri

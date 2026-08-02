@@ -5,7 +5,7 @@
   <p>
     <a href="https://www.nuget.org/packages/solrevdev.bbx"><img src="https://img.shields.io/nuget/v/solrevdev.bbx.svg?logo=nuget" alt="NuGet"></a>
     <a href="https://www.nuget.org/packages/solrevdev.bbx"><img src="https://img.shields.io/nuget/dt/solrevdev.bbx.svg" alt="NuGet downloads"></a>
-    <img src="https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4?logo=dotnet&logoColor=white" alt=".NET 8, 9, 10">
+    <img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white" alt=".NET 10">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
   </p>
 </div>
@@ -50,7 +50,7 @@ dotnet tool update -g solrevdev.bbx
 dotnet tool uninstall -g solrevdev.bbx
 ```
 
-Requires the [.NET SDK](https://dotnet.microsoft.com/download) 8, 9 or 10. If `bbx` isn't found afterwards, add the tools directory to your `PATH`:
+Requires the [.NET 10 runtime or SDK](https://dotnet.microsoft.com/download). If `bbx` isn't found afterwards, add the tools directory to your `PATH`:
 
 ```bash
 export PATH="$PATH:$HOME/.dotnet/tools"
@@ -459,7 +459,7 @@ src/Bbx/
   Commands/       System.CommandLine wiring only, no business logic
   Features/       one folder per verb: request + handler
   Composition/    DI container and shared JSON options
-tests/Bbx.Tests/  xUnit, fake HTTP handler, no network
+tests/Bbx.Tests/  xunit v3, fake HTTP handler, no network
 ```
 
 ## Contributing

@@ -1,7 +1,7 @@
+using AwesomeAssertions;
 using Bbx.Auth;
 using Bbx.Features.Auth.Token;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Auth;
 
@@ -24,7 +24,7 @@ public class AuthTokenHandlerTests : IDisposable
         })));
 
         var (stdout, stderr) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthTokenRequest(), CancellationToken.None));
+            handler.HandleAsync(new AuthTokenRequest(), TestContext.Current.CancellationToken));
 
         stdout.Trim().Should().Be("jane@example.com:ATATTsecret");
         stderr.Should().BeEmpty();
@@ -37,7 +37,7 @@ public class AuthTokenHandlerTests : IDisposable
         var handler = new AuthTokenHandler(new CredentialManager(new InMemoryCredentialStore()));
 
         var (stdout, stderr) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthTokenRequest(), CancellationToken.None));
+            handler.HandleAsync(new AuthTokenRequest(), TestContext.Current.CancellationToken));
 
         stdout.Should().BeEmpty();
         stderr.Should().Contain("Not authenticated");

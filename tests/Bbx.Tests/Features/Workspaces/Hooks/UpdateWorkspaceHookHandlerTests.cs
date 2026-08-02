@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Hooks.UpdateWorkspaceHook;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Hooks;
 
@@ -20,7 +20,7 @@ public class UpdateWorkspaceHookHandlerTests
 
         await handler.HandleAsync(
             new UpdateWorkspaceHookRequest("ws", "{u1}", null, null, null, false),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/ws/hooks/%7Bu1%7D");
@@ -40,7 +40,7 @@ public class UpdateWorkspaceHookHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new UpdateWorkspaceHookRequest("ws", "{u1}", null, null, null, null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("Error: Provide at least one of *");

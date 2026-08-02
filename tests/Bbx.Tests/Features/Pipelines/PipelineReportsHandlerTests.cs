@@ -1,4 +1,5 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Pipelines.ListPipelineReports;
@@ -9,7 +10,6 @@ using Bbx.Features.Pipelines.OidcConfig;
 using Bbx.Features.Pipelines.OidcKeys;
 using Bbx.Features.Pipelines.ViewPipelineReport;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Pipelines;
 
@@ -30,7 +30,7 @@ public class PipelineReportsHandlerTests
         var handler = new ListPipelineReportsHandler(Client(http), Creds());
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListPipelineReportsRequest("ws", "myrepo", "abcdef", 25), CancellationToken.None);
+            new ListPipelineReportsRequest("ws", "myrepo", "abcdef", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/commit/abcdef/reports");
@@ -45,7 +45,7 @@ public class PipelineReportsHandlerTests
         var handler = new ViewPipelineReportHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new ViewPipelineReportRequest("ws", "myrepo", "abc", "{r1}"), CancellationToken.None);
+            new ViewPipelineReportRequest("ws", "myrepo", "abc", "{r1}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/commit/abc/reports/%7Br1%7D");
@@ -59,7 +59,7 @@ public class PipelineReportsHandlerTests
         var handler = new ListReportAnnotationsHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new ListReportAnnotationsRequest("ws", "myrepo", "abc", "{r1}", 100), CancellationToken.None);
+            new ListReportAnnotationsRequest("ws", "myrepo", "abc", "{r1}", 100), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/commit/abc/reports/%7Br1%7D/annotations");
@@ -73,7 +73,7 @@ public class PipelineReportsHandlerTests
         var handler = new ListTestReportsHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new ListTestReportsRequest("ws", "myrepo", "{pl}", "{step}"), CancellationToken.None);
+            new ListTestReportsRequest("ws", "myrepo", "{pl}", "{step}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines/%7Bpl%7D/steps/%7Bstep%7D/test_reports");
@@ -87,7 +87,7 @@ public class PipelineReportsHandlerTests
         var handler = new ListTestCasesHandler(Client(http), Creds());
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListTestCasesRequest("ws", "myrepo", "{pl}", "{step}", 50), CancellationToken.None);
+            new ListTestCasesRequest("ws", "myrepo", "{pl}", "{step}", 50), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines/%7Bpl%7D/steps/%7Bstep%7D/test_reports/test_cases");
@@ -100,7 +100,7 @@ public class PipelineReportsHandlerTests
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, """{"issuer":"https://bitbucket.org/2.0"}""");
         var configHandler = new OidcConfigHandler(Client(http), Creds());
-        await configHandler.HandleAsync(new OidcConfigRequest("ws", "myrepo"), CancellationToken.None);
+        await configHandler.HandleAsync(new OidcConfigRequest("ws", "myrepo"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines-config/identity/oidc/.well-known/openid-configuration");
@@ -108,7 +108,7 @@ public class PipelineReportsHandlerTests
         var http2 = new FakeHttpMessageHandler();
         http2.Enqueue(HttpStatusCode.OK, """{"keys":[]}""");
         var keysHandler = new OidcKeysHandler(Client(http2), Creds());
-        await keysHandler.HandleAsync(new OidcKeysRequest("ws", "myrepo"), CancellationToken.None);
+        await keysHandler.HandleAsync(new OidcKeysRequest("ws", "myrepo"), TestContext.Current.CancellationToken);
 
         http2.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines-config/identity/oidc/keys.json");

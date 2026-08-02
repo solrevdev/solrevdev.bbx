@@ -7,14 +7,19 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- xunit v3 test projects are self-executing. -->
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageReference Include="FluentAssertions" Version="6.12.2" />
-    <PackageReference Include="NSubstitute" Version="5.1.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- A fork of FluentAssertions 7, kept under Apache-2.0. FluentAssertions 8
+         moved to the Xceed Community licence, which requires a paid commercial
+         licence for use by or for a revenue-earning organisation. This keeps the
+         same namespace and API with no licence question. -->
+    <PackageReference Include="AwesomeAssertions" Version="9.5.0" />
   </ItemGroup>
 
   <ItemGroup>

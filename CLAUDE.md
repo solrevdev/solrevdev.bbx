@@ -10,8 +10,8 @@ Bitbucket. Output is JSON so scripts and agents can consume it.
 ## Commands
 
 ```bash
-dotnet build src/Bbx/Bbx.csproj                    # multi-targets net8.0;net9.0;net10.0
-dotnet test tests/Bbx.Tests/Bbx.Tests.csproj       # xUnit, no network
+dotnet build src/Bbx/Bbx.csproj                    # net10.0; SDK pinned by global.json
+dotnet test tests/Bbx.Tests/Bbx.Tests.csproj       # xunit v3, no network
 dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- <args>
 dotnet pack src/Bbx/Bbx.csproj -c Release
 ```
@@ -61,6 +61,11 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
 9. **Destructive verbs take `--yes`** and confirm otherwise.
 10. **Tests do not run in parallel** (`AssemblyInfo.cs`), because several capture
     `Console` or touch `Environment.ExitCode`.
+    Assertions come from **AwesomeAssertions**, an Apache-2.0 fork of
+    FluentAssertions 7. Do not "upgrade" to FluentAssertions 8: it moved to the
+    Xceed Community licence, which needs a paid commercial licence for use by or
+    for a revenue-earning organisation. The API is the same; the namespace is
+    `AwesomeAssertions`.
 11. **Commands are bound through `CommandBinding`.** 2.0 replaced the typed
     `SetHandler(handler, symbols…)` family with a single `SetAction(ParseResult…)`
     callback. `Commands/CommandBinding.cs` keeps the declarative shape and the

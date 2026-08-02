@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Downloads.ListDownloads;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Downloads;
 
@@ -25,7 +25,7 @@ public class ListDownloadsHandlerTests
         var handler = new ListDownloadsHandler(client, credentials);
 
         var result = (dynamic)await handler.HandleAsync(
-            new ListDownloadsRequest("ws", "myrepo", 25), CancellationToken.None);
+            new ListDownloadsRequest("ws", "myrepo", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/downloads");

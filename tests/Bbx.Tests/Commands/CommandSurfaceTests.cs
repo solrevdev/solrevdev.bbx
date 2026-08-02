@@ -1,6 +1,6 @@
 using System.CommandLine;
+using AwesomeAssertions;
 using Bbx.Commands;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Tests.Commands;

@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.DefaultReviewers.AddDefaultReviewer;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Repos.DefaultReviewers;
 
@@ -18,7 +18,7 @@ public class AddDefaultReviewerHandlerTests
             """{"uuid":"{abc}","account_id":"a1","display_name":"Alice"}""");
 
         await handler.HandleAsync(
-            new AddDefaultReviewerRequest("ws", "myrepo", "{abc}"), CancellationToken.None);
+            new AddDefaultReviewerRequest("ws", "myrepo", "{abc}"), TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
         call.Method.Should().Be(HttpMethod.Put);
@@ -33,7 +33,7 @@ public class AddDefaultReviewerHandlerTests
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
 
         var act = async () => await handler.HandleAsync(
-            new AddDefaultReviewerRequest("ws", "myrepo", ""), CancellationToken.None);
+            new AddDefaultReviewerRequest("ws", "myrepo", ""), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*--target*");

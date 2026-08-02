@@ -1,7 +1,7 @@
+using AwesomeAssertions;
 using Bbx.Auth;
 using Bbx.Commands;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Tests.Commands;

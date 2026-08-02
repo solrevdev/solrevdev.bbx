@@ -25,6 +25,12 @@ URL and copy a key and secret before logging in once. That is more work than
 pasting a token, and it needs workspace admin rights. App passwords are not
 supported either; Bitbucket retires them on 2026-06-09.
 
+### Platform
+
+Targets .NET 10, the current LTS, supported until November 2028. .NET 8 and 9
+both reach end of support on 10 November 2026, so shipping against them would
+have meant a package built for runtimes that expire within months.
+
 ### Known gaps
 
 - `bbx workspace list` and `bbx user permissions {workspaces,repositories}`
@@ -38,6 +44,7 @@ supported either; Bitbucket retires them on 2026-06-09.
   and test cases, OIDC, workspace hooks and workspace projects.
 - `--json-compact` (and `BBX_JSON_COMPACT=1`) for single-line JSON.
 - A test project: 205 tests over a fake HTTP handler, wired into CI.
+  xunit v3 and AwesomeAssertions, both current and permissively licensed.
 
 ### Fixed before release
 

@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Tags.ViewTag;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Tags;
 
@@ -16,7 +16,7 @@ public class ViewTagHandlerTests
             seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
         http.Enqueue(HttpStatusCode.OK, """{"name":"v1.0.0","target":{"hash":"abcdef"}}""");
 
-        await handler.HandleAsync(new ViewTagRequest("ws", "myrepo", "v1.0.0"), CancellationToken.None);
+        await handler.HandleAsync(new ViewTagRequest("ws", "myrepo", "v1.0.0"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/refs/tags/v1.0.0");

@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Tags.CreateTag;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Tags;
 
@@ -19,7 +19,7 @@ public class CreateTagHandlerTests
 
         await handler.HandleAsync(
             new CreateTagRequest("ws", "myrepo", "v1.0.0", "abcdef", null),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/refs/tags");
@@ -38,7 +38,7 @@ public class CreateTagHandlerTests
 
         await handler.HandleAsync(
             new CreateTagRequest("ws", "myrepo", "v1.0.0", "abcdef", "Release 1.0.0"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var body = JsonDocument.Parse(http.CallBodies.Single()!);
         body.RootElement.GetProperty("message").GetString().Should().Be("Release 1.0.0");

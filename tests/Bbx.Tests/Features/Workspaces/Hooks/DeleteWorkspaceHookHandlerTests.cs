@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Hooks;
 
@@ -17,7 +17,7 @@ public class DeleteWorkspaceHookHandlerTests
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         var message = await handler.HandleAsync(
-            new DeleteWorkspaceHookRequest("ws", "{u1}"), CancellationToken.None);
+            new DeleteWorkspaceHookRequest("ws", "{u1}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().Method.Should().Be(HttpMethod.Delete);
         http.Calls.Single().RequestUri!.AbsoluteUri
@@ -31,7 +31,7 @@ public class DeleteWorkspaceHookHandlerTests
         var handler = BuildHandler(out _, seed: null);
 
         var act = async () => await handler.HandleAsync(
-            new DeleteWorkspaceHookRequest(null, "{u1}"), CancellationToken.None);
+            new DeleteWorkspaceHookRequest(null, "{u1}"), TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>();
     }

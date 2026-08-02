@@ -1,7 +1,7 @@
+using AwesomeAssertions;
 using Bbx.Auth;
 using Bbx.Features.Auth.LoginApiToken;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Tests.Auth;
@@ -20,7 +20,7 @@ public class AuthGateTests
         });
         var services = BuildServices(store);
 
-        await AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None);
+        await AuthGate.EnsureAuthenticatedAsync(services, TestContext.Current.CancellationToken);
 
         store.SaveCount.Should().Be(0, "an authenticated run must not rewrite the config");
     }
@@ -36,7 +36,7 @@ public class AuthGateTests
         {
             var services = BuildServices(new InMemoryCredentialStore());
 
-            var act = async () => await AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None);
+            var act = async () => await AuthGate.EnsureAuthenticatedAsync(services, TestContext.Current.CancellationToken);
 
             (await act.Should().ThrowAsync<BbxUserException>())
                 .WithMessage("*Not authenticated*")
@@ -60,7 +60,7 @@ public class AuthGateTests
         {
             var services = BuildServices(new InMemoryCredentialStore());
 
-            var act = async () => await AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None);
+            var act = async () => await AuthGate.EnsureAuthenticatedAsync(services, TestContext.Current.CancellationToken);
 
             await act.Should().ThrowAsync<BbxUserException>().WithMessage("*Not authenticated*");
         }
@@ -86,7 +86,7 @@ public class AuthGateTests
             Console.SetIn(new StringReader("jane@example.com\nATATTsecret\n"));
 
             await CaptureConsole.RunAsync(() =>
-                AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None));
+                AuthGate.EnsureAuthenticatedAsync(services, TestContext.Current.CancellationToken));
 
             var saved = store.Load();
             saved.Username.Should().Be("jane@example.com");
@@ -114,15 +114,15 @@ public class AuthGateTests
             // Resolve once with no credentials so the provider caches NullAuthProvider.
             var provider = services.GetRequiredService<IAuthProvider>();
             using var before = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
-            await provider.ApplyAsync(before, CancellationToken.None);
+            await provider.ApplyAsync(before, TestContext.Current.CancellationToken);
             before.Headers.Authorization.Should().BeNull();
 
             Console.SetIn(new StringReader("jane@example.com\nATATTsecret\n"));
             await CaptureConsole.RunAsync(() =>
-                AuthGate.EnsureAuthenticatedAsync(services, CancellationToken.None));
+                AuthGate.EnsureAuthenticatedAsync(services, TestContext.Current.CancellationToken));
 
             using var after = new HttpRequestMessage(HttpMethod.Get, "https://api.bitbucket.org/2.0/user");
-            await provider.ApplyAsync(after, CancellationToken.None);
+            await provider.ApplyAsync(after, TestContext.Current.CancellationToken);
             after.Headers.Authorization.Should().NotBeNull();
             after.Headers.Authorization!.Scheme.Should().Be("Basic");
         }

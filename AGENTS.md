@@ -7,7 +7,7 @@ are the same ones, stated for automation.
 ## Build and verify
 
 ```bash
-dotnet build src/Bbx/Bbx.csproj                 # net8.0;net9.0;net10.0
+dotnet build src/Bbx/Bbx.csproj                 # net10.0
 dotnet test tests/Bbx.Tests/Bbx.Tests.csproj    # must pass before you commit
 dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- <args>
 ```

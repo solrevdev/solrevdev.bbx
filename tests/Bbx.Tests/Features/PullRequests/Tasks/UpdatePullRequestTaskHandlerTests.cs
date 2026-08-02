@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.PullRequests.Tasks.UpdatePullRequestTask;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.PullRequests.Tasks;
 
@@ -19,7 +19,7 @@ public class UpdatePullRequestTaskHandlerTests
 
         await handler.HandleAsync(
             new UpdatePullRequestTaskRequest("ws", "myrepo", 42, 7, null, "resolved"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
         call.Method.Should().Be(HttpMethod.Put);
@@ -38,7 +38,7 @@ public class UpdatePullRequestTaskHandlerTests
 
         var act = async () => await handler.HandleAsync(
             new UpdatePullRequestTaskRequest("ws", "myrepo", 42, 7, null, "PENDING"),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*RESOLVED, UNRESOLVED*");

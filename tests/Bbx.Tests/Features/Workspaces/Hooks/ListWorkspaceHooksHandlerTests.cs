@@ -1,9 +1,9 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Workspaces.Hooks;
 
@@ -16,7 +16,7 @@ public class ListWorkspaceHooksHandlerTests
             seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "default-ws" });
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
 
-        await handler.HandleAsync(new ListWorkspaceHooksRequest(null, 25), CancellationToken.None);
+        await handler.HandleAsync(new ListWorkspaceHooksRequest(null, 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/workspaces/default-ws/hooks");
@@ -27,7 +27,7 @@ public class ListWorkspaceHooksHandlerTests
     {
         var handler = BuildHandler(out _, seed: null);
 
-        var act = async () => await handler.HandleAsync(new ListWorkspaceHooksRequest(null, 25), CancellationToken.None);
+        var act = async () => await handler.HandleAsync(new ListWorkspaceHooksRequest(null, 25), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("Error: Workspace required.*");
@@ -46,7 +46,7 @@ public class ListWorkspaceHooksHandlerTests
             ],"next":null}
             """);
 
-        var result = (dynamic)await handler.HandleAsync(new ListWorkspaceHooksRequest("ws", 2), CancellationToken.None);
+        var result = (dynamic)await handler.HandleAsync(new ListWorkspaceHooksRequest("ws", 2), TestContext.Current.CancellationToken);
 
         ((string)result.workspace).Should().Be("ws");
         ((int)result.count).Should().Be(2);

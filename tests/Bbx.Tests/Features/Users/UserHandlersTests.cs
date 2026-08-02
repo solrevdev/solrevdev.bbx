@@ -1,4 +1,5 @@
 using System.Net;
+using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Users.ListUserEmails;
@@ -9,7 +10,6 @@ using Bbx.Features.Users.SshKeys.DeleteSshKey;
 using Bbx.Features.Users.SshKeys.ListSshKeys;
 using Bbx.Features.Users.ViewUser;
 using Bbx.Tests.TestKit;
-using FluentAssertions;
 
 namespace Bbx.Tests.Features.Users;
 
@@ -30,7 +30,7 @@ public class UserHandlersTests
             """{"values":[{"email":"a@b","is_primary":true,"is_confirmed":true}],"next":null}""");
         var handler = new ListUserEmailsHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new ListUserEmailsRequest(25), CancellationToken.None);
+        await handler.HandleAsync(new ListUserEmailsRequest(25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/user/emails");
@@ -43,7 +43,7 @@ public class UserHandlersTests
         var creds = new CredentialManager(new InMemoryCredentialStore());
         var handler = new ListUserEmailsHandler(Client(http), creds);
 
-        var act = async () => await handler.HandleAsync(new ListUserEmailsRequest(25), CancellationToken.None);
+        var act = async () => await handler.HandleAsync(new ListUserEmailsRequest(25), TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*Not authenticated*");
@@ -56,7 +56,7 @@ public class UserHandlersTests
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
         var handler = new ListUserWorkspacePermissionsHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new ListUserWorkspacePermissionsRequest(50), CancellationToken.None);
+        await handler.HandleAsync(new ListUserWorkspacePermissionsRequest(50), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/user/permissions/workspaces");
@@ -69,7 +69,7 @@ public class UserHandlersTests
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
         var handler = new ListUserRepositoryPermissionsHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new ListUserRepositoryPermissionsRequest(50), CancellationToken.None);
+        await handler.HandleAsync(new ListUserRepositoryPermissionsRequest(50), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/user/permissions/repositories");
@@ -82,7 +82,7 @@ public class UserHandlersTests
         http.Enqueue(HttpStatusCode.OK, """{"display_name":"Alice"}""");
         var handler = new ViewUserHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new ViewUserRequest("{abc-uuid}"), CancellationToken.None);
+        await handler.HandleAsync(new ViewUserRequest("{abc-uuid}"), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/users/%7Babc-uuid%7D");
@@ -104,7 +104,7 @@ public class UserHandlersTests
         http.Enqueue(HttpStatusCode.OK, """{"values":[{"uuid":"{k1}","label":"laptop"}],"next":null}""");
         var handler = new ListSshKeysHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new ListSshKeysRequest(selector, 25), CancellationToken.None);
+        await handler.HandleAsync(new ListSshKeysRequest(selector, 25), TestContext.Current.CancellationToken);
 
         http.Calls[0].RequestUri!.AbsoluteUri.Should().Be("https://api.bitbucket.org/2.0/user");
         http.Calls[1].RequestUri!.AbsoluteUri.Should().Be($"{CurrentUserPath}/ssh-keys");
@@ -117,7 +117,7 @@ public class UserHandlersTests
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
         var handler = new ListSshKeysHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new ListSshKeysRequest("{other-uuid}", 25), CancellationToken.None);
+        await handler.HandleAsync(new ListSshKeysRequest("{other-uuid}", 25), TestContext.Current.CancellationToken);
 
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/users/%7Bother-uuid%7D/ssh-keys");
@@ -132,7 +132,7 @@ public class UserHandlersTests
         var handler = new AddSshKeyHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new AddSshKeyRequest("me", "ssh-ed25519 AAAA", "laptop"), CancellationToken.None);
+            new AddSshKeyRequest("me", "ssh-ed25519 AAAA", "laptop"), TestContext.Current.CancellationToken);
 
         http.Calls[1].Method.Should().Be(HttpMethod.Post);
         http.Calls[1].RequestUri!.AbsoluteUri.Should().Be($"{CurrentUserPath}/ssh-keys");
@@ -147,7 +147,7 @@ public class UserHandlersTests
         http.Enqueue(HttpStatusCode.NoContent, "");
         var handler = new DeleteSshKeyHandler(Client(http), Creds());
 
-        await handler.HandleAsync(new DeleteSshKeyRequest("me", "{k1}"), CancellationToken.None);
+        await handler.HandleAsync(new DeleteSshKeyRequest("me", "{k1}"), TestContext.Current.CancellationToken);
 
         http.Calls[1].Method.Should().Be(HttpMethod.Delete);
         http.Calls[1].RequestUri!.AbsoluteUri.Should().Be($"{CurrentUserPath}/ssh-keys/%7Bk1%7D");
