@@ -12,7 +12,7 @@ dotnet tool install -g solrevdev.bbx
 ## Authenticate
 
 Create an Atlassian API token at
-<https://bitbucket.org/account/settings/api-tokens/>, then:
+<https://id.atlassian.com/manage-profile/security/api-tokens>, then:
 
 ```
 bbx auth login
@@ -60,7 +60,7 @@ did not grant returns a 403 naming the gap:
 Error: Your credentials lack one or more required privilege scopes.
 (HTTP 403 Forbidden) Missing token scopes: admin:repository:bitbucket.
 Re-issue your token with those scopes at
-https://bitbucket.org/account/settings/api-tokens/
+https://id.atlassian.com/manage-profile/security/api-tokens
 ```
 
 ## Notes

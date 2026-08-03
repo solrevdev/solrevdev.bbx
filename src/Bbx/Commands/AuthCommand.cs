@@ -43,7 +43,7 @@ public static class AuthCommand
         {
             if (string.IsNullOrWhiteSpace(email))
             {
-                Console.Error.WriteLine("Create a token at https://bitbucket.org/account/settings/api-tokens/");
+                Console.Error.WriteLine("Create a token at https://id.atlassian.com/manage-profile/security/api-tokens");
                 Console.Error.Write("Email (Atlassian account): ");
                 email = Console.ReadLine()?.Trim();
             }

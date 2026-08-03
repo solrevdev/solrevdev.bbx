@@ -59,7 +59,7 @@ export PATH="$PATH:$HOME/.dotnet/tools"
 ## Authenticate
 
 `bbx` uses **Atlassian API tokens**. Create one at
-**<https://bitbucket.org/account/settings/api-tokens/>**, then:
+**<https://id.atlassian.com/manage-profile/security/api-tokens>**, then:
 
 ```bash
 bbx auth login
@@ -77,6 +77,10 @@ bbx auth status
 
 ### Scopes
 
+The Atlassian page offers two buttons: **Create API token** and **Create API
+token with scopes**. Use the scoped one. A token from the plain button carries
+no scopes, so `bbx` cannot tell you which one is missing when a call fails.
+
 Pick scopes when you create the token. Grant the least you need:
 
 | Doing this | Needs |
@@ -92,7 +96,7 @@ A token missing a scope gets a 403 that names the gap:
 $ bbx repo deploy-keys list -w myworkspace -r myrepo
 Error: Your credentials lack one or more required privilege scopes. (HTTP 403 Forbidden)
 Missing token scopes: admin:repository:bitbucket. Re-issue your token with those
-scopes at https://bitbucket.org/account/settings/api-tokens/
+scopes at https://id.atlassian.com/manage-profile/security/api-tokens
 ```
 
 ### In CI

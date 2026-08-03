@@ -27,11 +27,11 @@ public static class AuthGate
         {
             throw new BbxUserException(
                 "Error: Not authenticated. Run: bbx auth login\n" +
-                "  Create a token at https://bitbucket.org/account/settings/api-tokens/");
+                "  Create a token at https://id.atlassian.com/manage-profile/security/api-tokens");
         }
 
         Console.Error.WriteLine("No credentials found. Create an API token at:");
-        Console.Error.WriteLine("  https://bitbucket.org/account/settings/api-tokens/");
+        Console.Error.WriteLine("  https://id.atlassian.com/manage-profile/security/api-tokens");
         Console.Error.WriteLine();
         Console.Error.Write("Email (Atlassian account): ");
         var email = Console.ReadLine()?.Trim();

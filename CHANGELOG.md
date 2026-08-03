@@ -11,6 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATC
 
 (none.)
 
+## [1.0.1]
+
+### Fixed
+
+- Error messages and login prompts pointed at
+  `bitbucket.org/account/settings/api-tokens/`, which returns 404. Atlassian
+  API tokens are managed on the Atlassian account, so the correct page is
+  `id.atlassian.com/manage-profile/security/api-tokens`.
+
 ## [1.0.0] first public release
 
 Nothing before this was published to NuGet, so this is the baseline rather
