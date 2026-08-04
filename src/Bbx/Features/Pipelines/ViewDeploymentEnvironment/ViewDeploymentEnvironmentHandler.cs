@@ -19,13 +19,13 @@ public sealed class ViewDeploymentEnvironmentHandler(BitbucketClient client, Cre
         {
             uuid = PipelineFormat.GetString(env, "uuid"),
             name = PipelineFormat.GetString(env, "name"),
-            environment_type = env.TryGetProperty("environment_type", out var et) ? (object)new
+            environment_type = env.TryGetObject("environment_type", out var et) ? (object)new
             {
                 name = PipelineFormat.GetString(et, "name"),
                 rank = et.TryGetProperty("rank", out var r) ? r.GetInt32() : 0,
             } : null!,
             deployment_gate_enabled = env.TryGetProperty("deployment_gate_enabled", out var dg) && dg.GetBoolean(),
-            lock_ = env.TryGetProperty("lock", out var l) ? (object)new
+            lock_ = env.TryGetObject("lock", out var l) ? (object)new
             {
                 type = PipelineFormat.GetString(l, "type"),
                 name = PipelineFormat.GetString(l, "name"),

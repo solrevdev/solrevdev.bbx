@@ -43,6 +43,10 @@ internal readonly struct Bound<T>
 /// </remarks>
 internal static class CommandBinding
 {
+    private static readonly AsyncLocal<CancellationToken> ActiveCancellation = new();
+
+    public static CancellationToken CancellationToken => ActiveCancellation.Value;
+
     /// <summary>
     /// Add an option that applies to this command and everything under it.
     /// </summary>
@@ -53,52 +57,67 @@ internal static class CommandBinding
     }
 
     public static void SetHandler(this Command command, Func<Task> handler)
-        => command.SetAction((_, _) => handler());
+        => command.SetAction((_, ct) => InvokeAsync(handler, ct));
 
     public static void SetHandler<T1>(
         this Command command, Func<T1, Task> handler, Bound<T1> b1)
-        => command.SetAction((pr, _) => handler(b1.From(pr)));
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(b1.From(pr)), ct));
 
     public static void SetHandler<T1, T2>(
         this Command command, Func<T1, T2, Task> handler, Bound<T1> b1, Bound<T2> b2)
-        => command.SetAction((pr, _) => handler(b1.From(pr), b2.From(pr)));
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(b1.From(pr), b2.From(pr)), ct));
 
     public static void SetHandler<T1, T2, T3>(
         this Command command, Func<T1, T2, T3, Task> handler,
         Bound<T1> b1, Bound<T2> b2, Bound<T3> b3)
-        => command.SetAction((pr, _) => handler(b1.From(pr), b2.From(pr), b3.From(pr)));
+        => command.SetAction((pr, ct) => InvokeAsync(
+            () => handler(b1.From(pr), b2.From(pr), b3.From(pr)), ct));
 
     public static void SetHandler<T1, T2, T3, T4>(
         this Command command, Func<T1, T2, T3, T4, Task> handler,
         Bound<T1> b1, Bound<T2> b2, Bound<T3> b3, Bound<T4> b4)
-        => command.SetAction((pr, _) => handler(
-            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr)));
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(
+            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr)), ct));
 
     public static void SetHandler<T1, T2, T3, T4, T5>(
         this Command command, Func<T1, T2, T3, T4, T5, Task> handler,
         Bound<T1> b1, Bound<T2> b2, Bound<T3> b3, Bound<T4> b4, Bound<T5> b5)
-        => command.SetAction((pr, _) => handler(
-            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr)));
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(
+            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr)), ct));
 
     public static void SetHandler<T1, T2, T3, T4, T5, T6>(
         this Command command, Func<T1, T2, T3, T4, T5, T6, Task> handler,
         Bound<T1> b1, Bound<T2> b2, Bound<T3> b3, Bound<T4> b4, Bound<T5> b5, Bound<T6> b6)
-        => command.SetAction((pr, _) => handler(
-            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr), b6.From(pr)));
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(
+            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr), b6.From(pr)), ct));
 
     public static void SetHandler<T1, T2, T3, T4, T5, T6, T7>(
         this Command command, Func<T1, T2, T3, T4, T5, T6, T7, Task> handler,
         Bound<T1> b1, Bound<T2> b2, Bound<T3> b3, Bound<T4> b4, Bound<T5> b5, Bound<T6> b6,
         Bound<T7> b7)
-        => command.SetAction((pr, _) => handler(
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(
             b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr), b6.From(pr),
-            b7.From(pr)));
+            b7.From(pr)), ct));
 
     public static void SetHandler<T1, T2, T3, T4, T5, T6, T7, T8>(
         this Command command, Func<T1, T2, T3, T4, T5, T6, T7, T8, Task> handler,
         Bound<T1> b1, Bound<T2> b2, Bound<T3> b3, Bound<T4> b4, Bound<T5> b5, Bound<T6> b6,
         Bound<T7> b7, Bound<T8> b8)
-        => command.SetAction((pr, _) => handler(
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(
             b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr), b6.From(pr),
-            b7.From(pr), b8.From(pr)));
+            b7.From(pr), b8.From(pr)), ct));
+
+    private static async Task InvokeAsync(Func<Task> handler, CancellationToken cancellationToken)
+    {
+        var previous = ActiveCancellation.Value;
+        ActiveCancellation.Value = cancellationToken;
+        try
+        {
+            await handler();
+        }
+        finally
+        {
+            ActiveCancellation.Value = previous;
+        }
+    }
 }

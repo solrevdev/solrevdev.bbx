@@ -28,10 +28,10 @@ public class AuthStatusHandlerTests
         using var client = new BitbucketClient(http, new NullAuthProvider());
 
         var handler = new AuthStatusHandler(client, creds);
-        var (stdout, _) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthStatusRequest(), TestContext.Current.CancellationToken));
+        var act = async () => await handler.HandleAsync(
+            new AuthStatusRequest(), TestContext.Current.CancellationToken);
 
-        stdout.Should().Contain("Not authenticated");
+        (await act.Should().ThrowAsync<BbxUserException>()).WithMessage("*Not authenticated*");
         fakeHttp.Calls.Should().BeEmpty();
     }
 
@@ -53,11 +53,11 @@ public class AuthStatusHandlerTests
         using var client = new BitbucketClient(http, new NullAuthProvider());
 
         var handler = new AuthStatusHandler(client, creds);
-        var (stdout, _) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthStatusRequest(), TestContext.Current.CancellationToken));
+        var output = await handler.HandleAsync(
+            new AuthStatusRequest(), TestContext.Current.CancellationToken);
 
-        stdout.Should().Contain("Auth method: api-token");
-        stdout.Should().NotContain("Expires at:");
+        output.Should().Contain("Auth method: api-token");
+        output.Should().NotContain("Expires at:");
     }
 
     [Fact]
@@ -70,10 +70,30 @@ public class AuthStatusHandlerTests
         using var client = new BitbucketClient(http, new NullAuthProvider());
 
         var handler = new AuthStatusHandler(client, creds);
-        var (stdout, _) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthStatusRequest(), TestContext.Current.CancellationToken));
+        var act = async () => await handler.HandleAsync(
+            new AuthStatusRequest(), TestContext.Current.CancellationToken);
 
-        stdout.Should().Contain("Not authenticated");
+        (await act.Should().ThrowAsync<BbxUserException>()).WithMessage("*Not authenticated*");
         fakeHttp.Calls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Api_failure_is_not_reported_as_success()
+    {
+        var store = new InMemoryCredentialStore(new BbxConfig
+        {
+            Username = "jane@example.com",
+            ApiToken = "expired",
+        });
+        var fakeHttp = new FakeHttpMessageHandler();
+        fakeHttp.Enqueue(HttpStatusCode.Unauthorized, "{}");
+        using var http = TestHttpClientFactory.Create(fakeHttp);
+        using var client = new BitbucketClient(http, new NullAuthProvider());
+        var handler = new AuthStatusHandler(client, new CredentialManager(store));
+
+        var act = async () => await handler.HandleAsync(
+            new AuthStatusRequest(), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<HttpRequestException>();
     }
 }

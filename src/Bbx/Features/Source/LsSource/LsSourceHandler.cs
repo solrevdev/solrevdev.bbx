@@ -12,7 +12,7 @@ public sealed class LsSourceHandler(BitbucketClient client, CredentialManager cr
         var (ws, repo) = Resolve.WorkspaceAndRepo(credentials, request.Workspace, request.Repository,
             "Error: Workspace and repository required.");
 
-        var path = NormalizePath(request.Path);
+        var path = EndpointPath.EscapeSegments(request.Path);
         var refSegment = Uri.EscapeDataString(request.Ref);
         var endpoint = $"/repositories/{ws}/{repo}/src/{refSegment}/{path}";
 
@@ -45,17 +45,4 @@ public sealed class LsSourceHandler(BitbucketClient client, CredentialManager cr
         };
     }
 
-    private static string NormalizePath(string? path)
-    {
-        if (string.IsNullOrEmpty(path)) return string.Empty;
-        var trimmed = path.TrimStart('/');
-        // Escape segments individually so '/' separators survive but
-        // characters inside segments (spaces, %, etc.) get encoded.
-        var parts = trimmed.Split('/');
-        for (var i = 0; i < parts.Length; i++)
-        {
-            parts[i] = Uri.EscapeDataString(parts[i]);
-        }
-        return string.Join('/', parts);
-    }
 }

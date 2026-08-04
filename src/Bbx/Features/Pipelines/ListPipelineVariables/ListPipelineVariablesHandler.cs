@@ -28,9 +28,13 @@ public sealed class ListPipelineVariablesHandler(BitbucketClient client, Credent
             {
                 uuid = PipelineFormat.GetString(v, "uuid"),
                 key = PipelineFormat.GetString(v, "key"),
-                secured = v.TryGetProperty("secured", out var sec) && sec.GetBoolean(),
-                value = v.TryGetProperty("secured", out var s) && s.GetBoolean() ? "***" : PipelineFormat.GetString(v, "value"),
+                secured = IsTrue(v, "secured"),
+                value = IsTrue(v, "secured") ? "***" : PipelineFormat.GetString(v, "value"),
             }),
         };
     }
+
+    private static bool IsTrue(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value)
+        && value.ValueKind is JsonValueKind.True;
 }

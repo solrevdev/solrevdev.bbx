@@ -9,7 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATC
 
 ## [Unreleased]
 
-(none.)
+### Fixed
+
+- Ctrl+C during a command printed `Error: The operation was canceled.` and
+  exited 1. A cancelled run is not an error, so it now exits 130, the shell
+  convention for SIGINT, and prints nothing. An HttpClient timeout still
+  reports as a failure with exit 1.
 
 ## [1.0.1]
 

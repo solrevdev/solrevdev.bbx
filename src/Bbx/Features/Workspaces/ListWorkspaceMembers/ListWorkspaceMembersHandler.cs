@@ -9,8 +9,6 @@ public sealed class ListWorkspaceMembersHandler(BitbucketClient client, Credenti
 {
     public async Task<object> HandleAsync(ListWorkspaceMembersRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
@@ -18,7 +16,7 @@ public sealed class ListWorkspaceMembersHandler(BitbucketClient client, Credenti
         var members = new List<object>();
         await foreach (var member in client.GetPaginatedAsync<JsonElement>($"workspaces/{workspace}/members", ct))
         {
-            var user = member.TryGetProperty("user", out var u) ? u : member;
+            var user = member.TryGetObject("user", out var u) ? u : member;
 
             members.Add(new
             {

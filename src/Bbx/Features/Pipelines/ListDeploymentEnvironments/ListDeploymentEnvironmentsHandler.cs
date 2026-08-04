@@ -28,7 +28,9 @@ public sealed class ListDeploymentEnvironmentsHandler(BitbucketClient client, Cr
             {
                 uuid = PipelineFormat.GetString(e, "uuid"),
                 name = PipelineFormat.GetString(e, "name"),
-                environment_type = e.TryGetProperty("environment_type", out var et) ? PipelineFormat.GetString(et, "name") : null,
+                environment_type = e.TryGetObject("environment_type", out var et)
+                    ? PipelineFormat.GetString(et, "name")
+                    : null,
                 rank = e.TryGetProperty("rank", out var r) ? r.GetInt32() : 0,
                 deployment_gate_enabled = e.TryGetProperty("deployment_gate_enabled", out var dg) && dg.GetBoolean(),
             }),

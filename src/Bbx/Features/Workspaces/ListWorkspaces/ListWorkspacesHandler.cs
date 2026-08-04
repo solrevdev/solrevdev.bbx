@@ -4,12 +4,10 @@ using Bbx.Auth;
 
 namespace Bbx.Features.Workspaces.ListWorkspaces;
 
-public sealed class ListWorkspacesHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ListWorkspacesHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(ListWorkspacesRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var endpoint = "workspaces";
         if (!string.IsNullOrEmpty(request.Role))

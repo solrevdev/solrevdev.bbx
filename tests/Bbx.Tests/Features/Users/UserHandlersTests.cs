@@ -18,17 +18,13 @@ public class UserHandlersTests
     private static BitbucketClient Client(FakeHttpMessageHandler http) =>
         new(TestHttpClientFactory.Create(http), new NullAuthProvider());
 
-    private static CredentialManager Creds() =>
-        new(new InMemoryCredentialStore(new BbxConfig
-        { Username = "john@solrevdev.com", ApiToken = "t" }));
-
     [Fact]
     public async Task ListUserEmails_hits_user_emails_endpoint()
     {
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK,
             """{"values":[{"email":"a@b","is_primary":true,"is_confirmed":true}],"next":null}""");
-        var handler = new ListUserEmailsHandler(Client(http), Creds());
+        var handler = new ListUserEmailsHandler(Client(http));
 
         await handler.HandleAsync(new ListUserEmailsRequest(25), TestContext.Current.CancellationToken);
 
@@ -37,24 +33,11 @@ public class UserHandlersTests
     }
 
     [Fact]
-    public async Task ListUserEmails_throws_when_no_credentials()
-    {
-        var http = new FakeHttpMessageHandler();
-        var creds = new CredentialManager(new InMemoryCredentialStore());
-        var handler = new ListUserEmailsHandler(Client(http), creds);
-
-        var act = async () => await handler.HandleAsync(new ListUserEmailsRequest(25), TestContext.Current.CancellationToken);
-
-        (await act.Should().ThrowAsync<BbxUserException>())
-            .WithMessage("*Not authenticated*");
-    }
-
-    [Fact]
     public async Task ListUserWorkspacePermissions_hits_workspaces_path()
     {
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
-        var handler = new ListUserWorkspacePermissionsHandler(Client(http), Creds());
+        var handler = new ListUserWorkspacePermissionsHandler(Client(http));
 
         await handler.HandleAsync(new ListUserWorkspacePermissionsRequest(50), TestContext.Current.CancellationToken);
 
@@ -67,7 +50,7 @@ public class UserHandlersTests
     {
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
-        var handler = new ListUserRepositoryPermissionsHandler(Client(http), Creds());
+        var handler = new ListUserRepositoryPermissionsHandler(Client(http));
 
         await handler.HandleAsync(new ListUserRepositoryPermissionsRequest(50), TestContext.Current.CancellationToken);
 
@@ -80,7 +63,7 @@ public class UserHandlersTests
     {
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, """{"display_name":"Alice"}""");
-        var handler = new ViewUserHandler(Client(http), Creds());
+        var handler = new ViewUserHandler(Client(http));
 
         await handler.HandleAsync(new ViewUserRequest("{abc-uuid}"), TestContext.Current.CancellationToken);
 
@@ -102,7 +85,7 @@ public class UserHandlersTests
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, CurrentUserJson);
         http.Enqueue(HttpStatusCode.OK, """{"values":[{"uuid":"{k1}","label":"laptop"}],"next":null}""");
-        var handler = new ListSshKeysHandler(Client(http), Creds());
+        var handler = new ListSshKeysHandler(Client(http));
 
         await handler.HandleAsync(new ListSshKeysRequest(selector, 25), TestContext.Current.CancellationToken);
 
@@ -115,7 +98,7 @@ public class UserHandlersTests
     {
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
-        var handler = new ListSshKeysHandler(Client(http), Creds());
+        var handler = new ListSshKeysHandler(Client(http));
 
         await handler.HandleAsync(new ListSshKeysRequest("{other-uuid}", 25), TestContext.Current.CancellationToken);
 
@@ -129,7 +112,7 @@ public class UserHandlersTests
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, CurrentUserJson);
         http.Enqueue(HttpStatusCode.Created, """{"uuid":"{k1}","label":"laptop"}""");
-        var handler = new AddSshKeyHandler(Client(http), Creds());
+        var handler = new AddSshKeyHandler(Client(http));
 
         await handler.HandleAsync(
             new AddSshKeyRequest("me", "ssh-ed25519 AAAA", "laptop"), TestContext.Current.CancellationToken);
@@ -145,7 +128,7 @@ public class UserHandlersTests
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.OK, CurrentUserJson);
         http.Enqueue(HttpStatusCode.NoContent, "");
-        var handler = new DeleteSshKeyHandler(Client(http), Creds());
+        var handler = new DeleteSshKeyHandler(Client(http));
 
         await handler.HandleAsync(new DeleteSshKeyRequest("me", "{k1}"), TestContext.Current.CancellationToken);
 

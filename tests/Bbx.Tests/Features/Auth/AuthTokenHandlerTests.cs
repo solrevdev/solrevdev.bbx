@@ -6,12 +6,8 @@ using Bbx.Tests.TestKit;
 namespace Bbx.Tests.Features.Auth;
 
 [Collection("Console")]
-public class AuthTokenHandlerTests : IDisposable
+public class AuthTokenHandlerTests
 {
-    private readonly int _originalExitCode = Environment.ExitCode;
-
-    public void Dispose() => Environment.ExitCode = _originalExitCode;
-
     // Printed as email:token so it can be piped straight into curl -u.
     [Fact]
     public async Task Prints_the_basic_auth_pair()
@@ -23,24 +19,20 @@ public class AuthTokenHandlerTests : IDisposable
             ApiToken = "ATATTsecret",
         })));
 
-        var (stdout, stderr) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthTokenRequest(), TestContext.Current.CancellationToken));
+        var output = await handler.HandleAsync(
+            new AuthTokenRequest(), TestContext.Current.CancellationToken);
 
-        stdout.Trim().Should().Be("jane@example.com:ATATTsecret");
-        stderr.Should().BeEmpty();
+        output.Should().Be("jane@example.com:ATATTsecret");
     }
 
     [Fact]
     public async Task Reports_not_authenticated_and_fails_when_no_token_is_stored()
     {
-        Environment.ExitCode = 0;
         var handler = new AuthTokenHandler(new CredentialManager(new InMemoryCredentialStore()));
 
-        var (stdout, stderr) = await CaptureConsole.RunAsync(() =>
-            handler.HandleAsync(new AuthTokenRequest(), TestContext.Current.CancellationToken));
+        var act = async () => await handler.HandleAsync(
+            new AuthTokenRequest(), TestContext.Current.CancellationToken);
 
-        stdout.Should().BeEmpty();
-        stderr.Should().Contain("Not authenticated");
-        Environment.ExitCode.Should().Be(1);
+        (await act.Should().ThrowAsync<BbxUserException>()).WithMessage("*Not authenticated*");
     }
 }

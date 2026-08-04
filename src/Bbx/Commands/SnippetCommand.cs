@@ -43,7 +43,7 @@ public static class SnippetCommand
         command.SetHandler((string? workspace, string? role, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListSnippetsHandler>()
-                    .HandleAsync(new ListSnippetsRequest(workspace, role, limit), CancellationToken.None)),
+                    .HandleAsync(new ListSnippetsRequest(workspace, role, limit), CommandBinding.CancellationToken)),
             workspaceOption, roleOption, limitOption);
         return command;
     }
@@ -60,7 +60,7 @@ public static class SnippetCommand
         command.SetHandler((string snippetId, string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewSnippetHandler>()
-                    .HandleAsync(new ViewSnippetRequest(snippetId, workspace), CancellationToken.None)),
+                    .HandleAsync(new ViewSnippetRequest(snippetId, workspace), CommandBinding.CancellationToken)),
             snippetIdArg, workspaceOption);
         return command;
     }
@@ -68,8 +68,8 @@ public static class SnippetCommand
     private static Command CreateCreateCommand(IServiceProvider services)
     {
         var command = new Command("create", "Create a new snippet");
-        var titleOption = new Option<string>("--title", "-t") { Description = "Snippet title" , Required = true };
-        var fileOption = new Option<string[]>("--file", "-f") { Description = "File(s) to include in snippet (can be specified multiple times)" , Required = true, AllowMultipleArgumentsPerToken = true };
+        var titleOption = new Option<string>("--title", "-t") { Description = "Snippet title", Required = true };
+        var fileOption = new Option<string[]>("--file", "-f") { Description = "File(s) to include in snippet (can be specified multiple times)", Required = true, AllowMultipleArgumentsPerToken = true };
         var privateOption = new Option<bool>("--private", "-p") { Description = "Make snippet private", DefaultValueFactory = _ => false };
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
 
@@ -81,7 +81,7 @@ public static class SnippetCommand
         command.SetHandler((string title, string[] files, bool isPrivate, string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateSnippetHandler>()
-                    .HandleAsync(new CreateSnippetRequest(title, files, isPrivate, workspace), CancellationToken.None)),
+                    .HandleAsync(new CreateSnippetRequest(title, files, isPrivate, workspace), CommandBinding.CancellationToken)),
             titleOption, fileOption, privateOption, workspaceOption);
         return command;
     }
@@ -104,7 +104,7 @@ public static class SnippetCommand
         command.SetHandler((string snippetId, string? title, string[]? files, bool? isPrivate, string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateSnippetHandler>()
-                    .HandleAsync(new UpdateSnippetRequest(snippetId, title, files, isPrivate, workspace), CancellationToken.None)),
+                    .HandleAsync(new UpdateSnippetRequest(snippetId, title, files, isPrivate, workspace), CommandBinding.CancellationToken)),
             snippetIdArg, titleOption, fileOption, privateOption, workspaceOption);
         return command;
     }
@@ -126,7 +126,7 @@ public static class SnippetCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<DeleteSnippetHandler>()
-                    .HandleAsync(new DeleteSnippetRequest(snippetId, workspace), CancellationToken.None));
+                    .HandleAsync(new DeleteSnippetRequest(snippetId, workspace), CommandBinding.CancellationToken));
         }, snippetIdArg, workspaceOption, yesOption);
         return command;
     }
@@ -146,21 +146,9 @@ public static class SnippetCommand
 
         command.SetHandler(async (string snippetId, string? fileName, string? workspace, bool raw) =>
         {
-            try
-            {
-                await services.GetRequiredService<SnippetFilesHandler>()
-                    .HandleAsync(new SnippetFilesRequest(snippetId, fileName, workspace, raw), CancellationToken.None);
-            }
-            catch (BbxUserException ex)
-            {
-                Console.Error.WriteLine(ex.Message);
-                Environment.ExitCode = 1;
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                Environment.ExitCode = 1;
-            }
+            await CommandRunner.RunDirectAsync(() =>
+                services.GetRequiredService<SnippetFilesHandler>()
+                    .HandleAsync(new SnippetFilesRequest(snippetId, fileName, workspace, raw), CommandBinding.CancellationToken));
         }, snippetIdArg, fileNameArg, workspaceOption, rawOption);
         return command;
     }
@@ -181,7 +169,7 @@ public static class SnippetCommand
         command.SetHandler((string snippetId, string? workspace, bool list, bool unwatch) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<SnippetWatchHandler>()
-                    .HandleAsync(new SnippetWatchRequest(snippetId, workspace, list, unwatch), CancellationToken.None)),
+                    .HandleAsync(new SnippetWatchRequest(snippetId, workspace, list, unwatch), CommandBinding.CancellationToken)),
             snippetIdArg, workspaceOption, listOption, unwatchOption);
         return command;
     }
@@ -202,7 +190,7 @@ public static class SnippetCommand
         command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<SnippetCommentsHandler>()
-                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId), CancellationToken.None)),
+                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId), CommandBinding.CancellationToken)),
             snippetIdArg, workspaceOption, addOption, deleteOption);
         return command;
     }

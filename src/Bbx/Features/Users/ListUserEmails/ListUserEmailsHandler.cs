@@ -4,12 +4,10 @@ using Bbx.Auth;
 
 namespace Bbx.Features.Users.ListUserEmails;
 
-public sealed class ListUserEmailsHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ListUserEmailsHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(ListUserEmailsRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var emails = new List<object>();
         var count = 0;

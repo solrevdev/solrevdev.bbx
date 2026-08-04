@@ -22,10 +22,13 @@ public class GetDownloadHandlerTests
             new InMemoryCredentialStore(new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" }));
         var handler = new GetDownloadHandler(client, credentials);
 
-        var bytes = await handler.HandleAsync(
-            new GetDownloadRequest("ws", "myrepo", "release.bin", null), TestContext.Current.CancellationToken);
+        await using var destination = new MemoryStream();
+        await handler.HandleAsync(
+            new GetDownloadRequest("ws", "myrepo", "release.bin", null),
+            destination,
+            TestContext.Current.CancellationToken);
 
-        bytes.Should().Equal(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
+        destination.ToArray().Should().Equal(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/downloads/release.bin");
     }
@@ -40,7 +43,9 @@ public class GetDownloadHandlerTests
         var handler = new GetDownloadHandler(client, credentials);
 
         var act = async () => await handler.HandleAsync(
-            new GetDownloadRequest("ws", "myrepo", "", null), TestContext.Current.CancellationToken);
+            new GetDownloadRequest("ws", "myrepo", "", null),
+            Stream.Null,
+            TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<BbxUserException>())
             .WithMessage("*<filename>*");

@@ -8,8 +8,6 @@ public sealed class DeleteSnippetHandler(BitbucketClient client, CredentialManag
 {
     public async Task<object> HandleAsync(DeleteSnippetRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");

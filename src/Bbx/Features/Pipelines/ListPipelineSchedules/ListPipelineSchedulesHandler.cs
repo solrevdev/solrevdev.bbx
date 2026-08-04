@@ -29,7 +29,7 @@ public sealed class ListPipelineSchedulesHandler(BitbucketClient client, Credent
                 uuid = PipelineFormat.GetString(s, "uuid"),
                 enabled = s.TryGetProperty("enabled", out var en) && en.GetBoolean(),
                 cron_pattern = PipelineFormat.GetString(s, "cron_pattern"),
-                target = s.TryGetProperty("target", out var t) ? (object)new
+                target = s.TryGetObject("target", out var t) ? (object)new
                 {
                     ref_name = PipelineFormat.GetString(t, "ref_name"),
                     ref_type = PipelineFormat.GetString(t, "ref_type"),

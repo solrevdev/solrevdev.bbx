@@ -44,7 +44,7 @@ public static class RepoCommand
         listCommand.SetHandler((string? workspace, int limit, string? query) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListReposHandler>()
-                    .HandleAsync(new ListReposRequest(workspace, limit, query), CancellationToken.None)),
+                    .HandleAsync(new ListReposRequest(workspace, limit, query), CommandBinding.CancellationToken)),
             workspaceOption, limitOption, queryOption);
         command.Subcommands.Add(listCommand);
 
@@ -54,7 +54,7 @@ public static class RepoCommand
         viewCommand.SetHandler((string? workspace, string repository) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewRepoHandler>()
-                    .HandleAsync(new ViewRepoRequest(workspace, repository), CancellationToken.None)),
+                    .HandleAsync(new ViewRepoRequest(workspace, repository), CommandBinding.CancellationToken)),
             workspaceOption, repoArg);
         command.Subcommands.Add(viewCommand);
 
@@ -72,7 +72,7 @@ public static class RepoCommand
         createCommand.SetHandler((string? workspace, string name, bool isPrivate, string? project, string? description, string? forkPolicy) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateRepoHandler>()
-                    .HandleAsync(new CreateRepoRequest(workspace, name, isPrivate, project, description, forkPolicy), CancellationToken.None)),
+                    .HandleAsync(new CreateRepoRequest(workspace, name, isPrivate, project, description, forkPolicy), CommandBinding.CancellationToken)),
             workspaceOption, nameArg, privateOption, projectOption, descOption, forkPolicyOption);
         command.Subcommands.Add(createCommand);
 
@@ -84,18 +84,12 @@ public static class RepoCommand
         deleteCommand.SetHandler(async (string? workspace, string repository, bool yes) =>
         {
             var (resolvedWs, resolvedRepo) = ParseRepoPath(workspace, repository);
-            if (!yes)
-            {
-                Console.Write($"Delete {resolvedWs}/{resolvedRepo}? This cannot be undone. (y/N): ");
-                if (Console.ReadLine()?.Trim().ToLower() != "y")
-                {
-                    Console.WriteLine("Cancelled.");
-                    return;
-                }
-            }
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Delete {resolvedWs}/{resolvedRepo}? This cannot be undone. [y/N]: "))
+                return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteRepoHandler>()
-                    .HandleAsync(new DeleteRepoRequest(workspace, repository), CancellationToken.None));
+                    .HandleAsync(new DeleteRepoRequest(workspace, repository), CommandBinding.CancellationToken));
         }, workspaceOption, deleteRepoArg, yesOption);
         command.Subcommands.Add(deleteCommand);
 
@@ -109,7 +103,7 @@ public static class RepoCommand
         forkCommand.SetHandler((string? workspace, string repository, string? name, string? toWorkspace) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ForkRepoHandler>()
-                    .HandleAsync(new ForkRepoRequest(workspace, repository, name, toWorkspace), CancellationToken.None)),
+                    .HandleAsync(new ForkRepoRequest(workspace, repository, name, toWorkspace), CommandBinding.CancellationToken)),
             workspaceOption, forkRepoArg, forkNameOption, forkWorkspaceOption);
         command.Subcommands.Add(forkCommand);
 
@@ -121,7 +115,7 @@ public static class RepoCommand
         cloneCommand.SetHandler((string? workspace, string repository, bool ssh) =>
             CommandRunner.RunRawAsync(() =>
                 services.GetRequiredService<CloneRepoHandler>()
-                    .HandleAsync(new CloneRepoRequest(workspace, repository, ssh), CancellationToken.None)),
+                    .HandleAsync(new CloneRepoRequest(workspace, repository, ssh), CommandBinding.CancellationToken)),
             workspaceOption, cloneRepoArg, sshOption);
         command.Subcommands.Add(cloneCommand);
 
@@ -131,7 +125,7 @@ public static class RepoCommand
         permissionsCommand.SetHandler((string? workspace, string repository) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<RepoPermissionsHandler>()
-                    .HandleAsync(new RepoPermissionsRequest(workspace, repository), CancellationToken.None)),
+                    .HandleAsync(new RepoPermissionsRequest(workspace, repository), CommandBinding.CancellationToken)),
             workspaceOption, permRepoArg);
         command.Subcommands.Add(permissionsCommand);
 
@@ -159,7 +153,7 @@ public static class RepoCommand
         listCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListForksHandler>()
-                    .HandleAsync(new ListForksRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new ListForksRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, limitOption);
         forksCommand.Subcommands.Add(listCommand);
 
@@ -176,7 +170,7 @@ public static class RepoCommand
         watchersCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListWatchersHandler>()
-                    .HandleAsync(new ListWatchersRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new ListWatchersRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, limitOption);
 
         return watchersCommand;
@@ -192,7 +186,7 @@ public static class RepoCommand
         viewCommand.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewBranchingModelHandler>()
-                    .HandleAsync(new ViewBranchingModelRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new ViewBranchingModelRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         bmCommand.Subcommands.Add(viewCommand);
 
@@ -200,19 +194,19 @@ public static class RepoCommand
         settingsCommand.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewBranchingModelSettingsHandler>()
-                    .HandleAsync(new ViewBranchingModelSettingsRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new ViewBranchingModelSettingsRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         bmCommand.Subcommands.Add(settingsCommand);
 
         var updateCommand = new Command("update",
             "Replace branching-model settings (PUT raw JSON payload)");
         var settingsJsonOption = new Option<string>("--settings")
-        { Description = "JSON payload (e.g., '{\"development\":{\"name\":\"main\",\"use_mainbranch\":true}}')" , Required = true };
+        { Description = "JSON payload (e.g., '{\"development\":{\"name\":\"main\",\"use_mainbranch\":true}}')", Required = true };
         updateCommand.Options.Add(settingsJsonOption);
         updateCommand.SetHandler((string? workspace, string? repo, string settingsJson) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateBranchingModelSettingsHandler>()
-                    .HandleAsync(new UpdateBranchingModelSettingsRequest(workspace, repo, settingsJson), CancellationToken.None)),
+                    .HandleAsync(new UpdateBranchingModelSettingsRequest(workspace, repo, settingsJson), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, settingsJsonOption);
         bmCommand.Subcommands.Add(updateCommand);
 
@@ -231,7 +225,7 @@ public static class RepoCommand
         listCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListRepoDeployKeysHandler>()
-                    .HandleAsync(new ListRepoDeployKeysRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new ListRepoDeployKeysRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, limitOption);
         dkCommand.Subcommands.Add(listCommand);
 
@@ -241,19 +235,19 @@ public static class RepoCommand
         viewCommand.SetHandler((string? workspace, string? repo, int keyId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewRepoDeployKeyHandler>()
-                    .HandleAsync(new ViewRepoDeployKeyRequest(workspace, repo, keyId), CancellationToken.None)),
+                    .HandleAsync(new ViewRepoDeployKeyRequest(workspace, repo, keyId), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, viewIdArg);
         dkCommand.Subcommands.Add(viewCommand);
 
         var addCommand = new Command("add", "Add a deploy key");
-        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body" , Required = true };
+        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body", Required = true };
         var addLabelOption = new Option<string?>("--label") { Description = "Friendly label" };
         addCommand.Options.Add(addKeyOption);
         addCommand.Options.Add(addLabelOption);
         addCommand.SetHandler((string? workspace, string? repo, string key, string? label) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddRepoDeployKeyHandler>()
-                    .HandleAsync(new AddRepoDeployKeyRequest(workspace, repo, key, label), CancellationToken.None)),
+                    .HandleAsync(new AddRepoDeployKeyRequest(workspace, repo, key, label), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, addKeyOption, addLabelOption);
         dkCommand.Subcommands.Add(addCommand);
 
@@ -268,7 +262,7 @@ public static class RepoCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteRepoDeployKeyHandler>()
-                    .HandleAsync(new DeleteRepoDeployKeyRequest(workspace, repo, keyId), CancellationToken.None));
+                    .HandleAsync(new DeleteRepoDeployKeyRequest(workspace, repo, keyId), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, deleteIdArg, yesOption);
         dkCommand.Subcommands.Add(deleteCommand);
 
@@ -287,22 +281,22 @@ public static class RepoCommand
         listCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListDefaultReviewersHandler>()
-                    .HandleAsync(new ListDefaultReviewersRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new ListDefaultReviewersRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, listLimitOption);
         drCommand.Subcommands.Add(listCommand);
 
         var addCommand = new Command("add", "Add a default reviewer");
-        var addTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user" , Required = true };
+        var addTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
         addCommand.Options.Add(addTargetOption);
         addCommand.SetHandler((string? workspace, string? repo, string target) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddDefaultReviewerHandler>()
-                    .HandleAsync(new AddDefaultReviewerRequest(workspace, repo, target), CancellationToken.None)),
+                    .HandleAsync(new AddDefaultReviewerRequest(workspace, repo, target), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, addTargetOption);
         drCommand.Subcommands.Add(addCommand);
 
         var removeCommand = new Command("remove", "Remove a default reviewer");
-        var removeTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user" , Required = true };
+        var removeTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
         var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
         removeCommand.Options.Add(removeTargetOption);
         removeCommand.Options.Add(yesOption);
@@ -312,7 +306,7 @@ public static class RepoCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<RemoveDefaultReviewerHandler>()
-                    .HandleAsync(new RemoveDefaultReviewerRequest(workspace, repo, target), CancellationToken.None));
+                    .HandleAsync(new RemoveDefaultReviewerRequest(workspace, repo, target), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, removeTargetOption, yesOption);
         drCommand.Subcommands.Add(removeCommand);
 
@@ -323,7 +317,7 @@ public static class RepoCommand
         effectiveCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<EffectiveDefaultReviewersHandler>()
-                    .HandleAsync(new EffectiveDefaultReviewersRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new EffectiveDefaultReviewersRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, effectiveLimitOption);
         drCommand.Subcommands.Add(effectiveCommand);
 
@@ -342,7 +336,7 @@ public static class RepoCommand
         listCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListRepoHooksHandler>()
-                    .HandleAsync(new ListRepoHooksRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new ListRepoHooksRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, limitOption);
         hooksCommand.Subcommands.Add(listCommand);
 
@@ -352,12 +346,12 @@ public static class RepoCommand
         viewCommand.SetHandler((string? workspace, string? repo, string uid) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewRepoHookHandler>()
-                    .HandleAsync(new ViewRepoHookRequest(workspace, repo, uid), CancellationToken.None)),
+                    .HandleAsync(new ViewRepoHookRequest(workspace, repo, uid), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, viewUidArg);
         hooksCommand.Subcommands.Add(viewCommand);
 
         var createCommand = new Command("create", "Create a repository webhook");
-        var urlOption = new Option<string>("--url") { Description = "Webhook target URL" , Required = true };
+        var urlOption = new Option<string>("--url") { Description = "Webhook target URL", Required = true };
         var descriptionOption = new Option<string?>("--description") { Description = "Webhook description" };
         var eventsOption = new Option<string[]?>("--events") { Description = "Events to trigger webhook (default: repo:push)" };
         var activeOption = new Option<bool>("--active") { Description = "Whether the webhook is active", DefaultValueFactory = _ => true };
@@ -368,7 +362,7 @@ public static class RepoCommand
         createCommand.SetHandler((string? workspace, string? repo, string url, string? description, string[]? events, bool active) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateRepoHookHandler>()
-                    .HandleAsync(new CreateRepoHookRequest(workspace, repo, url, description, events, active), CancellationToken.None)),
+                    .HandleAsync(new CreateRepoHookRequest(workspace, repo, url, description, events, active), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, urlOption, descriptionOption, eventsOption, activeOption);
         hooksCommand.Subcommands.Add(createCommand);
 
@@ -386,7 +380,7 @@ public static class RepoCommand
         updateCommand.SetHandler((string? workspace, string? repo, string uid, string? url, string? description, string[]? events, bool? active) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateRepoHookHandler>()
-                    .HandleAsync(new UpdateRepoHookRequest(workspace, repo, uid, url, description, events, active), CancellationToken.None)),
+                    .HandleAsync(new UpdateRepoHookRequest(workspace, repo, uid, url, description, events, active), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, updateUidArg, updateUrlOption, updateDescriptionOption, updateEventsOption, updateActiveOption);
         hooksCommand.Subcommands.Add(updateCommand);
 
@@ -401,7 +395,7 @@ public static class RepoCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteRepoHookHandler>()
-                    .HandleAsync(new DeleteRepoHookRequest(workspace, repo, uid), CancellationToken.None));
+                    .HandleAsync(new DeleteRepoHookRequest(workspace, repo, uid), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, deleteUidArg, yesOption);
         hooksCommand.Subcommands.Add(deleteCommand);
 

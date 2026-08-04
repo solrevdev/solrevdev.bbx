@@ -53,6 +53,12 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
    so `Main` keeps a non-zero invocation result and otherwise returns what the
    handler set. System.CommandLine 2.0 has no built-in exception handler, so
    `Main` wraps the invocation and prints the message rather than a stack trace.
+   Ctrl+C is the library's job, not ours: `InvocationPipeline` links the token
+   passed to `InvokeAsync` to a source of its own and cancels it from
+   `ProcessTerminationHandler`, which registers for SIGINT and SIGTERM. Passing
+   `default` still gives handlers a cancelable token. Do not add a
+   `Console.CancelKeyPress` hook; it only competes with that registration.
+   A cancelled run exits 130 and says nothing.
 8. **Errors carry context.** `EnsureSuccessAsync` appends the HTTP status, names
    missing scopes from `error.detail.required`, and prints
    `error.data.announcement_url` for deprecations. `BitbucketErrorDetail.Detail`

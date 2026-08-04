@@ -9,8 +9,6 @@ public sealed class ListWorkspacePermissionsHandler(BitbucketClient client, Cred
 {
     public async Task<object> HandleAsync(ListWorkspacePermissionsRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
@@ -21,7 +19,7 @@ public sealed class ListWorkspacePermissionsHandler(BitbucketClient client, Cred
             permissions.Add(new
             {
                 permission = perm.TryGetProperty("permission", out var p) ? p.GetString() : null,
-                user = perm.TryGetProperty("user", out var u) ? (object)new
+                user = perm.TryGetObject("user", out var u) ? (object)new
                 {
                     display_name = u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
                     username = u.TryGetProperty("username", out var un) ? un.GetString() : null,

@@ -19,7 +19,7 @@ public sealed class RepoPermissionsHandler(BitbucketClient client, CredentialMan
             permissions.Add(new
             {
                 type = "user",
-                user = perm.TryGetProperty("user", out var u) ? u.GetProperty("display_name").GetString() : null,
+                user = perm.TryGetObject("user", out var u) ? u.GetStringOrNull("display_name") : null,
                 permission = perm.TryGetProperty("permission", out var p) ? p.GetString() : null,
             });
         }

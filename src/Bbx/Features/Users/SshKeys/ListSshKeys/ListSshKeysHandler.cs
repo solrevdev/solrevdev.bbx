@@ -5,12 +5,10 @@ using Bbx.Features.Users;
 
 namespace Bbx.Features.Users.SshKeys.ListSshKeys;
 
-public sealed class ListSshKeysHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ListSshKeysHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(ListSshKeysRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var user = await UserSelector.ResolveAsync(client, request.SelectedUser, ct);
         var keys = new List<object>();

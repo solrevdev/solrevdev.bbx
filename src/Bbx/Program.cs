@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text;
 using Bbx.Commands;
 using Bbx.Composition;
@@ -13,7 +14,12 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
+        return await RunAsync(args, ServiceRegistration.Build());
+    }
 
+    internal static async Task<int> RunAsync(
+        string[] args, IServiceProvider services, CancellationToken cancellationToken = default)
+    {
         // `--json-compact` is a global formatting toggle. It's stripped here
         // before System.CommandLine sees the args so every group inherits
         // it transparently, the same effect as setting BBX_JSON_COMPACT=1.
@@ -25,7 +31,7 @@ public class Program
         if (compactFromArg)
             args = args.Where(a => a != "--json-compact").ToArray();
 
-        Services = ServiceRegistration.Build();
+        Services = services;
 
         var rootCommand = new RootCommand("Bitbucket Cloud CLI for LLM integration");
         // Registered for --help discoverability only; the option is already
@@ -61,23 +67,45 @@ public class Program
         int exitCode;
         try
         {
-            exitCode = await parseResult.InvokeAsync();
+            // Ctrl+C, SIGINT and SIGTERM are already handled: System.CommandLine
+            // links this token to its own source and cancels it from
+            // ProcessTerminationHandler, so the token CommandBinding hands to a
+            // handler is always cancelable. Do not add a Console.CancelKeyPress
+            // hook here; on .NET 7+ the library registers for the POSIX signals
+            // directly and a second subscriber only competes with it. The token
+            // below is for a caller that drives RunAsync itself.
+            exitCode = await parseResult.InvokeAsync(new InvocationConfiguration
+            {
+                EnableDefaultExceptionHandler = false,
+            }, cancellationToken);
+        }
+        catch (BbxUserException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            return 1;
+        }
+        // An HttpClient timeout also surfaces as an OperationCanceledException,
+        // but carries a TimeoutException inside; that is a failure, not a
+        // cancellation, so it falls through to the handler below.
+        catch (OperationCanceledException ex) when (ex.InnerException is not TimeoutException)
+        {
+            // 130 is the shell convention for a run stopped by SIGINT, and what
+            // System.CommandLine returns when a handler ignores the token and
+            // gets forced out. A cancelled run is not an error, so say nothing.
+            return 130;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
         }
         catch (Exception ex)
         {
-            // CommandRunner catches the expected failures. Anything else that
-            // escapes a handler would otherwise print a full stack trace;
-            // System.CommandLine 2.0 dropped the built-in exception handler, so
-            // report the message here instead.
+            // Do not print a full stack trace for an unexpected CLI failure.
             Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
 
-        // A value returned from Main overrides Environment.ExitCode, and the
-        // invocation reports 0 whenever a handler returned normally. Handlers
-        // catch their own errors and set Environment.ExitCode, so returning the
-        // invocation's result alone made every failed command exit 0 and look
-        // successful to a script or an agent.
-        return exitCode != 0 ? exitCode : Environment.ExitCode;
+        return exitCode;
     }
 }

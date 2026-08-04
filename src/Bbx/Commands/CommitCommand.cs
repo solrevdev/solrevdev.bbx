@@ -7,8 +7,8 @@ using Bbx.Features.Commits.CreateCommitStatus;
 using Bbx.Features.Commits.FileHistory;
 using Bbx.Features.Commits.ListCommitComments;
 using Bbx.Features.Commits.ListCommitPullRequests;
-using Bbx.Features.Commits.ListCommitStatuses;
 using Bbx.Features.Commits.ListCommits;
+using Bbx.Features.Commits.ListCommitStatuses;
 using Bbx.Features.Commits.MergeBase;
 using Bbx.Features.Commits.UnapproveCommit;
 using Bbx.Features.Commits.UpdateCommitStatus;
@@ -37,7 +37,7 @@ public static class CommitCommand
         listCommand.SetHandler((string? workspace, string? repo, string? branch, string? path, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListCommitsHandler>()
-                    .HandleAsync(new ListCommitsRequest(workspace, repo, branch, path, limit), CancellationToken.None)),
+                    .HandleAsync(new ListCommitsRequest(workspace, repo, branch, path, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, branchOption, pathOption, limitOption);
         command.Subcommands.Add(listCommand);
 
@@ -47,7 +47,7 @@ public static class CommitCommand
         viewCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewCommitHandler>()
-                    .HandleAsync(new ViewCommitRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new ViewCommitRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, hashArg);
         command.Subcommands.Add(viewCommand);
 
@@ -57,7 +57,7 @@ public static class CommitCommand
         diffCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunRawAsync(() =>
                 services.GetRequiredService<CommitDiffHandler>()
-                    .HandleAsync(new CommitDiffRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new CommitDiffRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, diffHashArg);
         command.Subcommands.Add(diffCommand);
 
@@ -67,7 +67,7 @@ public static class CommitCommand
         patchCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunRawAsync(() =>
                 services.GetRequiredService<CommitPatchHandler>()
-                    .HandleAsync(new CommitPatchRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new CommitPatchRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, patchHashArg);
         command.Subcommands.Add(patchCommand);
 
@@ -77,7 +77,7 @@ public static class CommitCommand
         commentsCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListCommitCommentsHandler>()
-                    .HandleAsync(new ListCommitCommentsRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new ListCommitCommentsRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, commentsHashArg);
         command.Subcommands.Add(commentsCommand);
 
@@ -87,7 +87,7 @@ public static class CommitCommand
         statusesCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListCommitStatusesHandler>()
-                    .HandleAsync(new ListCommitStatusesRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new ListCommitStatusesRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, statusesHashArg);
         command.Subcommands.Add(statusesCommand);
 
@@ -104,7 +104,7 @@ public static class CommitCommand
         filehistoryCommand.SetHandler((string? workspace, string? repo, string hash, string path, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<FileHistoryHandler>()
-                    .HandleAsync(new FileHistoryRequest(workspace, repo, hash, path, limit), CancellationToken.None)),
+                    .HandleAsync(new FileHistoryRequest(workspace, repo, hash, path, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, fhHashArg, fhPathArg, fhLimitOption);
         command.Subcommands.Add(filehistoryCommand);
 
@@ -115,7 +115,7 @@ public static class CommitCommand
         mergeBaseCommand.SetHandler((string? workspace, string? repo, string spec) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<MergeBaseHandler>()
-                    .HandleAsync(new MergeBaseRequest(workspace, repo, spec), CancellationToken.None)),
+                    .HandleAsync(new MergeBaseRequest(workspace, repo, spec), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, mbSpecArg);
         command.Subcommands.Add(mergeBaseCommand);
 
@@ -125,7 +125,7 @@ public static class CommitCommand
         approveCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<ApproveCommitHandler>()
-                    .HandleAsync(new ApproveCommitRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new ApproveCommitRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, approveHashArg);
         command.Subcommands.Add(approveCommand);
 
@@ -135,7 +135,7 @@ public static class CommitCommand
         unapproveCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<UnapproveCommitHandler>()
-                    .HandleAsync(new UnapproveCommitRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new UnapproveCommitRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, unapproveHashArg);
         command.Subcommands.Add(unapproveCommand);
 
@@ -148,7 +148,7 @@ public static class CommitCommand
         diffstatCommand.SetHandler((string? workspace, string? repo, string spec, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CommitDiffstatHandler>()
-                    .HandleAsync(new CommitDiffstatRequest(workspace, repo, spec, limit), CancellationToken.None)),
+                    .HandleAsync(new CommitDiffstatRequest(workspace, repo, spec, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, dsSpecArg, dsLimitOption);
         command.Subcommands.Add(diffstatCommand);
 
@@ -158,7 +158,7 @@ public static class CommitCommand
         prsCommand.SetHandler((string? workspace, string? repo, string hash) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListCommitPullRequestsHandler>()
-                    .HandleAsync(new ListCommitPullRequestsRequest(workspace, repo, hash), CancellationToken.None)),
+                    .HandleAsync(new ListCommitPullRequestsRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, prsHashArg);
         command.Subcommands.Add(prsCommand);
 
@@ -171,10 +171,10 @@ public static class CommitCommand
 
         var createCommand = new Command("create", "Create a build status on a commit");
         var createHashArg = new Argument<string>("hash") { Description = "Commit hash" };
-        var createKeyOption = new Option<string>("--key") { Description = "Build status key" , Required = true };
+        var createKeyOption = new Option<string>("--key") { Description = "Build status key", Required = true };
         var createStateOption = new Option<string>("--state")
-        { Description = "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)" , Required = true };
-        var createUrlOption = new Option<string>("--url") { Description = "URL to the build (e.g., CI run)" , Required = true };
+        { Description = "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)", Required = true };
+        var createUrlOption = new Option<string>("--url") { Description = "URL to the build (e.g., CI run)", Required = true };
         var createNameOption = new Option<string?>("--name") { Description = "Human-readable name" };
         var createDescriptionOption = new Option<string?>("--description") { Description = "Description" };
         createCommand.Arguments.Add(createHashArg);
@@ -186,13 +186,13 @@ public static class CommitCommand
         createCommand.SetHandler((string? workspace, string? repo, string hash, string key, string state, string url, string? name, string? description) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateCommitStatusHandler>()
-                    .HandleAsync(new CreateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CancellationToken.None)),
+                    .HandleAsync(new CreateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, createHashArg, createKeyOption, createStateOption, createUrlOption, createNameOption, createDescriptionOption);
         statusCommand.Subcommands.Add(createCommand);
 
         var updateCommand = new Command("update", "Update an existing build status on a commit");
         var updateHashArg = new Argument<string>("hash") { Description = "Commit hash" };
-        var updateKeyOption = new Option<string>("--key") { Description = "Build status key" , Required = true };
+        var updateKeyOption = new Option<string>("--key") { Description = "Build status key", Required = true };
         var updateStateOption = new Option<string?>("--state")
         { Description = "Build state (SUCCESSFUL, FAILED, INPROGRESS, STOPPED)" };
         var updateUrlOption = new Option<string?>("--url") { Description = "URL to the build" };
@@ -207,7 +207,7 @@ public static class CommitCommand
         updateCommand.SetHandler((string? workspace, string? repo, string hash, string key, string? state, string? url, string? name, string? description) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateCommitStatusHandler>()
-                    .HandleAsync(new UpdateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CancellationToken.None)),
+                    .HandleAsync(new UpdateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, updateHashArg, updateKeyOption, updateStateOption, updateUrlOption, updateNameOption, updateDescriptionOption);
         statusCommand.Subcommands.Add(updateCommand);
 
