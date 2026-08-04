@@ -35,4 +35,28 @@ public class CommandBindingTests
         seen.CanBeCanceled.Should().BeTrue();
         seen.IsCancellationRequested.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Bound_handlers_get_a_cancelable_token_even_with_no_token_supplied()
+    {
+        var command = new Command("test");
+        var seen = CancellationToken.None;
+        command.SetHandler(() =>
+        {
+            seen = CommandBinding.CancellationToken;
+            return Task.CompletedTask;
+        });
+
+        // Passing no token is the point of the test, so xUnit1051 is off here.
+#pragma warning disable xUnit1051
+        await command.Parse([]).InvokeAsync(new InvocationConfiguration());
+#pragma warning restore xUnit1051
+
+        // System.CommandLine links whatever token it is handed to a source of
+        // its own and cancels that from ProcessTerminationHandler, so Ctrl+C,
+        // SIGINT and SIGTERM reach handlers without Program hooking any signal
+        // itself. A false here means the CLI has stopped answering Ctrl+C.
+        seen.CanBeCanceled.Should().BeTrue();
+        seen.IsCancellationRequested.Should().BeFalse();
+    }
 }

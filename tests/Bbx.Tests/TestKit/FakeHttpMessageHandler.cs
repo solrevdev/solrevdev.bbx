@@ -23,6 +23,10 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        // HttpClient hands the token straight to its handler without checking it
+        // first, so a fake that ignores it would answer a request a real one
+        // would have refused.
+        cancellationToken.ThrowIfCancellationRequested();
         Calls.Add(request);
         string? body = null;
         if (request.Content is not null)

@@ -17,7 +17,8 @@ public class Program
         return await RunAsync(args, ServiceRegistration.Build());
     }
 
-    internal static async Task<int> RunAsync(string[] args, IServiceProvider services)
+    internal static async Task<int> RunAsync(
+        string[] args, IServiceProvider services, CancellationToken cancellationToken = default)
     {
         // `--json-compact` is a global formatting toggle. It's stripped here
         // before System.CommandLine sees the args so every group inherits
@@ -66,15 +67,32 @@ public class Program
         int exitCode;
         try
         {
+            // Ctrl+C, SIGINT and SIGTERM are already handled: System.CommandLine
+            // links this token to its own source and cancels it from
+            // ProcessTerminationHandler, so the token CommandBinding hands to a
+            // handler is always cancelable. Do not add a Console.CancelKeyPress
+            // hook here; on .NET 7+ the library registers for the POSIX signals
+            // directly and a second subscriber only competes with it. The token
+            // below is for a caller that drives RunAsync itself.
             exitCode = await parseResult.InvokeAsync(new InvocationConfiguration
             {
                 EnableDefaultExceptionHandler = false,
-            }, default);
+            }, cancellationToken);
         }
         catch (BbxUserException ex)
         {
             Console.Error.WriteLine(ex.Message);
             return 1;
+        }
+        // An HttpClient timeout also surfaces as an OperationCanceledException,
+        // but carries a TimeoutException inside; that is a failure, not a
+        // cancellation, so it falls through to the handler below.
+        catch (OperationCanceledException ex) when (ex.InnerException is not TimeoutException)
+        {
+            // 130 is the shell convention for a run stopped by SIGINT, and what
+            // System.CommandLine returns when a handler ignores the token and
+            // gets forced out. A cancelled run is not an error, so say nothing.
+            return 130;
         }
         catch (HttpRequestException ex)
         {
