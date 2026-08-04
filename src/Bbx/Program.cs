@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text;
 using Bbx.Commands;
 using Bbx.Composition;
@@ -13,7 +14,11 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
+        return await RunAsync(args, ServiceRegistration.Build());
+    }
 
+    internal static async Task<int> RunAsync(string[] args, IServiceProvider services)
+    {
         // `--json-compact` is a global formatting toggle. It's stripped here
         // before System.CommandLine sees the args so every group inherits
         // it transparently, the same effect as setting BBX_JSON_COMPACT=1.
@@ -25,7 +30,7 @@ public class Program
         if (compactFromArg)
             args = args.Where(a => a != "--json-compact").ToArray();
 
-        Services = ServiceRegistration.Build();
+        Services = services;
 
         var rootCommand = new RootCommand("Bitbucket Cloud CLI for LLM integration");
         // Registered for --help discoverability only; the option is already
@@ -61,23 +66,28 @@ public class Program
         int exitCode;
         try
         {
-            exitCode = await parseResult.InvokeAsync();
+            exitCode = await parseResult.InvokeAsync(new InvocationConfiguration
+            {
+                EnableDefaultExceptionHandler = false,
+            }, default);
+        }
+        catch (BbxUserException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            return 1;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
         }
         catch (Exception ex)
         {
-            // CommandRunner catches the expected failures. Anything else that
-            // escapes a handler would otherwise print a full stack trace;
-            // System.CommandLine 2.0 dropped the built-in exception handler, so
-            // report the message here instead.
+            // Do not print a full stack trace for an unexpected CLI failure.
             Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
 
-        // A value returned from Main overrides Environment.ExitCode, and the
-        // invocation reports 0 whenever a handler returned normally. Handlers
-        // catch their own errors and set Environment.ExitCode, so returning the
-        // invocation's result alone made every failed command exit 0 and look
-        // successful to a script or an agent.
-        return exitCode != 0 ? exitCode : Environment.ExitCode;
+        return exitCode;
     }
 }

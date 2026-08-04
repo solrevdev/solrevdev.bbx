@@ -4,12 +4,10 @@ using Bbx.Auth;
 
 namespace Bbx.Features.Users.ListUserRepositoryPermissions;
 
-public sealed class ListUserRepositoryPermissionsHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ListUserRepositoryPermissionsHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(ListUserRepositoryPermissionsRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var perms = new List<object>();
         var count = 0;

@@ -15,18 +15,7 @@ public sealed class CatSourceHandler(BitbucketClient client, CredentialManager c
             "Error: Workspace and repository required.");
 
         var refSegment = Uri.EscapeDataString(request.Ref);
-        var path = NormalizePath(request.Path);
+        var path = EndpointPath.EscapeSegments(request.Path);
         return await client.GetStringAsync($"/repositories/{ws}/{repo}/src/{refSegment}/{path}", ct);
-    }
-
-    private static string NormalizePath(string path)
-    {
-        var trimmed = path.TrimStart('/');
-        var parts = trimmed.Split('/');
-        for (var i = 0; i < parts.Length; i++)
-        {
-            parts[i] = Uri.EscapeDataString(parts[i]);
-        }
-        return string.Join('/', parts);
     }
 }

@@ -9,8 +9,6 @@ public sealed class ViewWorkspaceHandler(BitbucketClient client, CredentialManag
 {
     public async Task<object> HandleAsync(ViewWorkspaceRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Provide as argument or set default with 'bbx auth set-workspace'.");
@@ -24,7 +22,7 @@ public sealed class ViewWorkspaceHandler(BitbucketClient client, CredentialManag
             uuid = ws.TryGetProperty("uuid", out var u) ? u.GetString() : null,
             is_private = ws.TryGetProperty("is_private", out var p) && p.GetBoolean(),
             created_on = ws.TryGetProperty("created_on", out var c) ? c.GetString() : null,
-            links = ws.TryGetProperty("links", out var l) ? (object)new
+            links = ws.TryGetObject("links", out var l) ? (object)new
             {
                 html = l.TryGetObject("html", out var h) && h.TryGetProperty("href", out var href) ? href.GetString() : null,
                 avatar = l.TryGetObject("avatar", out var a) && a.TryGetProperty("href", out var ahref) ? ahref.GetString() : null,

@@ -9,7 +9,6 @@ namespace Bbx.Tests.Commands;
 [Collection("Console")]
 public class CommandRunnerTests : IDisposable
 {
-    private readonly int _originalExitCode = Environment.ExitCode;
     private readonly IServiceProvider? _originalServices = Program.Services;
 
     public CommandRunnerTests()
@@ -27,60 +26,43 @@ public class CommandRunnerTests : IDisposable
 
     public void Dispose()
     {
-        Environment.ExitCode = _originalExitCode;
         Program.Services = _originalServices!;
     }
 
-    // Regression: handlers catch their own errors and set Environment.ExitCode,
-    // but Program.Main returned InvokeAsync's result, which overrode it. Every
-    // failed command exited 0 and read as success to a script.
     [Fact]
-    public async Task RunJsonAsync_sets_a_failing_exit_code_on_api_errors()
+    public async Task RunJsonAsync_leaves_api_errors_for_the_program_boundary()
     {
-        Environment.ExitCode = 0;
+        var act = async () => await CommandRunner.RunJsonAsync<object>(
+            () => throw new HttpRequestException("Repository not found"));
 
-        var (stdout, stderr) = await CaptureConsole.RunAsync(() =>
-            CommandRunner.RunJsonAsync<object>(() => throw new HttpRequestException("Repository not found")));
-
-        Environment.ExitCode.Should().Be(1);
-        stderr.Should().Contain("Repository not found");
-        stdout.Should().BeEmpty();
+        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("Repository not found");
     }
 
     [Fact]
-    public async Task RunJsonAsync_sets_a_failing_exit_code_on_user_errors()
+    public async Task RunJsonAsync_leaves_user_errors_for_the_program_boundary()
     {
-        Environment.ExitCode = 0;
+        var act = async () => await CommandRunner.RunJsonAsync<object>(
+            () => throw new BbxUserException("Error: repo required."));
 
-        var (_, stderr) = await CaptureConsole.RunAsync(() =>
-            CommandRunner.RunJsonAsync<object>(() => throw new BbxUserException("Error: repo required.")));
-
-        Environment.ExitCode.Should().Be(1);
-        stderr.Should().Contain("repo required");
+        (await act.Should().ThrowAsync<BbxUserException>()).WithMessage("*repo required*");
     }
 
     [Fact]
     public async Task RunJsonAsync_leaves_the_exit_code_alone_on_success()
     {
-        Environment.ExitCode = 0;
-
         var (stdout, stderr) = await CaptureConsole.RunAsync(() =>
             CommandRunner.RunJsonAsync(() => Task.FromResult<object>(new { ok = true })));
 
-        Environment.ExitCode.Should().Be(0);
         stdout.Should().Contain("\"ok\"");
         stderr.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task RunRawAsync_sets_a_failing_exit_code_on_api_errors()
+    public async Task RunRawAsync_leaves_api_errors_for_the_program_boundary()
     {
-        Environment.ExitCode = 0;
+        var act = async () => await CommandRunner.RunRawAsync(
+            () => throw new HttpRequestException("HTTP 406 Not Acceptable"));
 
-        var (_, stderr) = await CaptureConsole.RunAsync(() =>
-            CommandRunner.RunRawAsync(() => throw new HttpRequestException("HTTP 406 Not Acceptable")));
-
-        Environment.ExitCode.Should().Be(1);
-        stderr.Should().Contain("406");
+        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("*406*");
     }
 }

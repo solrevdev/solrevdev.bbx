@@ -14,7 +14,7 @@ public sealed class FileHistoryHandler(BitbucketClient client, CredentialManager
         if (string.IsNullOrEmpty(request.Path))
             throw new BbxUserException("Error: <path> is required.");
 
-        var path = NormalizePath(request.Path);
+        var path = EndpointPath.EscapeSegments(request.Path);
         var endpoint = $"/repositories/{ws}/{repo}/filehistory/{Uri.EscapeDataString(request.Hash)}/{path}";
 
         var entries = new List<object>();
@@ -46,14 +46,4 @@ public sealed class FileHistoryHandler(BitbucketClient client, CredentialManager
         };
     }
 
-    private static string NormalizePath(string path)
-    {
-        var trimmed = path.TrimStart('/');
-        var parts = trimmed.Split('/');
-        for (var i = 0; i < parts.Length; i++)
-        {
-            parts[i] = Uri.EscapeDataString(parts[i]);
-        }
-        return string.Join('/', parts);
-    }
 }

@@ -21,8 +21,9 @@ public sealed class ViewPipelineHandler(BitbucketClient client, CredentialManage
         {
             pipeline = PipelineFormat.PipelineDetailed(pipeline),
             steps = steps.TryGetProperty("values", out var stepsArray)
+                    && stepsArray.ValueKind == JsonValueKind.Array
                 ? stepsArray.EnumerateArray().Select(PipelineFormat.Step).ToList()
-                : new List<object>(),
+                : [],
         };
     }
 }

@@ -5,9 +5,7 @@ namespace Bbx.Features.Pipelines;
 internal static class PipelineFormat
 {
     public static string? GetString(JsonElement element, string propertyName) =>
-        element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
-            ? prop.GetString()
-            : null;
+        element.GetStringOrNull(propertyName);
 
     public static string BuildQuery(string? status, string? branch)
     {
@@ -19,68 +17,133 @@ internal static class PipelineFormat
         return string.Join(" AND ", conditions);
     }
 
-    public static object Pipeline(JsonElement p) => new
+    public static PipelineSummary Pipeline(JsonElement pipeline)
     {
-        uuid = GetString(p, "uuid"),
-        build_number = p.TryGetProperty("build_number", out var bn) ? bn.GetInt32() : 0,
-        state = p.TryGetProperty("state", out var state) ? (object)new
-        {
-            name = GetString(state, "name"),
-            result = state.TryGetProperty("result", out var r) ? GetString(r, "name") : null,
-        } : null!,
-        target = p.TryGetProperty("target", out var target) ? (object)new
-        {
-            ref_type = GetString(target, "ref_type"),
-            ref_name = GetString(target, "ref_name"),
-            commit = target.TryGetProperty("commit", out var c) ? GetString(c, "hash") : null,
-        } : null!,
-        trigger = p.TryGetProperty("trigger", out var trigger) ? GetString(trigger, "name") : null,
-        created_on = GetString(p, "created_on"),
-        completed_on = GetString(p, "completed_on"),
-        duration_in_seconds = p.TryGetProperty("duration_in_seconds", out var dur) ? dur.GetInt32() : (int?)null,
-    };
+        var state = State(pipeline);
+        var target = Target(pipeline);
 
-    public static object PipelineDetailed(JsonElement p)
-    {
-        var basic = Pipeline(p);
-        return new
-        {
-            ((dynamic)basic).uuid,
-            ((dynamic)basic).build_number,
-            ((dynamic)basic).state,
-            ((dynamic)basic).target,
-            ((dynamic)basic).trigger,
-            ((dynamic)basic).created_on,
-            ((dynamic)basic).completed_on,
-            ((dynamic)basic).duration_in_seconds,
-            creator = p.TryGetProperty("creator", out var creator) ? (object)new
-            {
-                display_name = GetString(creator, "display_name"),
-                account_id = GetString(creator, "account_id"),
-            } : null!,
-            repository = p.TryGetProperty("repository", out var repo) ? (object)new
-            {
-                name = GetString(repo, "name"),
-                full_name = GetString(repo, "full_name"),
-            } : null!,
-            links = p.TryGetObject("links", out var links) && links.TryGetProperty("html", out var html)
-                ? GetString(html, "href") : null,
-        };
+        return new PipelineSummary(
+            GetString(pipeline, "uuid"),
+            GetInt32(pipeline, "build_number") ?? 0,
+            state,
+            target,
+            pipeline.TryGetObject("trigger", out var trigger) ? GetString(trigger, "name") : null,
+            GetString(pipeline, "created_on"),
+            GetString(pipeline, "completed_on"),
+            GetInt32(pipeline, "duration_in_seconds"));
     }
 
-    public static object Step(JsonElement s) => new
+    public static PipelineDetails PipelineDetailed(JsonElement pipeline)
     {
-        uuid = GetString(s, "uuid"),
-        name = GetString(s, "name"),
-        state = s.TryGetProperty("state", out var state) ? (object)new
-        {
-            name = GetString(state, "name"),
-            result = state.TryGetProperty("result", out var r) ? GetString(r, "name") : null,
-        } : null!,
-        started_on = GetString(s, "started_on"),
-        completed_on = GetString(s, "completed_on"),
-        duration_in_seconds = s.TryGetProperty("duration_in_seconds", out var dur) ? dur.GetInt32() : (int?)null,
-        run_number = s.TryGetProperty("run_number", out var rn) ? rn.GetInt32() : (int?)null,
-        max_time = s.TryGetProperty("max_time", out var mt) ? mt.GetInt32() : (int?)null,
-    };
+        var summary = Pipeline(pipeline);
+        PipelineActor? creator = pipeline.TryGetObject("creator", out var creatorElement)
+            ? new PipelineActor(
+                GetString(creatorElement, "display_name"),
+                GetString(creatorElement, "account_id"))
+            : null;
+        PipelineRepository? repository = pipeline.TryGetObject("repository", out var repositoryElement)
+            ? new PipelineRepository(
+                GetString(repositoryElement, "name"),
+                GetString(repositoryElement, "full_name"))
+            : null;
+        var link = pipeline.TryGetObject("links", out var links)
+                   && links.TryGetObject("html", out var html)
+            ? GetString(html, "href")
+            : null;
+
+        return new PipelineDetails(
+            summary.Uuid,
+            summary.BuildNumber,
+            summary.State,
+            summary.Target,
+            summary.Trigger,
+            summary.CreatedOn,
+            summary.CompletedOn,
+            summary.DurationInSeconds,
+            creator,
+            repository,
+            link);
+    }
+
+    public static PipelineStep Step(JsonElement step) => new(
+        GetString(step, "uuid"),
+        GetString(step, "name"),
+        State(step),
+        GetString(step, "started_on"),
+        GetString(step, "completed_on"),
+        GetInt32(step, "duration_in_seconds"),
+        GetInt32(step, "run_number"),
+        GetInt32(step, "max_time"));
+
+    private static PipelineState? State(JsonElement element)
+    {
+        if (!element.TryGetObject("state", out var state)) return null;
+
+        var result = state.TryGetObject("result", out var resultElement)
+            ? GetString(resultElement, "name")
+            : null;
+        return new PipelineState(GetString(state, "name"), result);
+    }
+
+    private static PipelineTarget? Target(JsonElement element)
+    {
+        if (!element.TryGetObject("target", out var target)) return null;
+
+        var commit = target.TryGetObject("commit", out var commitElement)
+            ? GetString(commitElement, "hash")
+            : null;
+        return new PipelineTarget(
+            GetString(target, "ref_type"),
+            GetString(target, "ref_name"),
+            commit);
+    }
+
+    private static int? GetInt32(JsonElement element, string propertyName) =>
+        element.ValueKind == JsonValueKind.Object
+        && element.TryGetProperty(propertyName, out var value)
+        && value.ValueKind == JsonValueKind.Number
+        && value.TryGetInt32(out var number)
+            ? number
+            : null;
 }
+
+internal sealed record PipelineState(string? Name, string? Result);
+
+internal sealed record PipelineTarget(string? RefType, string? RefName, string? Commit);
+
+internal sealed record PipelineSummary(
+    string? Uuid,
+    int BuildNumber,
+    PipelineState? State,
+    PipelineTarget? Target,
+    string? Trigger,
+    string? CreatedOn,
+    string? CompletedOn,
+    int? DurationInSeconds);
+
+internal sealed record PipelineActor(string? DisplayName, string? AccountId);
+
+internal sealed record PipelineRepository(string? Name, string? FullName);
+
+internal sealed record PipelineDetails(
+    string? Uuid,
+    int BuildNumber,
+    PipelineState? State,
+    PipelineTarget? Target,
+    string? Trigger,
+    string? CreatedOn,
+    string? CompletedOn,
+    int? DurationInSeconds,
+    PipelineActor? Creator,
+    PipelineRepository? Repository,
+    string? Links);
+
+internal sealed record PipelineStep(
+    string? Uuid,
+    string? Name,
+    PipelineState? State,
+    string? StartedOn,
+    string? CompletedOn,
+    int? DurationInSeconds,
+    int? RunNumber,
+    int? MaxTime);

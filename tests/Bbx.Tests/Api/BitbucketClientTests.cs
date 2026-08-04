@@ -271,6 +271,69 @@ public class BitbucketClientTests
     }
 
     [Fact]
+    public async Task Redirects_never_restore_credentials_after_leaving_the_api_origin()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.EnqueueResponder(_ =>
+        {
+            var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+            redirect.Headers.Location = new Uri("https://downloads.example.com/first");
+            return redirect;
+        });
+        handler.EnqueueResponder(_ =>
+        {
+            var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+            redirect.Headers.Location = new Uri("https://downloads.example.com/second");
+            return redirect;
+        });
+        handler.Enqueue(HttpStatusCode.OK, "binary", "application/octet-stream");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "token"));
+
+        await client.GetByteArrayAsync(
+            "repositories/ws/repo/downloads/artifact.zip", TestContext.Current.CancellationToken);
+
+        handler.Calls.Should().HaveCount(3);
+        handler.Calls[1].Headers.Authorization.Should().BeNull();
+        handler.Calls[2].Headers.Authorization.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Absolute_urls_outside_the_api_origin_do_not_receive_credentials()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.OK, "{}");
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new BasicAuthProvider("jane@example.com", "token"));
+
+        await client.GetAsync<JsonElement>(
+            "https://example.com/page-two", TestContext.Current.CancellationToken);
+
+        handler.Calls.Single().Headers.Authorization.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CopyToAsync_streams_non_json_content_to_the_destination()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.EnqueueResponder(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([0, 1, 2, 3, 255]),
+        });
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+        await using var destination = new MemoryStream();
+
+        await client.CopyToAsync("downloads/file", destination, TestContext.Current.CancellationToken);
+
+        destination.ToArray().Should().Equal(0, 1, 2, 3, 255);
+        handler.Calls.Single().Headers.Accept.Select(a => a.MediaType).Should().Equal("*/*");
+    }
+
+    [Fact]
     public async Task Redirect_loops_stop_rather_than_hanging()
     {
         var handler = new FakeHttpMessageHandler();

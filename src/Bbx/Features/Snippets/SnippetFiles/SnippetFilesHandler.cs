@@ -10,8 +10,6 @@ public sealed class SnippetFilesHandler(BitbucketClient client, CredentialManage
 {
     public async Task HandleAsync(SnippetFilesRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
@@ -43,7 +41,7 @@ public sealed class SnippetFilesHandler(BitbucketClient client, CredentialManage
         else
         {
             var content = await client.GetRawAsync(
-                $"snippets/{workspace}/{request.SnippetId}/files/{request.FileName}", ct);
+                $"snippets/{workspace}/{request.SnippetId}/files/{EndpointPath.EscapeSegments(request.FileName)}", ct);
 
             if (request.Raw)
             {

@@ -6,12 +6,10 @@ using Bbx.Features.Users.SshKeys.ListSshKeys;
 
 namespace Bbx.Features.Users.SshKeys.AddSshKey;
 
-public sealed class AddSshKeyHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class AddSshKeyHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(AddSshKeyRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
         if (string.IsNullOrWhiteSpace(request.Key))
             throw new BbxUserException("Error: --key (the public SSH key body) is required.");
 

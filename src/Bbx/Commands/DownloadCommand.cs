@@ -23,19 +23,19 @@ public static class DownloadCommand
         listCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListDownloadsHandler>()
-                    .HandleAsync(new ListDownloadsRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new ListDownloadsRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, listLimitOption);
         command.Subcommands.Add(listCommand);
 
         var uploadCommand = new Command("upload", "Upload a new download artifact");
-        var uploadFileOption = new Option<string>("--file") { Description = "Path to the local file to upload" , Required = true };
+        var uploadFileOption = new Option<string>("--file") { Description = "Path to the local file to upload", Required = true };
         var uploadNameOption = new Option<string?>("--name") { Description = "Name on Bitbucket (defaults to local filename)" };
         uploadCommand.Options.Add(uploadFileOption);
         uploadCommand.Options.Add(uploadNameOption);
         uploadCommand.SetHandler((string? workspace, string? repo, string filePath, string? name) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UploadDownloadHandler>()
-                    .HandleAsync(new UploadDownloadRequest(workspace, repo, filePath, name), CancellationToken.None)),
+                    .HandleAsync(new UploadDownloadRequest(workspace, repo, filePath, name), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, uploadFileOption, uploadNameOption);
         command.Subcommands.Add(uploadCommand);
 
@@ -51,24 +51,43 @@ public static class DownloadCommand
             {
                 await CommandRunner.RunJsonAsync(async () =>
                 {
-                    var bytes = await services.GetRequiredService<GetDownloadHandler>()
-                        .HandleAsync(new GetDownloadRequest(workspace, repo, filename, output), CancellationToken.None);
-                    var dir = Path.GetDirectoryName(output);
-                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                    await File.WriteAllBytesAsync(output, bytes, CancellationToken.None);
-                    return new
+                    var fullOutput = Path.GetFullPath(output);
+                    var dir = Path.GetDirectoryName(fullOutput)!;
+                    Directory.CreateDirectory(dir);
+                    var temporaryOutput = Path.Combine(dir, $".bbx-download-{Guid.NewGuid():N}.tmp");
+                    try
                     {
-                        filename,
-                        output,
-                        size = bytes.LongLength,
-                    };
+                        long size;
+                        await using (var destination = new FileStream(
+                                         temporaryOutput, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                                         bufferSize: 81920, useAsync: true))
+                        {
+                            await services.GetRequiredService<GetDownloadHandler>()
+                                .HandleAsync(
+                                    new GetDownloadRequest(workspace, repo, filename, output),
+                                    destination,
+                                    CommandBinding.CancellationToken);
+                            await destination.FlushAsync(CommandBinding.CancellationToken);
+                            size = destination.Length;
+                        }
+
+                        File.Move(temporaryOutput, fullOutput, overwrite: true);
+                        return new { filename, output, size };
+                    }
+                    finally
+                    {
+                        if (File.Exists(temporaryOutput)) File.Delete(temporaryOutput);
+                    }
                 });
                 return;
             }
 
-            await CommandRunner.RunBinaryAsync(() =>
+            await CommandRunner.RunStreamAsync(stdout =>
                 services.GetRequiredService<GetDownloadHandler>()
-                    .HandleAsync(new GetDownloadRequest(workspace, repo, filename, null), CancellationToken.None));
+                    .HandleAsync(
+                        new GetDownloadRequest(workspace, repo, filename, null),
+                        stdout,
+                        CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, getFilenameArg, getOutputOption);
         command.Subcommands.Add(getCommand);
 
@@ -83,7 +102,7 @@ public static class DownloadCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteDownloadHandler>()
-                    .HandleAsync(new DeleteDownloadRequest(workspace, repo, filename), CancellationToken.None));
+                    .HandleAsync(new DeleteDownloadRequest(workspace, repo, filename), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, deleteFilenameArg, yesOption);
         command.Subcommands.Add(deleteCommand);
 

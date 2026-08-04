@@ -32,7 +32,7 @@ public static class IssueCommand
         listCommand.SetHandler((string? workspace, string? repo, string? state, string? priority, string? assignee, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListIssuesHandler>()
-                    .HandleAsync(new ListIssuesRequest(workspace, repo, state, priority, assignee, limit), CancellationToken.None)),
+                    .HandleAsync(new ListIssuesRequest(workspace, repo, state, priority, assignee, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, stateOption, priorityOption, assigneeOption, limitOption);
         command.Subcommands.Add(listCommand);
 
@@ -42,12 +42,12 @@ public static class IssueCommand
         viewCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewIssueHandler>()
-                    .HandleAsync(new ViewIssueRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new ViewIssueRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, idArg);
         command.Subcommands.Add(viewCommand);
 
         var createCommand = new Command("create", "Create a new issue");
-        var titleOption = new Option<string>("--title") { Description = "Issue title" , Required = true };
+        var titleOption = new Option<string>("--title") { Description = "Issue title", Required = true };
         var contentOption = new Option<string?>("--content") { Description = "Issue description" };
         var kindOption = new Option<string?>("--kind") { Description = "Issue kind (bug, enhancement, proposal, task)" };
         var priorityCreateOption = new Option<string?>("--priority") { Description = "Priority (trivial, minor, major, critical, blocker)" };
@@ -58,7 +58,7 @@ public static class IssueCommand
         createCommand.SetHandler((string? workspace, string? repo, string title, string? content, string? kind, string? priority) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateIssueHandler>()
-                    .HandleAsync(new CreateIssueRequest(workspace, repo, title, content, kind, priority), CancellationToken.None)),
+                    .HandleAsync(new CreateIssueRequest(workspace, repo, title, content, kind, priority), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, titleOption, contentOption, kindOption, priorityCreateOption);
         command.Subcommands.Add(createCommand);
 
@@ -76,7 +76,7 @@ public static class IssueCommand
         updateCommand.SetHandler((string? workspace, string? repo, int id, string? title, string? state, string? priority, string? assignee) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateIssueHandler>()
-                    .HandleAsync(new UpdateIssueRequest(workspace, repo, id, title, state, priority, assignee), CancellationToken.None)),
+                    .HandleAsync(new UpdateIssueRequest(workspace, repo, id, title, state, priority, assignee), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, updateIdArg, updateTitleOption, updateStateOption, updatePriorityOption, updateAssigneeOption);
         command.Subcommands.Add(updateCommand);
 
@@ -87,18 +87,11 @@ public static class IssueCommand
         deleteCommand.Options.Add(yesOption);
         deleteCommand.SetHandler(async (string? workspace, string? repo, int id, bool yes) =>
         {
-            if (!yes)
-            {
-                Console.Write($"Delete issue #{id}? (y/N): ");
-                if (Console.ReadLine()?.Trim().ToLower() != "y")
-                {
-                    Console.WriteLine("Cancelled.");
-                    return;
-                }
-            }
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete issue #{id}? [y/N]: "))
+                return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteIssueHandler>()
-                    .HandleAsync(new DeleteIssueRequest(workspace, repo, id), CancellationToken.None));
+                    .HandleAsync(new DeleteIssueRequest(workspace, repo, id), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, deleteIdArg, yesOption);
         command.Subcommands.Add(deleteCommand);
 
@@ -108,19 +101,19 @@ public static class IssueCommand
         commentsCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListIssueCommentsHandler>()
-                    .HandleAsync(new ListIssueCommentsRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new ListIssueCommentsRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, commentsIdArg);
         command.Subcommands.Add(commentsCommand);
 
         var commentCommand = new Command("comment", "Add a comment to an issue");
         var commentIdArg = new Argument<int>("id") { Description = "Issue ID" };
-        var commentBodyOption = new Option<string>("--body") { Description = "Comment text" , Required = true };
+        var commentBodyOption = new Option<string>("--body") { Description = "Comment text", Required = true };
         commentCommand.Arguments.Add(commentIdArg);
         commentCommand.Options.Add(commentBodyOption);
         commentCommand.SetHandler((string? workspace, string? repo, int id, string commentBody) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddIssueCommentHandler>()
-                    .HandleAsync(new AddIssueCommentRequest(workspace, repo, id, commentBody), CancellationToken.None)),
+                    .HandleAsync(new AddIssueCommentRequest(workspace, repo, id, commentBody), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, commentIdArg, commentBodyOption);
         command.Subcommands.Add(commentCommand);
 

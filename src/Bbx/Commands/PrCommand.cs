@@ -3,8 +3,8 @@ using Bbx.Features.PullRequests.AddPullRequestComment;
 using Bbx.Features.PullRequests.ApprovePullRequest;
 using Bbx.Features.PullRequests.CreatePullRequest;
 using Bbx.Features.PullRequests.DeclinePullRequest;
-using Bbx.Features.PullRequests.ListPullRequestCommits;
 using Bbx.Features.PullRequests.ListPullRequestComments;
+using Bbx.Features.PullRequests.ListPullRequestCommits;
 using Bbx.Features.PullRequests.ListPullRequests;
 using Bbx.Features.PullRequests.MergePullRequest;
 using Bbx.Features.PullRequests.PullRequestActivity;
@@ -44,7 +44,7 @@ public static class PrCommand
         listCommand.SetHandler((string? workspace, string? repo, string? state, string? author, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPullRequestsHandler>()
-                    .HandleAsync(new ListPullRequestsRequest(workspace, repo, state, author, limit), CancellationToken.None)),
+                    .HandleAsync(new ListPullRequestsRequest(workspace, repo, state, author, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, stateOption, authorOption, limitOption);
         command.Subcommands.Add(listCommand);
 
@@ -54,14 +54,14 @@ public static class PrCommand
         viewCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewPullRequestHandler>()
-                    .HandleAsync(new ViewPullRequestRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new ViewPullRequestRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, idArg);
         command.Subcommands.Add(viewCommand);
 
         var createCommand = new Command("create", "Create a new pull request");
-        var titleOption = new Option<string>("--title") { Description = "Pull request title" , Required = true };
-        var sourceOption = new Option<string>("--source") { Description = "Source branch" , Required = true };
-        var destOption = new Option<string>("--dest") { Description = "Destination branch" , Required = true };
+        var titleOption = new Option<string>("--title") { Description = "Pull request title", Required = true };
+        var sourceOption = new Option<string>("--source") { Description = "Source branch", Required = true };
+        var destOption = new Option<string>("--dest") { Description = "Destination branch", Required = true };
         var bodyOption = new Option<string?>("--body") { Description = "Pull request description" };
         var reviewersOption = new Option<string[]?>("--reviewers") { Description = "Reviewer account IDs (UUID format)" };
         var closeSourceOption = new Option<bool>("--close-source-branch") { Description = "Close source branch after merge" };
@@ -74,7 +74,7 @@ public static class PrCommand
         createCommand.SetHandler((string? workspace, string? repo, string title, string source, string dest, string? body, string[]? reviewers, bool closeSource) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreatePullRequestHandler>()
-                    .HandleAsync(new CreatePullRequestRequest(workspace, repo, title, source, dest, body, reviewers, closeSource), CancellationToken.None)),
+                    .HandleAsync(new CreatePullRequestRequest(workspace, repo, title, source, dest, body, reviewers, closeSource), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, titleOption, sourceOption, destOption, bodyOption, reviewersOption, closeSourceOption);
         command.Subcommands.Add(createCommand);
 
@@ -101,7 +101,7 @@ public static class PrCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<MergePullRequestHandler>()
-                    .HandleAsync(new MergePullRequestRequest(workspace, repo, id, strategy, message, closeSource), CancellationToken.None));
+                    .HandleAsync(new MergePullRequestRequest(workspace, repo, id, strategy, message, closeSource), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, mergeIdArg, strategyOption, messageOption, closeSourceMergeOption, mergeYesOption);
         command.Subcommands.Add(mergeCommand);
 
@@ -111,7 +111,7 @@ public static class PrCommand
         approveCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<ApprovePullRequestHandler>()
-                    .HandleAsync(new ApprovePullRequestRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new ApprovePullRequestRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, approveIdArg);
         command.Subcommands.Add(approveCommand);
 
@@ -121,7 +121,7 @@ public static class PrCommand
         unapproveCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<UnapprovePullRequestHandler>()
-                    .HandleAsync(new UnapprovePullRequestRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new UnapprovePullRequestRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, unapproveIdArg);
         command.Subcommands.Add(unapproveCommand);
 
@@ -133,7 +133,7 @@ public static class PrCommand
         declineCommand.SetHandler((string? workspace, string? repo, int id, string? reason) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeclinePullRequestHandler>()
-                    .HandleAsync(new DeclinePullRequestRequest(workspace, repo, id, reason), CancellationToken.None)),
+                    .HandleAsync(new DeclinePullRequestRequest(workspace, repo, id, reason), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, declineIdArg, declineReasonOption);
         command.Subcommands.Add(declineCommand);
 
@@ -143,19 +143,19 @@ public static class PrCommand
         commentsCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPullRequestCommentsHandler>()
-                    .HandleAsync(new ListPullRequestCommentsRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new ListPullRequestCommentsRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, commentsIdArg);
         command.Subcommands.Add(commentsCommand);
 
         var commentCommand = new Command("comment", "Add a comment to a pull request");
         var commentIdArg = new Argument<int>("id") { Description = "Pull request ID" };
-        var commentBodyOption = new Option<string>("--body") { Description = "Comment text" , Required = true };
+        var commentBodyOption = new Option<string>("--body") { Description = "Comment text", Required = true };
         commentCommand.Arguments.Add(commentIdArg);
         commentCommand.Options.Add(commentBodyOption);
         commentCommand.SetHandler((string? workspace, string? repo, int id, string commentBody) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddPullRequestCommentHandler>()
-                    .HandleAsync(new AddPullRequestCommentRequest(workspace, repo, id, commentBody), CancellationToken.None)),
+                    .HandleAsync(new AddPullRequestCommentRequest(workspace, repo, id, commentBody), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, commentIdArg, commentBodyOption);
         command.Subcommands.Add(commentCommand);
 
@@ -165,7 +165,7 @@ public static class PrCommand
         diffCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunRawAsync(() =>
                 services.GetRequiredService<PullRequestDiffHandler>()
-                    .HandleAsync(new PullRequestDiffRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new PullRequestDiffRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, diffIdArg);
         command.Subcommands.Add(diffCommand);
 
@@ -175,7 +175,7 @@ public static class PrCommand
         activityCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<PullRequestActivityHandler>()
-                    .HandleAsync(new PullRequestActivityRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new PullRequestActivityRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, activityIdArg);
         command.Subcommands.Add(activityCommand);
 
@@ -185,7 +185,7 @@ public static class PrCommand
         statusesCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<PullRequestStatusesHandler>()
-                    .HandleAsync(new PullRequestStatusesRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new PullRequestStatusesRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, statusesIdArg);
         command.Subcommands.Add(statusesCommand);
 
@@ -200,7 +200,7 @@ public static class PrCommand
         defaultReviewersCommand.SetHandler((string? workspace, string? repo, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<EffectiveDefaultReviewersHandler>()
-                    .HandleAsync(new EffectiveDefaultReviewersRequest(workspace, repo, limit), CancellationToken.None)),
+                    .HandleAsync(new EffectiveDefaultReviewersRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, drLimitOption);
         command.Subcommands.Add(defaultReviewersCommand);
 
@@ -212,7 +212,7 @@ public static class PrCommand
         requestChangesCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<RequestChangesHandler>()
-                    .HandleAsync(new RequestChangesRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new RequestChangesRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, rcIdArg);
         command.Subcommands.Add(requestChangesCommand);
 
@@ -222,7 +222,7 @@ public static class PrCommand
         unrequestChangesCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<UnrequestChangesHandler>()
-                    .HandleAsync(new UnrequestChangesRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new UnrequestChangesRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, urcIdArg);
         command.Subcommands.Add(unrequestChangesCommand);
 
@@ -234,7 +234,7 @@ public static class PrCommand
         commitsCommand.SetHandler((string? workspace, string? repo, int id, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPullRequestCommitsHandler>()
-                    .HandleAsync(new ListPullRequestCommitsRequest(workspace, repo, id, limit), CancellationToken.None)),
+                    .HandleAsync(new ListPullRequestCommitsRequest(workspace, repo, id, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, commitsIdArg, commitsLimitOption);
         command.Subcommands.Add(commitsCommand);
 
@@ -244,7 +244,7 @@ public static class PrCommand
         patchCommand.SetHandler((string? workspace, string? repo, int id) =>
             CommandRunner.RunRawAsync(() =>
                 services.GetRequiredService<PullRequestPatchHandler>()
-                    .HandleAsync(new PullRequestPatchRequest(workspace, repo, id), CancellationToken.None)),
+                    .HandleAsync(new PullRequestPatchRequest(workspace, repo, id), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, patchIdArg);
         command.Subcommands.Add(patchCommand);
 
@@ -263,25 +263,25 @@ public static class PrCommand
         listCommand.SetHandler((string? workspace, string? repo, int id, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPullRequestTasksHandler>()
-                    .HandleAsync(new ListPullRequestTasksRequest(workspace, repo, id, limit), CancellationToken.None)),
+                    .HandleAsync(new ListPullRequestTasksRequest(workspace, repo, id, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, listIdArg, listLimitOption);
         tasksCommand.Subcommands.Add(listCommand);
 
         var addCommand = new Command("add", "Add a task to a PR");
         var addIdArg = new Argument<int>("id") { Description = "Pull request ID" };
-        var addContentOption = new Option<string>("--content") { Description = "Task body (markdown)" , Required = true };
+        var addContentOption = new Option<string>("--content") { Description = "Task body (markdown)", Required = true };
         addCommand.Arguments.Add(addIdArg);
         addCommand.Options.Add(addContentOption);
         addCommand.SetHandler((string? workspace, string? repo, int id, string content) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddPullRequestTaskHandler>()
-                    .HandleAsync(new AddPullRequestTaskRequest(workspace, repo, id, content), CancellationToken.None)),
+                    .HandleAsync(new AddPullRequestTaskRequest(workspace, repo, id, content), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, addIdArg, addContentOption);
         tasksCommand.Subcommands.Add(addCommand);
 
         var updateCommand = new Command("update", "Update a PR task (content and/or state)");
         var updateIdArg = new Argument<int>("id") { Description = "Pull request ID" };
-        var updateTaskIdOption = new Option<int>("--task-id") { Description = "Task ID" , Required = true };
+        var updateTaskIdOption = new Option<int>("--task-id") { Description = "Task ID", Required = true };
         var updateContentOption = new Option<string?>("--content") { Description = "New task body" };
         var updateStateOption = new Option<string?>("--state") { Description = "Task state (RESOLVED or UNRESOLVED)" };
         updateCommand.Arguments.Add(updateIdArg);
@@ -291,25 +291,25 @@ public static class PrCommand
         updateCommand.SetHandler((string? workspace, string? repo, int id, int taskId, string? content, string? state) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdatePullRequestTaskHandler>()
-                    .HandleAsync(new UpdatePullRequestTaskRequest(workspace, repo, id, taskId, content, state), CancellationToken.None)),
+                    .HandleAsync(new UpdatePullRequestTaskRequest(workspace, repo, id, taskId, content, state), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, updateIdArg, updateTaskIdOption, updateContentOption, updateStateOption);
         tasksCommand.Subcommands.Add(updateCommand);
 
         var completeCommand = new Command("complete", "Mark a PR task as RESOLVED");
         var completeIdArg = new Argument<int>("id") { Description = "Pull request ID" };
-        var completeTaskIdOption = new Option<int>("--task-id") { Description = "Task ID" , Required = true };
+        var completeTaskIdOption = new Option<int>("--task-id") { Description = "Task ID", Required = true };
         completeCommand.Arguments.Add(completeIdArg);
         completeCommand.Options.Add(completeTaskIdOption);
         completeCommand.SetHandler((string? workspace, string? repo, int id, int taskId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdatePullRequestTaskHandler>()
-                    .HandleAsync(new UpdatePullRequestTaskRequest(workspace, repo, id, taskId, null, "RESOLVED"), CancellationToken.None)),
+                    .HandleAsync(new UpdatePullRequestTaskRequest(workspace, repo, id, taskId, null, "RESOLVED"), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, completeIdArg, completeTaskIdOption);
         tasksCommand.Subcommands.Add(completeCommand);
 
         var deleteCommand = new Command("delete", "Delete a PR task");
         var deleteIdArg = new Argument<int>("id") { Description = "Pull request ID" };
-        var deleteTaskIdOption = new Option<int>("--task-id") { Description = "Task ID" , Required = true };
+        var deleteTaskIdOption = new Option<int>("--task-id") { Description = "Task ID", Required = true };
         var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
         deleteCommand.Arguments.Add(deleteIdArg);
         deleteCommand.Options.Add(deleteTaskIdOption);
@@ -320,7 +320,7 @@ public static class PrCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeletePullRequestTaskHandler>()
-                    .HandleAsync(new DeletePullRequestTaskRequest(workspace, repo, id, taskId), CancellationToken.None));
+                    .HandleAsync(new DeletePullRequestTaskRequest(workspace, repo, id, taskId), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, deleteIdArg, deleteTaskIdOption, yesOption);
         tasksCommand.Subcommands.Add(deleteCommand);
 

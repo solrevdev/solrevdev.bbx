@@ -46,6 +46,14 @@ public class BitbucketClient : IDisposable
         return await response.Content.ReadAsByteArrayAsync(ct);
     }
 
+    public async Task CopyToAsync(string endpoint, Stream destination, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(
+            HttpMethod.Get, endpoint, null, ct, AnyMediaType, HttpCompletionOption.ResponseHeadersRead);
+        await EnsureSuccessAsync(response);
+        await response.Content.CopyToAsync(destination, ct);
+    }
+
     public async Task<T?> PostAsync<T>(string endpoint, object? body = null, CancellationToken ct = default)
     {
         var content = body != null
@@ -123,10 +131,12 @@ public class BitbucketClient : IDisposable
         string endpoint,
         HttpContent? content,
         CancellationToken ct,
-        string? accept = null)
+        string? accept = null,
+        HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
     {
         var current = new Uri(_client.BaseAddress!, NormalizeEndpoint(endpoint));
-        var response = await SendOnceAsync(method, current.AbsoluteUri, content, ct, accept);
+        var response = await SendOnceAsync(
+            method, current.AbsoluteUri, content, ct, accept, completionOption, IsApiOrigin(current));
 
         // Redirects are followed here rather than by HttpClient because
         // HttpClient drops the Authorization header when it follows one, which
@@ -146,11 +156,11 @@ public class BitbucketClient : IDisposable
 
             // Re-apply credentials only when staying on the same origin, so a
             // redirect out to storage (downloads) cannot leak them.
-            var sameOrigin = Uri.Compare(target, current, UriComponents.SchemeAndServer,
-                UriFormat.UriEscaped, StringComparison.OrdinalIgnoreCase) == 0;
+            var sameOrigin = IsApiOrigin(target);
 
             current = target;
-            response = await SendOnceAsync(HttpMethod.Get, target.AbsoluteUri, null, ct, accept, applyAuth: sameOrigin);
+            response = await SendOnceAsync(
+                HttpMethod.Get, target.AbsoluteUri, null, ct, accept, completionOption, sameOrigin);
         }
 
         return response;
@@ -162,6 +172,7 @@ public class BitbucketClient : IDisposable
         HttpContent? content,
         CancellationToken ct,
         string? accept,
+        HttpCompletionOption completionOption,
         bool applyAuth = true)
     {
         var request = new HttpRequestMessage(method, url)
@@ -176,8 +187,15 @@ public class BitbucketClient : IDisposable
         {
             await _auth.ApplyAsync(request, ct);
         }
-        return await _client.SendAsync(request, ct);
+        return await _client.SendAsync(request, completionOption, ct);
     }
+
+    private bool IsApiOrigin(Uri target) => Uri.Compare(
+        target,
+        _client.BaseAddress!,
+        UriComponents.SchemeAndServer,
+        UriFormat.UriEscaped,
+        StringComparison.OrdinalIgnoreCase) == 0;
 
     private static bool IsRedirect(HttpResponseMessage response) => (int)response.StatusCode switch
     {

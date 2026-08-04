@@ -23,7 +23,7 @@ public static class UserCommand
         emailsCommand.SetHandler((int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListUserEmailsHandler>()
-                    .HandleAsync(new ListUserEmailsRequest(limit), CancellationToken.None)),
+                    .HandleAsync(new ListUserEmailsRequest(limit), CommandBinding.CancellationToken)),
             emailsLimitOption);
         command.Subcommands.Add(emailsCommand);
 
@@ -36,7 +36,7 @@ public static class UserCommand
         permsWsCommand.SetHandler((int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListUserWorkspacePermissionsHandler>()
-                    .HandleAsync(new ListUserWorkspacePermissionsRequest(limit), CancellationToken.None)),
+                    .HandleAsync(new ListUserWorkspacePermissionsRequest(limit), CommandBinding.CancellationToken)),
             permsWsLimitOption);
         permissionsCommand.Subcommands.Add(permsWsCommand);
 
@@ -46,7 +46,7 @@ public static class UserCommand
         permsRepoCommand.SetHandler((int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListUserRepositoryPermissionsHandler>()
-                    .HandleAsync(new ListUserRepositoryPermissionsRequest(limit), CancellationToken.None)),
+                    .HandleAsync(new ListUserRepositoryPermissionsRequest(limit), CommandBinding.CancellationToken)),
             permsRepoLimitOption);
         permissionsCommand.Subcommands.Add(permsRepoCommand);
 
@@ -62,7 +62,7 @@ public static class UserCommand
         viewCommand.SetHandler((string selectedUser) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewUserHandler>()
-                    .HandleAsync(new ViewUserRequest(selectedUser), CancellationToken.None)),
+                    .HandleAsync(new ViewUserRequest(selectedUser), CommandBinding.CancellationToken)),
             viewUserArg);
         command.Subcommands.Add(viewCommand);
 
@@ -86,7 +86,7 @@ public static class UserCommand
         listCommand.SetHandler((string? user, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListSshKeysHandler>()
-                    .HandleAsync(new ListSshKeysRequest(user ?? "me", limit), CancellationToken.None)),
+                    .HandleAsync(new ListSshKeysRequest(user ?? "me", limit), CommandBinding.CancellationToken)),
             userOption, listLimitOption);
         sshCommand.Subcommands.Add(listCommand);
 
@@ -96,19 +96,19 @@ public static class UserCommand
         viewCommand.SetHandler((string? user, string keyId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewSshKeyHandler>()
-                    .HandleAsync(new ViewSshKeyRequest(user ?? "me", keyId), CancellationToken.None)),
+                    .HandleAsync(new ViewSshKeyRequest(user ?? "me", keyId), CommandBinding.CancellationToken)),
             userOption, viewIdArg);
         sshCommand.Subcommands.Add(viewCommand);
 
         var addCommand = new Command("add", "Add an SSH key");
-        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body" , Required = true };
+        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body", Required = true };
         var addLabelOption = new Option<string?>("--label") { Description = "Friendly label" };
         addCommand.Options.Add(addKeyOption);
         addCommand.Options.Add(addLabelOption);
         addCommand.SetHandler((string? user, string key, string? label) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddSshKeyHandler>()
-                    .HandleAsync(new AddSshKeyRequest(user ?? "me", key, label), CancellationToken.None)),
+                    .HandleAsync(new AddSshKeyRequest(user ?? "me", key, label), CommandBinding.CancellationToken)),
             userOption, addKeyOption, addLabelOption);
         sshCommand.Subcommands.Add(addCommand);
 
@@ -123,7 +123,7 @@ public static class UserCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteSshKeyHandler>()
-                    .HandleAsync(new DeleteSshKeyRequest(user ?? "me", keyId), CancellationToken.None));
+                    .HandleAsync(new DeleteSshKeyRequest(user ?? "me", keyId), CommandBinding.CancellationToken));
         }, userOption, deleteIdArg, yesOption);
         sshCommand.Subcommands.Add(deleteCommand);
 

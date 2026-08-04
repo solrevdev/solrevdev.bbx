@@ -4,12 +4,10 @@ using Bbx.Auth;
 
 namespace Bbx.Features.Users.ListUserWorkspacePermissions;
 
-public sealed class ListUserWorkspacePermissionsHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ListUserWorkspacePermissionsHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(ListUserWorkspacePermissionsRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var perms = new List<object>();
         var count = 0;

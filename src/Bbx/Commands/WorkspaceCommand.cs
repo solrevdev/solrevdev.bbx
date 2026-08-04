@@ -1,4 +1,9 @@
 using System.CommandLine;
+using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
+using Bbx.Features.Workspaces.Hooks.UpdateWorkspaceHook;
+using Bbx.Features.Workspaces.Hooks.ViewWorkspaceHook;
 using Bbx.Features.Workspaces.ListWorkspaceMembers;
 using Bbx.Features.Workspaces.ListWorkspacePermissions;
 using Bbx.Features.Workspaces.ListWorkspaces;
@@ -15,11 +20,6 @@ using Bbx.Features.Workspaces.Projects.DeployKeys.ListProjectDeployKeys;
 using Bbx.Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey;
 using Bbx.Features.Workspaces.Projects.ListProjects;
 using Bbx.Features.Workspaces.Projects.ViewProject;
-using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
-using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
-using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
-using Bbx.Features.Workspaces.Hooks.UpdateWorkspaceHook;
-using Bbx.Features.Workspaces.Hooks.ViewWorkspaceHook;
 using Bbx.Features.Workspaces.ViewWorkspace;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -62,7 +62,7 @@ public static class WorkspaceCommand
         projectCommand.Subcommands.Add(CreateProjectCreateCommand(services, workspaceOption));
         projectCommand.Subcommands.Add(CreateProjectDeleteCommand(services, workspaceOption));
 
-        var projectKeyOption = new Option<string>("--project-key") { Description = "Project key" , Required = true };
+        var projectKeyOption = new Option<string>("--project-key") { Description = "Project key", Required = true };
         projectCommand.Subcommands.Add(CreateProjectDefaultReviewersCommand(services, workspaceOption, projectKeyOption));
         projectCommand.Subcommands.Add(CreateProjectBranchingModelCommand(services, workspaceOption, projectKeyOption));
         projectCommand.Subcommands.Add(CreateProjectDeployKeysCommand(services, workspaceOption, projectKeyOption));
@@ -78,7 +78,7 @@ public static class WorkspaceCommand
         listCommand.SetHandler((string? workspace, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListProjectsHandler>()
-                    .HandleAsync(new ListProjectsRequest(workspace, limit), CancellationToken.None)),
+                    .HandleAsync(new ListProjectsRequest(workspace, limit), CommandBinding.CancellationToken)),
             workspaceOption, limitOption);
         return listCommand;
     }
@@ -91,7 +91,7 @@ public static class WorkspaceCommand
         viewCommand.SetHandler((string? workspace, string key) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewProjectHandler>()
-                    .HandleAsync(new ViewProjectRequest(workspace, key), CancellationToken.None)),
+                    .HandleAsync(new ViewProjectRequest(workspace, key), CommandBinding.CancellationToken)),
             workspaceOption, keyArg);
         return viewCommand;
     }
@@ -99,8 +99,8 @@ public static class WorkspaceCommand
     private static Command CreateProjectCreateCommand(IServiceProvider services, Option<string?> workspaceOption)
     {
         var createCommand = new Command("create", "Create a workspace project");
-        var keyOption = new Option<string>("--key", "-k") { Description = "Project key" , Required = true };
-        var nameOption = new Option<string>("--name", "-n") { Description = "Project name" , Required = true };
+        var keyOption = new Option<string>("--key", "-k") { Description = "Project key", Required = true };
+        var nameOption = new Option<string>("--name", "-n") { Description = "Project name", Required = true };
         var descriptionOption = new Option<string?>("--description", "-d") { Description = "Project description" };
         var privateOption = new Option<bool>("--private", "-p") { Description = "Make project private", DefaultValueFactory = _ => true };
         createCommand.Options.Add(keyOption);
@@ -110,7 +110,7 @@ public static class WorkspaceCommand
         createCommand.SetHandler((string? workspace, string key, string name, string? description, bool isPrivate) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateProjectHandler>()
-                    .HandleAsync(new CreateProjectRequest(workspace, key, name, description, isPrivate), CancellationToken.None)),
+                    .HandleAsync(new CreateProjectRequest(workspace, key, name, description, isPrivate), CommandBinding.CancellationToken)),
             workspaceOption, keyOption, nameOption, descriptionOption, privateOption);
         return createCommand;
     }
@@ -128,7 +128,7 @@ public static class WorkspaceCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteProjectHandler>()
-                    .HandleAsync(new DeleteProjectRequest(workspace, key), CancellationToken.None));
+                    .HandleAsync(new DeleteProjectRequest(workspace, key), CommandBinding.CancellationToken));
         }, workspaceOption, keyArg, yesOption);
         return deleteCommand;
     }
@@ -147,22 +147,22 @@ public static class WorkspaceCommand
         listCommand.SetHandler((string? workspace, string projectKey, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListProjectDefaultReviewersHandler>()
-                    .HandleAsync(new ListProjectDefaultReviewersRequest(workspace, projectKey, limit), CancellationToken.None)),
+                    .HandleAsync(new ListProjectDefaultReviewersRequest(workspace, projectKey, limit), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption, listLimitOption);
         drCommand.Subcommands.Add(listCommand);
 
         var addCommand = new Command("add", "Add a project default reviewer");
-        var addTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user" , Required = true };
+        var addTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
         addCommand.Options.Add(addTargetOption);
         addCommand.SetHandler((string? workspace, string projectKey, string target) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddProjectDefaultReviewerHandler>()
-                    .HandleAsync(new AddProjectDefaultReviewerRequest(workspace, projectKey, target), CancellationToken.None)),
+                    .HandleAsync(new AddProjectDefaultReviewerRequest(workspace, projectKey, target), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption, addTargetOption);
         drCommand.Subcommands.Add(addCommand);
 
         var removeCommand = new Command("remove", "Remove a project default reviewer");
-        var removeTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user" , Required = true };
+        var removeTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
         var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
         removeCommand.Options.Add(removeTargetOption);
         removeCommand.Options.Add(yesOption);
@@ -172,7 +172,7 @@ public static class WorkspaceCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<RemoveProjectDefaultReviewerHandler>()
-                    .HandleAsync(new RemoveProjectDefaultReviewerRequest(workspace, projectKey, target), CancellationToken.None));
+                    .HandleAsync(new RemoveProjectDefaultReviewerRequest(workspace, projectKey, target), CommandBinding.CancellationToken));
         }, workspaceOption, projectKeyOption, removeTargetOption, yesOption);
         drCommand.Subcommands.Add(removeCommand);
 
@@ -189,18 +189,18 @@ public static class WorkspaceCommand
         viewCommand.SetHandler((string? workspace, string projectKey) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewProjectBranchingModelHandler>()
-                    .HandleAsync(new ViewProjectBranchingModelRequest(workspace, projectKey), CancellationToken.None)),
+                    .HandleAsync(new ViewProjectBranchingModelRequest(workspace, projectKey), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption);
         bmCommand.Subcommands.Add(viewCommand);
 
         var updateCommand = new Command("update",
             "Replace project branching-model settings (PUT raw JSON payload to /branching-model/settings)");
-        var settingsJsonOption = new Option<string>("--settings") { Description = "JSON payload" , Required = true };
+        var settingsJsonOption = new Option<string>("--settings") { Description = "JSON payload", Required = true };
         updateCommand.Options.Add(settingsJsonOption);
         updateCommand.SetHandler((string? workspace, string projectKey, string settingsJson) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateProjectBranchingModelSettingsHandler>()
-                    .HandleAsync(new UpdateProjectBranchingModelSettingsRequest(workspace, projectKey, settingsJson), CancellationToken.None)),
+                    .HandleAsync(new UpdateProjectBranchingModelSettingsRequest(workspace, projectKey, settingsJson), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption, settingsJsonOption);
         bmCommand.Subcommands.Add(updateCommand);
 
@@ -218,7 +218,7 @@ public static class WorkspaceCommand
         listCommand.SetHandler((string? workspace, string projectKey, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListProjectDeployKeysHandler>()
-                    .HandleAsync(new ListProjectDeployKeysRequest(workspace, projectKey, limit), CancellationToken.None)),
+                    .HandleAsync(new ListProjectDeployKeysRequest(workspace, projectKey, limit), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption, listLimitOption);
         dkCommand.Subcommands.Add(listCommand);
 
@@ -228,19 +228,19 @@ public static class WorkspaceCommand
         viewCommand.SetHandler((string? workspace, string projectKey, int keyId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewProjectDeployKeyHandler>()
-                    .HandleAsync(new ViewProjectDeployKeyRequest(workspace, projectKey, keyId), CancellationToken.None)),
+                    .HandleAsync(new ViewProjectDeployKeyRequest(workspace, projectKey, keyId), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption, viewIdArg);
         dkCommand.Subcommands.Add(viewCommand);
 
         var addCommand = new Command("add", "Add a project deploy key");
-        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body" , Required = true };
+        var addKeyOption = new Option<string>("--key") { Description = "Public SSH key body", Required = true };
         var addLabelOption = new Option<string?>("--label") { Description = "Friendly label" };
         addCommand.Options.Add(addKeyOption);
         addCommand.Options.Add(addLabelOption);
         addCommand.SetHandler((string? workspace, string projectKey, string key, string? label) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddProjectDeployKeyHandler>()
-                    .HandleAsync(new AddProjectDeployKeyRequest(workspace, projectKey, key, label), CancellationToken.None)),
+                    .HandleAsync(new AddProjectDeployKeyRequest(workspace, projectKey, key, label), CommandBinding.CancellationToken)),
             workspaceOption, projectKeyOption, addKeyOption, addLabelOption);
         dkCommand.Subcommands.Add(addCommand);
 
@@ -255,7 +255,7 @@ public static class WorkspaceCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteProjectDeployKeyHandler>()
-                    .HandleAsync(new DeleteProjectDeployKeyRequest(workspace, projectKey, keyId), CancellationToken.None));
+                    .HandleAsync(new DeleteProjectDeployKeyRequest(workspace, projectKey, keyId), CommandBinding.CancellationToken));
         }, workspaceOption, projectKeyOption, deleteIdArg, yesOption);
         dkCommand.Subcommands.Add(deleteCommand);
 
@@ -274,7 +274,7 @@ public static class WorkspaceCommand
         command.SetHandler((string? role, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListWorkspacesHandler>()
-                    .HandleAsync(new ListWorkspacesRequest(role, limit), CancellationToken.None)),
+                    .HandleAsync(new ListWorkspacesRequest(role, limit), CommandBinding.CancellationToken)),
             roleOption, limitOption);
         return command;
     }
@@ -288,7 +288,7 @@ public static class WorkspaceCommand
         command.SetHandler((string? workspace) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewWorkspaceHandler>()
-                    .HandleAsync(new ViewWorkspaceRequest(workspace), CancellationToken.None)),
+                    .HandleAsync(new ViewWorkspaceRequest(workspace), CommandBinding.CancellationToken)),
             workspaceArg);
         return command;
     }
@@ -305,7 +305,7 @@ public static class WorkspaceCommand
         command.SetHandler((string? workspace, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListWorkspaceMembersHandler>()
-                    .HandleAsync(new ListWorkspaceMembersRequest(workspace, limit), CancellationToken.None)),
+                    .HandleAsync(new ListWorkspaceMembersRequest(workspace, limit), CommandBinding.CancellationToken)),
             workspaceOption, limitOption);
         return command;
     }
@@ -322,7 +322,7 @@ public static class WorkspaceCommand
         command.SetHandler((string? workspace, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListWorkspacePermissionsHandler>()
-                    .HandleAsync(new ListWorkspacePermissionsRequest(workspace, limit), CancellationToken.None)),
+                    .HandleAsync(new ListWorkspacePermissionsRequest(workspace, limit), CommandBinding.CancellationToken)),
             workspaceOption, limitOption);
         return command;
     }
@@ -339,7 +339,7 @@ public static class WorkspaceCommand
         listCommand.SetHandler((string? workspace, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListWorkspaceHooksHandler>()
-                    .HandleAsync(new ListWorkspaceHooksRequest(workspace, limit), CancellationToken.None)),
+                    .HandleAsync(new ListWorkspaceHooksRequest(workspace, limit), CommandBinding.CancellationToken)),
             workspaceOption, limitOption);
         hooksCommand.Subcommands.Add(listCommand);
 
@@ -349,12 +349,12 @@ public static class WorkspaceCommand
         viewCommand.SetHandler((string? workspace, string uid) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewWorkspaceHookHandler>()
-                    .HandleAsync(new ViewWorkspaceHookRequest(workspace, uid), CancellationToken.None)),
+                    .HandleAsync(new ViewWorkspaceHookRequest(workspace, uid), CommandBinding.CancellationToken)),
             workspaceOption, viewUidArg);
         hooksCommand.Subcommands.Add(viewCommand);
 
         var createCommand = new Command("create", "Create a workspace webhook");
-        var urlOption = new Option<string>("--url") { Description = "Webhook target URL" , Required = true };
+        var urlOption = new Option<string>("--url") { Description = "Webhook target URL", Required = true };
         var descriptionOption = new Option<string?>("--description") { Description = "Webhook description" };
         var eventsOption = new Option<string[]?>("--events") { Description = "Events to trigger webhook (default: repo:push)" };
         var activeOption = new Option<bool>("--active") { Description = "Whether the webhook is active", DefaultValueFactory = _ => true };
@@ -365,7 +365,7 @@ public static class WorkspaceCommand
         createCommand.SetHandler((string? workspace, string url, string? description, string[]? events, bool active) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreateWorkspaceHookHandler>()
-                    .HandleAsync(new CreateWorkspaceHookRequest(workspace, url, description, events, active), CancellationToken.None)),
+                    .HandleAsync(new CreateWorkspaceHookRequest(workspace, url, description, events, active), CommandBinding.CancellationToken)),
             workspaceOption, urlOption, descriptionOption, eventsOption, activeOption);
         hooksCommand.Subcommands.Add(createCommand);
 
@@ -383,7 +383,7 @@ public static class WorkspaceCommand
         updateCommand.SetHandler((string? workspace, string uid, string? url, string? description, string[]? events, bool? active) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateWorkspaceHookHandler>()
-                    .HandleAsync(new UpdateWorkspaceHookRequest(workspace, uid, url, description, events, active), CancellationToken.None)),
+                    .HandleAsync(new UpdateWorkspaceHookRequest(workspace, uid, url, description, events, active), CommandBinding.CancellationToken)),
             workspaceOption, updateUidArg, updateUrlOption, updateDescriptionOption, updateEventsOption, updateActiveOption);
         hooksCommand.Subcommands.Add(updateCommand);
 
@@ -398,7 +398,7 @@ public static class WorkspaceCommand
                 return;
             await CommandRunner.RunActionAsync(() =>
                 services.GetRequiredService<DeleteWorkspaceHookHandler>()
-                    .HandleAsync(new DeleteWorkspaceHookRequest(workspace, uid), CancellationToken.None));
+                    .HandleAsync(new DeleteWorkspaceHookRequest(workspace, uid), CommandBinding.CancellationToken));
         }, workspaceOption, deleteUidArg, yesOption);
         hooksCommand.Subcommands.Add(deleteCommand);
 

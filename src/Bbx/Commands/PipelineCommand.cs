@@ -7,10 +7,10 @@ using Bbx.Features.Pipelines.DeletePipelineVariable;
 using Bbx.Features.Pipelines.ListDeploymentEnvironments;
 using Bbx.Features.Pipelines.ListPipelineCaches;
 using Bbx.Features.Pipelines.ListPipelineReports;
+using Bbx.Features.Pipelines.ListPipelines;
 using Bbx.Features.Pipelines.ListPipelineSchedules;
 using Bbx.Features.Pipelines.ListPipelineSteps;
 using Bbx.Features.Pipelines.ListPipelineVariables;
-using Bbx.Features.Pipelines.ListPipelines;
 using Bbx.Features.Pipelines.ListReportAnnotations;
 using Bbx.Features.Pipelines.ListTestCases;
 using Bbx.Features.Pipelines.ListTestReports;
@@ -66,7 +66,7 @@ public static class PipelineCommand
         listCommand.SetHandler((string? workspace, string? repo, string hash, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineReportsHandler>()
-                    .HandleAsync(new ListPipelineReportsRequest(workspace, repo, hash, limit), CancellationToken.None)),
+                    .HandleAsync(new ListPipelineReportsRequest(workspace, repo, hash, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, listHashArg, listLimitOption);
         reportsCommand.Subcommands.Add(listCommand);
 
@@ -78,7 +78,7 @@ public static class PipelineCommand
         viewCommand.SetHandler((string? workspace, string? repo, string hash, string reportId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewPipelineReportHandler>()
-                    .HandleAsync(new ViewPipelineReportRequest(workspace, repo, hash, reportId), CancellationToken.None)),
+                    .HandleAsync(new ViewPipelineReportRequest(workspace, repo, hash, reportId), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, viewHashArg, viewReportIdArg);
         reportsCommand.Subcommands.Add(viewCommand);
 
@@ -92,7 +92,7 @@ public static class PipelineCommand
         annotationsCommand.SetHandler((string? workspace, string? repo, string hash, string reportId, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListReportAnnotationsHandler>()
-                    .HandleAsync(new ListReportAnnotationsRequest(workspace, repo, hash, reportId, limit), CancellationToken.None)),
+                    .HandleAsync(new ListReportAnnotationsRequest(workspace, repo, hash, reportId, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, annHashArg, annReportIdArg, annLimitOption);
         reportsCommand.Subcommands.Add(annotationsCommand);
 
@@ -114,7 +114,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListTestReportsHandler>()
-                    .HandleAsync(new ListTestReportsRequest(workspace, repo, pipelineUuid, stepUuid), CancellationToken.None)),
+                    .HandleAsync(new ListTestReportsRequest(workspace, repo, pipelineUuid, stepUuid), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, pipelineUuidArg, stepUuidArg);
         return command;
     }
@@ -136,7 +136,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListTestCasesHandler>()
-                    .HandleAsync(new ListTestCasesRequest(workspace, repo, pipelineUuid, stepUuid, limit), CancellationToken.None)),
+                    .HandleAsync(new ListTestCasesRequest(workspace, repo, pipelineUuid, stepUuid, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, pipelineUuidArg, stepUuidArg, limitOption);
         return command;
     }
@@ -153,7 +153,7 @@ public static class PipelineCommand
         configCommand.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<OidcConfigHandler>()
-                    .HandleAsync(new OidcConfigRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new OidcConfigRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         oidcCommand.Subcommands.Add(configCommand);
 
@@ -161,7 +161,7 @@ public static class PipelineCommand
         keysCommand.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<OidcKeysHandler>()
-                    .HandleAsync(new OidcKeysRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new OidcKeysRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         oidcCommand.Subcommands.Add(keysCommand);
 
@@ -188,7 +188,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string? status, string sort, int limit, string? branch) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelinesHandler>()
-                    .HandleAsync(new ListPipelinesRequest(workspace, repo, status, sort, limit, branch), CancellationToken.None)),
+                    .HandleAsync(new ListPipelinesRequest(workspace, repo, status, sort, limit, branch), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, statusOption, sortOption, limitOption, targetBranchOption);
         return command;
     }
@@ -207,7 +207,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string pipelineUuid) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewPipelineHandler>()
-                    .HandleAsync(new ViewPipelineRequest(workspace, repo, pipelineUuid), CancellationToken.None)),
+                    .HandleAsync(new ViewPipelineRequest(workspace, repo, pipelineUuid), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, pipelineArg);
         return command;
     }
@@ -221,7 +221,7 @@ public static class PipelineCommand
         var commitOption = new Option<string?>("--commit") { Description = "Specific commit hash to run on (branch trigger only)" };
         var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern (selector) to run" };
         var pullRequestOption = new Option<string?>("--pull-request") { Description = "Trigger the pull-request pipeline for this PR id (uses --branch as the PR's source branch)" };
-        var variablesOption = new Option<string[]>("--variable") { Description = "Pipeline variables in key=value format" , AllowMultipleArgumentsPerToken = true };
+        var variablesOption = new Option<string[]>("--variable") { Description = "Pipeline variables in key=value format", AllowMultipleArgumentsPerToken = true };
 
         command.Options.Add(workspaceOption);
         command.Options.Add(repoOption);
@@ -234,7 +234,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string branch, string? commit, string? pattern, string? pullRequest, string[] variables) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<TriggerPipelineHandler>()
-                    .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, pullRequest, variables), CancellationToken.None)),
+                    .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, pullRequest, variables), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, branchOption, commitOption, patternOption, pullRequestOption, variablesOption);
         return command;
     }
@@ -258,7 +258,7 @@ public static class PipelineCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<StopPipelineHandler>()
-                    .HandleAsync(new StopPipelineRequest(workspace, repo, pipelineUuid), CancellationToken.None));
+                    .HandleAsync(new StopPipelineRequest(workspace, repo, pipelineUuid), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, pipelineArg, yesOption);
         return command;
     }
@@ -281,7 +281,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string pipelineUuid, string stepUuid, bool follow) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<PipelineLogsHandler>()
-                    .HandleAsync(new PipelineLogsRequest(workspace, repo, pipelineUuid, stepUuid), CancellationToken.None)),
+                    .HandleAsync(new PipelineLogsRequest(workspace, repo, pipelineUuid, stepUuid), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, pipelineArg, stepArg, followOption);
         return command;
     }
@@ -300,7 +300,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string pipelineUuid) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineStepsHandler>()
-                    .HandleAsync(new ListPipelineStepsRequest(workspace, repo, pipelineUuid), CancellationToken.None)),
+                    .HandleAsync(new ListPipelineStepsRequest(workspace, repo, pipelineUuid), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, pipelineArg);
         return command;
     }
@@ -324,7 +324,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineVariablesHandler>()
-                    .HandleAsync(new ListPipelineVariablesRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new ListPipelineVariablesRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         return command;
     }
@@ -334,8 +334,8 @@ public static class PipelineCommand
         var command = new Command("add", "Add a pipeline variable");
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
-        var keyOption = new Option<string>("--key") { Description = "Variable key" , Required = true };
-        var valueOption = new Option<string>("--value") { Description = "Variable value" , Required = true };
+        var keyOption = new Option<string>("--key") { Description = "Variable key", Required = true };
+        var valueOption = new Option<string>("--value") { Description = "Variable value", Required = true };
         var securedOption = new Option<bool>("--secured") { Description = "Mark as secured (value hidden)" };
 
         command.Options.Add(workspaceOption);
@@ -347,7 +347,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string key, string value, bool secured) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<AddPipelineVariableHandler>()
-                    .HandleAsync(new AddPipelineVariableRequest(workspace, repo, key, value, secured), CancellationToken.None)),
+                    .HandleAsync(new AddPipelineVariableRequest(workspace, repo, key, value, secured), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, keyOption, valueOption, securedOption);
         return command;
     }
@@ -371,7 +371,7 @@ public static class PipelineCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<DeletePipelineVariableHandler>()
-                    .HandleAsync(new DeletePipelineVariableRequest(workspace, repo, uuid), CancellationToken.None));
+                    .HandleAsync(new DeletePipelineVariableRequest(workspace, repo, uuid), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, uuidArg, yesOption);
         return command;
     }
@@ -395,7 +395,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineSchedulesHandler>()
-                    .HandleAsync(new ListPipelineSchedulesRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new ListPipelineSchedulesRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         return command;
     }
@@ -405,7 +405,7 @@ public static class PipelineCommand
         var command = new Command("create", "Create a pipeline schedule");
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
-        var cronOption = new Option<string>("--cron") { Description = "Cron expression (e.g., '0 0 * * *')" , Required = true };
+        var cronOption = new Option<string>("--cron") { Description = "Cron expression (e.g., '0 0 * * *')", Required = true };
         var branchOption = new Option<string>("--branch") { Description = "Target branch", DefaultValueFactory = _ => "main" };
         var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern" };
         var enabledOption = new Option<bool>("--enabled") { Description = "Enable the schedule", DefaultValueFactory = _ => true };
@@ -420,7 +420,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string cron, string branch, string? pattern, bool enabled) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreatePipelineScheduleHandler>()
-                    .HandleAsync(new CreatePipelineScheduleRequest(workspace, repo, cron, branch, pattern, enabled), CancellationToken.None)),
+                    .HandleAsync(new CreatePipelineScheduleRequest(workspace, repo, cron, branch, pattern, enabled), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, cronOption, branchOption, patternOption, enabledOption);
         return command;
     }
@@ -444,7 +444,7 @@ public static class PipelineCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<DeletePipelineScheduleHandler>()
-                    .HandleAsync(new DeletePipelineScheduleRequest(workspace, repo, uuid), CancellationToken.None));
+                    .HandleAsync(new DeletePipelineScheduleRequest(workspace, repo, uuid), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, uuidArg, yesOption);
         return command;
     }
@@ -467,7 +467,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListPipelineCachesHandler>()
-                    .HandleAsync(new ListPipelineCachesRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new ListPipelineCachesRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         return command;
     }
@@ -491,7 +491,7 @@ public static class PipelineCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ClearPipelineCacheHandler>()
-                    .HandleAsync(new ClearPipelineCacheRequest(workspace, repo, name), CancellationToken.None));
+                    .HandleAsync(new ClearPipelineCacheRequest(workspace, repo, name), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, nameArg, yesOption);
         return command;
     }
@@ -514,7 +514,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListDeploymentEnvironmentsHandler>()
-                    .HandleAsync(new ListDeploymentEnvironmentsRequest(workspace, repo), CancellationToken.None)),
+                    .HandleAsync(new ListDeploymentEnvironmentsRequest(workspace, repo), CommandBinding.CancellationToken)),
             workspaceOption, repoOption);
         return command;
     }
@@ -531,7 +531,7 @@ public static class PipelineCommand
         command.SetHandler((string? workspace, string? repo, string environment) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewDeploymentEnvironmentHandler>()
-                    .HandleAsync(new ViewDeploymentEnvironmentRequest(workspace, repo, environment), CancellationToken.None)),
+                    .HandleAsync(new ViewDeploymentEnvironmentRequest(workspace, repo, environment), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, envArg);
         return command;
     }

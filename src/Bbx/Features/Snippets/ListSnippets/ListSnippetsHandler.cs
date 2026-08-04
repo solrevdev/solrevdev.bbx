@@ -4,12 +4,10 @@ using Bbx.Auth;
 
 namespace Bbx.Features.Snippets.ListSnippets;
 
-public sealed class ListSnippetsHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ListSnippetsHandler(BitbucketClient client)
 {
     public async Task<object> HandleAsync(ListSnippetsRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
 
         var endpoint = !string.IsNullOrEmpty(request.Workspace) ? $"snippets/{request.Workspace}" : "snippets";
         if (!string.IsNullOrEmpty(request.Role))

@@ -4,12 +4,10 @@ using Bbx.Auth;
 
 namespace Bbx.Features.Users.ViewUser;
 
-public sealed class ViewUserHandler(BitbucketClient client, CredentialManager credentials)
+public sealed class ViewUserHandler(BitbucketClient client)
 {
     public async Task<JsonElement> HandleAsync(ViewUserRequest request, CancellationToken ct)
     {
-        if (!credentials.HasCredentials())
-            throw new BbxUserException("Error: Not authenticated. Run 'bbx auth login' first.");
         // No selector means "show me". Bitbucket exposes that as /2.0/user,
         // a different route from /2.0/users/{selected_user}.
         if (string.IsNullOrEmpty(request.SelectedUser)

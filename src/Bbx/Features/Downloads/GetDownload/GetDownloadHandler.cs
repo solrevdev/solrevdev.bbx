@@ -6,14 +6,14 @@ namespace Bbx.Features.Downloads.GetDownload;
 
 public sealed class GetDownloadHandler(BitbucketClient client, CredentialManager credentials)
 {
-    public async Task<byte[]> HandleAsync(GetDownloadRequest request, CancellationToken ct)
+    public async Task HandleAsync(GetDownloadRequest request, Stream destination, CancellationToken ct)
     {
         var (ws, repo) = Resolve.WorkspaceAndRepo(credentials, request.Workspace, request.Repository,
             "Error: Workspace and repository required.");
         if (string.IsNullOrEmpty(request.Filename))
             throw new BbxUserException("Error: <filename> is required.");
 
-        return await client.GetByteArrayAsync(
-            $"/repositories/{ws}/{repo}/downloads/{Uri.EscapeDataString(request.Filename)}", ct);
+        await client.CopyToAsync(
+            $"/repositories/{ws}/{repo}/downloads/{Uri.EscapeDataString(request.Filename)}", destination, ct);
     }
 }

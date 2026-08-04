@@ -56,14 +56,12 @@ public static class AuthCommand
 
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
             {
-                Console.Error.WriteLine("Error: Email and API token required");
-                Environment.ExitCode = 1;
-                return;
+                throw new BbxUserException("Error: Email and API token required");
             }
 
             await CommandRunner.RunActionNoGateAsync(() =>
                 services.GetRequiredService<LoginApiTokenHandler>()
-                    .HandleAsync(new LoginApiTokenRequest(email, token), CancellationToken.None));
+                    .HandleAsync(new LoginApiTokenRequest(email, token), CommandBinding.CancellationToken));
         }, emailOption, tokenOption);
 
         return loginCommand;
@@ -72,11 +70,9 @@ public static class AuthCommand
     private static Command BuildStatusCommand(IServiceProvider services)
     {
         var statusCommand = new Command("status", "Show authentication status");
-        statusCommand.SetHandler(async () =>
-        {
-            await services.GetRequiredService<AuthStatusHandler>()
-                .HandleAsync(new AuthStatusRequest(), CancellationToken.None);
-        });
+        statusCommand.SetHandler(() => CommandRunner.RunActionNoGateAsync(() =>
+            services.GetRequiredService<AuthStatusHandler>()
+                .HandleAsync(new AuthStatusRequest(), CommandBinding.CancellationToken)));
         return statusCommand;
     }
 
@@ -87,7 +83,7 @@ public static class AuthCommand
         {
             await CommandRunner.RunActionNoGateAsync(() =>
                 services.GetRequiredService<LogoutHandler>()
-                    .HandleAsync(new LogoutRequest(), CancellationToken.None));
+                    .HandleAsync(new LogoutRequest(), CommandBinding.CancellationToken));
         });
         return logoutCommand;
     }
@@ -95,11 +91,9 @@ public static class AuthCommand
     private static Command BuildTokenCommand(IServiceProvider services)
     {
         var tokenCommand = new Command("token", "Display current access token");
-        tokenCommand.SetHandler(async () =>
-        {
-            await services.GetRequiredService<AuthTokenHandler>()
-                .HandleAsync(new AuthTokenRequest(), CancellationToken.None);
-        });
+        tokenCommand.SetHandler(() => CommandRunner.RunActionNoGateAsync(() =>
+            services.GetRequiredService<AuthTokenHandler>()
+                .HandleAsync(new AuthTokenRequest(), CommandBinding.CancellationToken)));
         return tokenCommand;
     }
 
@@ -112,7 +106,7 @@ public static class AuthCommand
         {
             await CommandRunner.RunActionNoGateAsync(() =>
                 services.GetRequiredService<SetWorkspaceHandler>()
-                    .HandleAsync(new SetWorkspaceRequest(workspace), CancellationToken.None));
+                    .HandleAsync(new SetWorkspaceRequest(workspace), CommandBinding.CancellationToken));
         }, workspaceArg);
         return setWorkspaceCommand;
     }
