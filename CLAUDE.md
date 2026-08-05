@@ -28,7 +28,13 @@ src/Bbx/
   Features/<Area>/<Verb>/   Request record + Handler, co-located
   Composition/      ServiceRegistration (DI), JsonOptions
 tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureConsole
+docs/spec/          pinned Bitbucket API spec; query it, do not fetch the docs site
 ```
+
+Before guessing at an endpoint, read it: `jq '.paths["<path>"]' docs/spec/swagger.json`.
+`scripts/fetch-spec.sh` refreshes the copy and records the date beside it. The
+spec is often wrong about bodies and required fields, which is what most of the
+rules below are; it is still the right place to start.
 
 ## Rules that bite
 

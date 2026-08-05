@@ -4,6 +4,11 @@ Every Bitbucket Cloud API v2 operation `bbx` did not call, with a verdict for ea
 comes from diffing the published OpenAPI spec against the endpoints the source calls, run on
 2026-08-05 against `https://dac-static.atlassian.com/cloud/bitbucket/swagger.v3.json`.
 
+`docs/spec/swagger.json` is a pinned copy of that spec, so every row below can be checked
+without a network call. It is the same document served as Swagger 2.0 rather than OpenAPI 3:
+the two carry the same 331 operations, descriptions, deprecation flags and request bodies.
+Refresh it with `scripts/fetch-spec.sh`.
+
 | | |
 | --- | --- |
 | Spec operations | 331 |
