@@ -140,6 +140,67 @@ public class CommandSurfaceTests
     }
 
     [Fact]
+    public void Pr_update_takes_every_mutable_field()
+    {
+        var result = Parse(PrCommand.Create(Services()),
+            "update", "1", "--title", "New", "--body", "Text", "--dest", "main",
+            "--reviewers", "557058:abc", "-r", "widgets");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--title").Should().Be("New");
+        result.GetValue<string>("--body").Should().Be("Text");
+        result.GetValue<string>("--dest").Should().Be("main");
+        result.GetValue<string[]>("--reviewers").Should().Equal("557058:abc");
+    }
+
+    // Clearing a description means sending "". If the parser folded an empty
+    // value into null the handler would drop the field and the clear would
+    // silently do nothing.
+    [Fact]
+    public void Pr_update_keeps_an_empty_body_distinct_from_an_absent_one()
+    {
+        var command = PrCommand.Create(Services());
+
+        Parse(command, "update", "1", "--body", "").GetValue<string>("--body").Should().BeEmpty();
+        Parse(command, "update", "1", "--title", "t").GetValue<string>("--body").Should().BeNull();
+    }
+
+    // pr update has no required option, so a bare "pr update 1" parses. The
+    // handler is what rejects it; this pins the parse half of that contract.
+    [Fact]
+    public void Pr_update_parses_with_no_fields_and_leaves_them_unset()
+    {
+        var result = Parse(PrCommand.Create(Services()), "update", "1");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--title").Should().BeNull();
+        BoolValue(result, "--close-source-branch").Should().BeFalse();
+        BoolValue(result, "--no-close-source-branch").Should().BeFalse();
+    }
+
+    // An absent array option parses to an empty array, not null. A handler that
+    // tests the array for null therefore treats "no --reviewers" as "replace the
+    // reviewers with nobody", which quietly strips them on every unrelated edit.
+    [Fact]
+    public void An_absent_array_option_parses_to_an_empty_array()
+    {
+        var result = Parse(PrCommand.Create(Services()), "update", "1", "--title", "t");
+
+        result.GetValue<string[]>("--reviewers").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Pr_update_accepts_both_source_branch_flags_at_parse_time()
+    {
+        var result = Parse(PrCommand.Create(Services()),
+            "update", "1", "--close-source-branch", "--no-close-source-branch");
+
+        result.Errors.Should().BeEmpty();
+        BoolValue(result, "--close-source-branch").Should().BeTrue();
+        BoolValue(result, "--no-close-source-branch").Should().BeTrue();
+    }
+
+    [Fact]
     public void The_projects_alias_still_resolves()
     {
         var result = Parse(WorkspaceCommand.Create(Services()), "projects", "list", "-w", "acme");

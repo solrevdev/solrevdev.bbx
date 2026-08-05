@@ -78,6 +78,19 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
     compile-time check that each bound symbol matches its handler parameter.
     A broken command definition still compiles, so parse-level behaviour is
     covered by `CommandSurfaceTests`.
+12. **An absent array option parses to an empty array, not null.** A handler that
+    keys off null therefore treats "flag not given" as "set this to nothing".
+    `UpdatePullRequestHandler` only sends `reviewers` when the array is non-empty,
+    because the null check shipped a bug that stripped the reviewers off every
+    pull request it touched.
+13. **`PUT pullrequests/{id}` merges, and drops `close_source_branch` on its own.**
+    Fields left out of the body keep their value, so send only what changed.
+    `close_source_branch` is the exception: Bitbucket applies it only when the
+    same call also moves another field to a *new* value. On its own, or beside a
+    field set to what it already holds, it is discarded, and the 200 response
+    still echoes the value you sent. `UpdatePullRequestHandler` reads the pull
+    request first and refuses rather than report a change that did not land.
+    Only open pull requests can be updated at all.
 
 ## Auth
 

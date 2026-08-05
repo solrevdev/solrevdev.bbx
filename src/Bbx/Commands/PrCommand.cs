@@ -17,6 +17,7 @@ using Bbx.Features.PullRequests.Tasks.DeletePullRequestTask;
 using Bbx.Features.PullRequests.Tasks.ListPullRequestTasks;
 using Bbx.Features.PullRequests.Tasks.UpdatePullRequestTask;
 using Bbx.Features.PullRequests.UnapprovePullRequest;
+using Bbx.Features.PullRequests.UpdatePullRequest;
 using Bbx.Features.PullRequests.UnrequestChanges;
 using Bbx.Features.PullRequests.ViewPullRequest;
 using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
@@ -77,6 +78,34 @@ public static class PrCommand
                     .HandleAsync(new CreatePullRequestRequest(workspace, repo, title, source, dest, body, reviewers, closeSource), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, titleOption, sourceOption, destOption, bodyOption, reviewersOption, closeSourceOption);
         command.Subcommands.Add(createCommand);
+
+        var updateCommand = new Command("update", "Update an open pull request");
+        var updateIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var updateTitleOption = new Option<string?>("--title") { Description = "New title" };
+        var updateBodyOption = new Option<string?>("--body") { Description = "New description. Pass an empty string to clear it." };
+        var updateDestOption = new Option<string?>("--dest") { Description = "Retarget the pull request at this destination branch" };
+        var updateReviewersOption = new Option<string[]?>("--reviewers") { Description = "Replace reviewers with these account IDs" };
+        var updateCloseSourceOption = new Option<bool>("--close-source-branch") { Description = "Close the source branch after merge" };
+        var updateKeepSourceOption = new Option<bool>("--no-close-source-branch") { Description = "Keep the source branch after merge" };
+        updateCommand.Arguments.Add(updateIdArg);
+        updateCommand.Options.Add(updateTitleOption);
+        updateCommand.Options.Add(updateBodyOption);
+        updateCommand.Options.Add(updateDestOption);
+        updateCommand.Options.Add(updateReviewersOption);
+        updateCommand.Options.Add(updateCloseSourceOption);
+        updateCommand.Options.Add(updateKeepSourceOption);
+        updateCommand.SetHandler((string? workspace, string? repo, int id, string? title, string? body, string? dest, string[]? reviewers, bool closeSource, bool keepSource) =>
+            CommandRunner.RunJsonAsync(() =>
+            {
+                if (closeSource && keepSource)
+                    throw new BbxUserException(
+                        "Error: --close-source-branch and --no-close-source-branch are mutually exclusive.");
+                bool? closeSourceBranch = closeSource ? true : keepSource ? false : null;
+                return services.GetRequiredService<UpdatePullRequestHandler>()
+                    .HandleAsync(new UpdatePullRequestRequest(workspace, repo, id, title, body, dest, reviewers, closeSourceBranch), CommandBinding.CancellationToken);
+            }),
+            workspaceOption, repoOption, updateIdArg, updateTitleOption, updateBodyOption, updateDestOption, updateReviewersOption, updateCloseSourceOption, updateKeepSourceOption);
+        command.Subcommands.Add(updateCommand);
 
         var mergeCommand = new Command("merge", "Merge a pull request");
         var mergeIdArg = new Argument<int>("id") { Description = "Pull request ID" };

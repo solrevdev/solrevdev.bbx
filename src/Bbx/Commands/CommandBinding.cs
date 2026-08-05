@@ -107,6 +107,14 @@ internal static class CommandBinding
             b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr), b6.From(pr),
             b7.From(pr), b8.From(pr)), ct));
 
+    public static void SetHandler<T1, T2, T3, T4, T5, T6, T7, T8, T9>(
+        this Command command, Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, Task> handler,
+        Bound<T1> b1, Bound<T2> b2, Bound<T3> b3, Bound<T4> b4, Bound<T5> b5, Bound<T6> b6,
+        Bound<T7> b7, Bound<T8> b8, Bound<T9> b9)
+        => command.SetAction((pr, ct) => InvokeAsync(() => handler(
+            b1.From(pr), b2.From(pr), b3.From(pr), b4.From(pr), b5.From(pr), b6.From(pr),
+            b7.From(pr), b8.From(pr), b9.From(pr)), ct));
+
     private static async Task InvokeAsync(Func<Task> handler, CancellationToken cancellationToken)
     {
         var previous = ActiveCancellation.Value;

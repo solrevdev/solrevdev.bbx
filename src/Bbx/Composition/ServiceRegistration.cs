@@ -100,6 +100,7 @@ public static class ServiceRegistration
         services.AddTransient<Features.PullRequests.ListPullRequests.ListPullRequestsHandler>();
         services.AddTransient<Features.PullRequests.ViewPullRequest.ViewPullRequestHandler>();
         services.AddTransient<Features.PullRequests.CreatePullRequest.CreatePullRequestHandler>();
+        services.AddTransient<Features.PullRequests.UpdatePullRequest.UpdatePullRequestHandler>();
         services.AddTransient<Features.PullRequests.MergePullRequest.MergePullRequestHandler>();
         services.AddTransient<Features.PullRequests.ApprovePullRequest.ApprovePullRequestHandler>();
         services.AddTransient<Features.PullRequests.UnapprovePullRequest.UnapprovePullRequestHandler>();

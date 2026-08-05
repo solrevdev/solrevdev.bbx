@@ -212,6 +212,8 @@ bbx repo branching-model view|settings|update -w myws -r myrepo
 bbx pr list -w myws -r myrepo --state OPEN --limit 25
 bbx pr view 42 -w myws -r myrepo
 bbx pr create --title "Fix" --source feat/x --dest main -w myws -r myrepo
+bbx pr update 42 --title "Better title" -w myws -r myrepo
+bbx pr update 42 --dest release/next -w myws -r myrepo    # retarget
 bbx pr merge 42 --strategy squash --yes -w myws -r myrepo
 bbx pr decline 42 --reason "superseded" -w myws -r myrepo
 
@@ -230,6 +232,11 @@ bbx pr tasks list|add|update|complete|delete 42 -w myws -r myrepo
 
 Merge strategies: `merge_commit` (default), `squash`, `fast_forward`.
 `merge`, `fast-forward` and `ff` are accepted as aliases.
+
+`pr update` changes only the fields you name and works on open pull requests
+only. `--body ""` clears the description. `--close-source-branch` and
+`--no-close-source-branch` need another real change in the same call, because
+Bitbucket silently drops the setting otherwise.
 </details>
 
 <details>

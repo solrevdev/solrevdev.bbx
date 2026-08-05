@@ -162,6 +162,7 @@ they're available on `repo` / `pr` / `branch` / `commit` / `issue`.
 | `list` | `GET repositories/{ws}/{repo}/pullrequests` — `--state OPEN\|MERGED\|DECLINED\|SUPERSEDED`, `--author <account-id>` |
 | `view <id>` | `GET repositories/{ws}/{repo}/pullrequests/{id}` |
 | `create` | `POST repositories/{ws}/{repo}/pullrequests` — `--title`, `--source`, `--dest`, `--body`, `--close-source-branch`, `--reviewer <account-id>` (repeatable) |
+| `update <id>` | `PUT repositories/{ws}/{repo}/pullrequests/{id}` — `--title`, `--body`, `--dest`, `--reviewers <account-id>...`, `--close-source-branch`, `--no-close-source-branch`. Open pull requests only. |
 | `merge <id>` | `POST .../merge` — `--strategy merge_commit\|squash\|fast_forward`, `--message`, `--close-source-branch` |
 | `approve <id>` / `unapprove <id>` | `POST/DELETE .../approve` |
 | `decline <id>` | `POST .../decline` |
@@ -173,6 +174,28 @@ they're available on `repo` / `pr` / `branch` / `commit` / `issue`.
 | `tasks {list,add,update,complete,delete} <id>` | `.../tasks[/{task-id}]` |
 | `request-changes <id>` / `unrequest-changes <id>` | `POST/DELETE .../request-changes` |
 | `commits <id>` | `GET .../commits` |
+
+`pr update` sends only the flags you pass. Anything you leave out keeps its
+current value, so you can retitle a pull request without touching its
+description. An empty `--body ""` clears the description.
+
+Two things to know before scripting it:
+
+- `--close-source-branch` and `--no-close-source-branch` only take effect when
+  the same call also changes a field to a new value. Bitbucket drops the setting
+  otherwise and still answers 200, so `bbx` reads the pull request first and
+  exits 1 rather than report a change that did not happen. Pair the flag with a
+  real `--title`, `--body` or `--dest` change.
+- `--reviewers` replaces the whole list and needs at least one account ID. There
+  is no way to clear the reviewers, because an omitted `--reviewers` has to mean
+  "leave them alone".
+
+```bash
+bbx pr update 42 -r myrepo --title "New title"
+bbx pr update 42 -r myrepo --body ""                        # clear the description
+bbx pr update 42 -r myrepo --dest release/next              # retarget
+bbx pr update 42 -r myrepo --title "New title" --close-source-branch
+```
 
 ### 4.4 `bbx branch`
 
