@@ -82,6 +82,13 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.DeployKeys.ViewRepoDeployKey.ViewRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.DeployKeys.AddRepoDeployKey.AddRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.DeployKeys.DeleteRepoDeployKey.DeleteRepoDeployKeyHandler>();
+        services.AddTransient<Features.Repos.DeployKeys.UpdateRepoDeployKey.UpdateRepoDeployKeyHandler>();
+        services.AddTransient<Features.Repos.UpdateRepo.UpdateRepoHandler>();
+        services.AddTransient<Features.Repos.DefaultReviewers.ViewDefaultReviewer.ViewDefaultReviewerHandler>();
+        services.AddTransient<Features.Repos.BranchingModel.EffectiveBranchingModel.EffectiveBranchingModelHandler>();
+        services.AddTransient<Features.Repos.OverrideSettings.ViewOverrideSettings.ViewOverrideSettingsHandler>();
+        services.AddTransient<Features.Repos.OverrideSettings.UpdateOverrideSettings.UpdateOverrideSettingsHandler>();
+        services.AddTransient<Features.Repos.FileConflicts.FileConflictsHandler>();
 
         services.AddTransient<Features.Source.LsSource.LsSourceHandler>();
         services.AddTransient<Features.Source.CatSource.CatSourceHandler>();
@@ -126,6 +133,9 @@ public static class ServiceRegistration
         services.AddTransient<Features.Branches.ListBranchRestrictions.ListBranchRestrictionsHandler>();
         services.AddTransient<Features.Branches.AddBranchRestriction.AddBranchRestrictionHandler>();
         services.AddTransient<Features.Branches.DeleteBranchRestriction.DeleteBranchRestrictionHandler>();
+        services.AddTransient<Features.Branches.ViewBranchRestriction.ViewBranchRestrictionHandler>();
+        services.AddTransient<Features.Branches.UpdateBranchRestriction.UpdateBranchRestrictionHandler>();
+        services.AddTransient<Features.Branches.ListRefs.ListRefsHandler>();
 
         services.AddTransient<Features.Commits.ListCommits.ListCommitsHandler>();
         services.AddTransient<Features.Commits.ViewCommit.ViewCommitHandler>();

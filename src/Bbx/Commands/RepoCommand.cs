@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Bbx.Features.Repos.BranchingModel.EffectiveBranchingModel;
 using Bbx.Features.Repos.BranchingModel.UpdateBranchingModelSettings;
 using Bbx.Features.Repos.BranchingModel.ViewBranchingModel;
 using Bbx.Features.Repos.BranchingModel.ViewBranchingModelSettings;
@@ -8,11 +9,14 @@ using Bbx.Features.Repos.DefaultReviewers.AddDefaultReviewer;
 using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
 using Bbx.Features.Repos.DefaultReviewers.ListDefaultReviewers;
 using Bbx.Features.Repos.DefaultReviewers.RemoveDefaultReviewer;
+using Bbx.Features.Repos.DefaultReviewers.ViewDefaultReviewer;
 using Bbx.Features.Repos.DeleteRepo;
 using Bbx.Features.Repos.DeployKeys.AddRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.DeleteRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.ListRepoDeployKeys;
+using Bbx.Features.Repos.DeployKeys.UpdateRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.ViewRepoDeployKey;
+using Bbx.Features.Repos.FileConflicts;
 using Bbx.Features.Repos.ForkRepo;
 using Bbx.Features.Repos.Hooks.CreateRepoHook;
 using Bbx.Features.Repos.Hooks.DeleteRepoHook;
@@ -22,7 +26,10 @@ using Bbx.Features.Repos.Hooks.ViewRepoHook;
 using Bbx.Features.Repos.ListForks;
 using Bbx.Features.Repos.ListRepos;
 using Bbx.Features.Repos.ListWatchers;
+using Bbx.Features.Repos.OverrideSettings.UpdateOverrideSettings;
+using Bbx.Features.Repos.OverrideSettings.ViewOverrideSettings;
 using Bbx.Features.Repos.RepoPermissions;
+using Bbx.Features.Repos.UpdateRepo;
 using Bbx.Features.Repos.ViewRepo;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -75,6 +82,81 @@ public static class RepoCommand
                     .HandleAsync(new CreateRepoRequest(workspace, name, isPrivate, project, description, forkPolicy), CommandBinding.CancellationToken)),
             workspaceOption, nameArg, privateOption, projectOption, descOption, forkPolicyOption);
         command.Subcommands.Add(createCommand);
+
+        var updateCommand = new Command("update", "Update repository settings");
+        var updateRepoArg = new Argument<string>("repository") { Description = "Repository (workspace/repo or just repo with --workspace)" };
+        var updateNameOption = new Option<string?>("--name") { Description = "New repository name (does not change the slug)" };
+        var updateDescOption = new Option<string?>("--description") { Description = "New description. Pass an empty string to clear it." };
+        var updatePrivateOption = new Option<bool>("--private") { Description = "Make the repository private" };
+        var updatePublicOption = new Option<bool>("--public") { Description = "Make the repository public" };
+        var updateForkPolicyOption = new Option<string?>("--fork-policy") { Description = "Fork policy (allow_forks, no_public_forks, no_forks)" };
+        var updateLanguageOption = new Option<string?>("--language") { Description = "Primary language" };
+        var updateWebsiteOption = new Option<string?>("--website") { Description = "Project website URL" };
+        var updateProjectOption = new Option<string?>("--project") { Description = "Move the repository to this project key" };
+        var updateMainBranchOption = new Option<string?>("--main-branch") { Description = "Name of the branch to use as the main branch" };
+        var updateIssuesOption = new Option<bool>("--issues") { Description = "Enable the issue tracker" };
+        var updateNoIssuesOption = new Option<bool>("--no-issues") { Description = "Disable the issue tracker" };
+        var updateWikiOption = new Option<bool>("--wiki") { Description = "Enable the wiki" };
+        var updateNoWikiOption = new Option<bool>("--no-wiki") { Description = "Disable the wiki" };
+        updateCommand.Arguments.Add(updateRepoArg);
+        foreach (var option in new Option[]
+                 {
+                     updateNameOption, updateDescOption, updatePrivateOption, updatePublicOption,
+                     updateForkPolicyOption, updateLanguageOption, updateWebsiteOption,
+                     updateProjectOption, updateMainBranchOption, updateIssuesOption,
+                     updateNoIssuesOption, updateWikiOption, updateNoWikiOption,
+                 })
+        {
+            updateCommand.Options.Add(option);
+        }
+        // SetHandler binds up to nine symbols. This command has fifteen, so it
+        // reads the paired flags out of the parse result itself rather than
+        // growing the overload set for one caller.
+        updateCommand.SetAction((parseResult, _) => CommandRunner.RunJsonAsync(() =>
+        {
+            var isPrivate = Exclusive(
+                parseResult.GetValue(updatePrivateOption), parseResult.GetValue(updatePublicOption),
+                "--private", "--public");
+            var hasIssues = Exclusive(
+                parseResult.GetValue(updateIssuesOption), parseResult.GetValue(updateNoIssuesOption),
+                "--issues", "--no-issues");
+            var hasWiki = Exclusive(
+                parseResult.GetValue(updateWikiOption), parseResult.GetValue(updateNoWikiOption),
+                "--wiki", "--no-wiki");
+            return services.GetRequiredService<UpdateRepoHandler>().HandleAsync(
+                new UpdateRepoRequest(
+                    parseResult.GetValue(workspaceOption),
+                    parseResult.GetValue(updateRepoArg)!,
+                    parseResult.GetValue(updateNameOption),
+                    parseResult.GetValue(updateDescOption),
+                    isPrivate,
+                    parseResult.GetValue(updateForkPolicyOption),
+                    parseResult.GetValue(updateLanguageOption),
+                    parseResult.GetValue(updateWebsiteOption),
+                    parseResult.GetValue(updateProjectOption),
+                    parseResult.GetValue(updateMainBranchOption),
+                    hasIssues,
+                    hasWiki),
+                CommandBinding.CancellationToken);
+        }));
+        command.Subcommands.Add(updateCommand);
+
+        var fileConflictsCommand = new Command("file-conflicts",
+            "List the files that would conflict when merging one ref into another");
+        var fcRepoOption = CommandOptions.CreateRepoOption();
+        var fcSpecArg = new Argument<string>("spec") { Description = "Merge spec, source..destination (e.g. feature/x..main)" };
+        var fcLimitOption = new Option<int>("--limit") { Description = "Maximum conflicts to list", DefaultValueFactory = _ => 100 };
+        fileConflictsCommand.Options.Add(fcRepoOption);
+        fileConflictsCommand.Arguments.Add(fcSpecArg);
+        fileConflictsCommand.Options.Add(fcLimitOption);
+        fileConflictsCommand.SetHandler((string? workspace, string? repo, string spec, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<FileConflictsHandler>()
+                    .HandleAsync(new FileConflictsRequest(workspace, repo, spec, limit), CommandBinding.CancellationToken)),
+            workspaceOption, fcRepoOption, fcSpecArg, fcLimitOption);
+        command.Subcommands.Add(fileConflictsCommand);
+
+        command.Subcommands.Add(CreateOverrideSettingsCommand(services, workspaceOption));
 
         var deleteCommand = new Command("delete", "Delete a repository");
         var deleteRepoArg = new Argument<string>("repository") { Description = "Repository to delete" };
@@ -210,6 +292,15 @@ public static class RepoCommand
             workspaceOption, repoOption, settingsJsonOption);
         bmCommand.Subcommands.Add(updateCommand);
 
+        var effectiveCommand = new Command("effective",
+            "Show the branching model actually in force, project inheritance included");
+        effectiveCommand.SetHandler((string? workspace, string? repo) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<EffectiveBranchingModelHandler>()
+                    .HandleAsync(new EffectiveBranchingModelRequest(workspace, repo), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption);
+        bmCommand.Subcommands.Add(effectiveCommand);
+
         return bmCommand;
     }
 
@@ -250,6 +341,20 @@ public static class RepoCommand
                     .HandleAsync(new AddRepoDeployKeyRequest(workspace, repo, key, label), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, addKeyOption, addLabelOption);
         dkCommand.Subcommands.Add(addCommand);
+
+        var updateKeyCommand = new Command("update", "Replace a deploy key");
+        var updateKeyIdArg = new Argument<int>("key-id") { Description = "Deploy key ID" };
+        var updateKeyOption = new Option<string>("--key") { Description = "Public SSH key body. Required: this PUT replaces rather than merges.", Required = true };
+        var updateKeyLabelOption = new Option<string?>("--label") { Description = "Friendly label" };
+        updateKeyCommand.Arguments.Add(updateKeyIdArg);
+        updateKeyCommand.Options.Add(updateKeyOption);
+        updateKeyCommand.Options.Add(updateKeyLabelOption);
+        updateKeyCommand.SetHandler((string? workspace, string? repo, int keyId, string key, string? label) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateRepoDeployKeyHandler>()
+                    .HandleAsync(new UpdateRepoDeployKeyRequest(workspace, repo, keyId, key, label), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, updateKeyIdArg, updateKeyOption, updateKeyLabelOption);
+        dkCommand.Subcommands.Add(updateKeyCommand);
 
         var deleteCommand = new Command("delete", "Delete a deploy key");
         var deleteIdArg = new Argument<int>("key-id") { Description = "Deploy key ID" };
@@ -309,6 +414,16 @@ public static class RepoCommand
                     .HandleAsync(new RemoveDefaultReviewerRequest(workspace, repo, target), CommandBinding.CancellationToken));
         }, workspaceOption, repoOption, removeTargetOption, yesOption);
         drCommand.Subcommands.Add(removeCommand);
+
+        var viewCommand = new Command("view", "Check whether a user is a default reviewer");
+        var viewTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
+        viewCommand.Options.Add(viewTargetOption);
+        viewCommand.SetHandler((string? workspace, string? repo, string target) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewDefaultReviewerHandler>()
+                    .HandleAsync(new ViewDefaultReviewerRequest(workspace, repo, target), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, viewTargetOption);
+        drCommand.Subcommands.Add(viewCommand);
 
         var effectiveCommand = new Command("effective",
             "List effective default reviewers (includes inherited from project)");
@@ -411,4 +526,47 @@ public static class RepoCommand
         }
         return (workspace ?? "<workspace>", path);
     }
+
+    /// <summary>
+    /// Resolve a pair of opposed switches into a nullable bool: null when
+    /// neither was given, so the field never reaches the wire.
+    /// </summary>
+    private static bool? Exclusive(bool on, bool off, string onName, string offName)
+    {
+        if (on && off) throw new BbxUserException($"Error: {onName} and {offName} are mutually exclusive.");
+        return on ? true : off ? false : null;
+    }
+
+    private static Command CreateOverrideSettingsCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var osCommand = new Command("override-settings",
+            "Show or set whether the repository overrides its project's settings");
+        var repoOption = CommandOptions.CreateRepoOption();
+        osCommand.AddRecursiveOption(repoOption);
+
+        var viewCommand = new Command("view", "Show which settings the repository overrides");
+        viewCommand.SetHandler((string? workspace, string? repo) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewOverrideSettingsHandler>()
+                    .HandleAsync(new ViewOverrideSettingsRequest(workspace, repo), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption);
+        osCommand.Subcommands.Add(viewCommand);
+
+        var updateCommand = new Command("update", "Set which settings the repository overrides");
+        var drOption = new Option<bool?>("--default-reviewers") { Description = "true to override the project default reviewers, false to inherit them" };
+        var bmOption = new Option<bool?>("--branching-model") { Description = "true to override the project branching model, false to inherit it" };
+        var brOption = new Option<bool?>("--branch-restrictions") { Description = "true to override the project branch restrictions, false to inherit them" };
+        updateCommand.Options.Add(drOption);
+        updateCommand.Options.Add(bmOption);
+        updateCommand.Options.Add(brOption);
+        updateCommand.SetHandler((string? workspace, string? repo, bool? defaultReviewers, bool? branchingModel, bool? branchRestrictions) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateOverrideSettingsHandler>()
+                    .HandleAsync(new UpdateOverrideSettingsRequest(workspace, repo, defaultReviewers, branchingModel, branchRestrictions), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, drOption, bmOption, brOption);
+        osCommand.Subcommands.Add(updateCommand);
+
+        return osCommand;
+    }
+
 }

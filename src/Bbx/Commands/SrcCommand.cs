@@ -17,13 +17,13 @@ public static class SrcCommand
         command.AddRecursiveOption(repoOption);
 
         var lsCommand = new Command("ls", "List entries at a path");
-        var lsRefOption = new Option<string>("--ref") { Description = "Commit hash or branch name", Required = true };
+        var lsRefOption = new Option<string?>("--ref") { Description = "Commit hash or branch name. Omit to list the root of the main branch." };
         var lsPathArg = new Argument<string?>("path") { Description = "Directory path (defaults to repo root)", DefaultValueFactory = _ => null };
         var lsLimitOption = new Option<int>("--limit") { Description = "Maximum entries to list", DefaultValueFactory = _ => 100 };
         lsCommand.Options.Add(lsRefOption);
         lsCommand.Arguments.Add(lsPathArg);
         lsCommand.Options.Add(lsLimitOption);
-        lsCommand.SetHandler((string? workspace, string? repo, string @ref, string? path, int limit) =>
+        lsCommand.SetHandler((string? workspace, string? repo, string? @ref, string? path, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<LsSourceHandler>()
                     .HandleAsync(new LsSourceRequest(workspace, repo, @ref, path, limit), CommandBinding.CancellationToken)),

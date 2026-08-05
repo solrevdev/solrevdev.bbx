@@ -200,6 +200,60 @@ public class CommandSurfaceTests
         BoolValue(result, "--no-close-source-branch").Should().BeTrue();
     }
 
+    // repo update carries fifteen bound symbols, more than SetHandler takes, so
+    // it reads the parse result itself. That hand-rolled binding is exactly the
+    // kind that compiles while doing nothing.
+    [Fact]
+    public void Repo_update_binds_its_options()
+    {
+        var result = Parse(RepoCommand.Create(Services()),
+            "update", "myrepo", "--description", "d", "--main-branch", "trunk", "--public");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--description").Should().Be("d");
+        result.GetValue<string>("--main-branch").Should().Be("trunk");
+        BoolValue(result, "--public").Should().BeTrue();
+        BoolValue(result, "--private").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Repo_update_parses_with_no_fields_and_leaves_them_unset()
+    {
+        var result = Parse(RepoCommand.Create(Services()), "update", "myrepo");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--name").Should().BeNull();
+        BoolValue(result, "--issues").Should().BeFalse();
+        BoolValue(result, "--no-issues").Should().BeFalse();
+    }
+
+    // src ls used to require --ref. Omitting it now lists the root of the main
+    // branch, so the option must not have crept back to Required.
+    [Fact]
+    public void Src_ls_parses_without_a_ref()
+    {
+        var result = Parse(SrcCommand.Create(Services()), "ls", "-r", "myrepo");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--ref").Should().BeNull();
+    }
+
+    // Same hazard as --reviewers: these replace the exemption list on a branch
+    // restriction, so an empty array must stay distinguishable from a request
+    // to clear it.
+    [Fact]
+    public void Branch_restriction_update_array_options_are_repeatable_and_empty_when_absent()
+    {
+        var command = BranchCommand.Create(Services());
+
+        Parse(command, "restrictions", "update", "1", "--pattern", "main")
+            .GetValue<string[]>("--users").Should().BeEmpty();
+
+        var given = Parse(command, "restrictions", "update", "1", "--users", "{a}", "--users", "{b}");
+        given.Errors.Should().BeEmpty();
+        given.GetValue<string[]>("--users").Should().Equal("{a}", "{b}");
+    }
+
     [Fact]
     public void The_projects_alias_still_resolves()
     {
