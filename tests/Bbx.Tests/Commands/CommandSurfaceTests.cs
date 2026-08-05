@@ -338,6 +338,41 @@ public class CommandSurfaceTests
     }
 
     [Fact]
+    public void Snippet_writes_take_an_optional_revision()
+    {
+        var command = SnippetCommand.Create(Services());
+
+        var latest = Parse(command, "view", "abc");
+        latest.Errors.Should().BeEmpty();
+        latest.GetValue<string>("--revision").Should().BeNull();
+
+        var pinned = Parse(command, "update", "abc", "--title", "t", "--revision", "d3adb33f");
+        pinned.Errors.Should().BeEmpty();
+        pinned.GetValue<string>("--revision").Should().Be("d3adb33f");
+    }
+
+    [Fact]
+    public void Workspace_pipeline_variables_bind_the_workspace_recursively()
+    {
+        var result = Parse(WorkspaceCommand.Create(Services()),
+            "pipelines", "variables", "list", "-w", "acme");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--workspace").Should().Be("acme");
+    }
+
+    [Fact]
+    public void Project_update_accepts_both_visibility_flags_at_parse_time()
+    {
+        var result = Parse(WorkspaceCommand.Create(Services()),
+            "project", "update", "PROJ", "--private", "--public");
+
+        result.Errors.Should().BeEmpty();
+        BoolValue(result, "--private").Should().BeTrue();
+        BoolValue(result, "--public").Should().BeTrue();
+    }
+
+    [Fact]
     public void The_projects_alias_still_resolves()
     {
         var result = Parse(WorkspaceCommand.Create(Services()), "projects", "list", "-w", "acme");

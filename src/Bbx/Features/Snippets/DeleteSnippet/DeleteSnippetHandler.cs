@@ -12,7 +12,7 @@ public sealed class DeleteSnippetHandler(BitbucketClient client, CredentialManag
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
 
-        await client.DeleteAsync($"snippets/{workspace}/{request.SnippetId}", ct);
+        await client.DeleteAsync(SnippetPath.For(workspace, request.SnippetId, request.Revision), ct);
         return new { deleted = true, snippet_id = request.SnippetId };
     }
 }

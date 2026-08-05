@@ -5,4 +5,5 @@ public sealed record UpdateSnippetRequest(
     string? Title,
     string[]? Files,
     bool? IsPrivate,
-    string? Workspace);
+    string? Workspace,
+    string? Revision = null);

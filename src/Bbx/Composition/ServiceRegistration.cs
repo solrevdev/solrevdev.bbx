@@ -247,6 +247,8 @@ public static class ServiceRegistration
         services.AddTransient<Features.Snippets.SnippetFiles.SnippetFilesHandler>();
         services.AddTransient<Features.Snippets.SnippetWatch.SnippetWatchHandler>();
         services.AddTransient<Features.Snippets.SnippetComments.SnippetCommentsHandler>();
+        services.AddTransient<Features.Snippets.SnippetCommits.SnippetCommitsHandler>();
+        services.AddTransient<Features.Snippets.SnippetDiff.SnippetDiffHandler>();
 
         services.AddTransient<Features.Workspaces.ListWorkspaces.ListWorkspacesHandler>();
         services.AddTransient<Features.Workspaces.ViewWorkspace.ViewWorkspaceHandler>();
@@ -278,6 +280,20 @@ public static class ServiceRegistration
         services.AddTransient<Features.Workspaces.Projects.Access.ViewProjectUserPermission.ViewProjectUserPermissionHandler>();
         services.AddTransient<Features.Workspaces.Projects.Access.SetProjectUserPermission.SetProjectUserPermissionHandler>();
         services.AddTransient<Features.Workspaces.Projects.Access.RemoveProjectUserPermission.RemoveProjectUserPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.UpdateProject.UpdateProjectHandler>();
+        services.AddTransient<Features.Workspaces.Projects.BranchingModel.ViewProjectBranchingModelSettings.ViewProjectBranchingModelSettingsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.DefaultReviewers.ViewProjectDefaultReviewer.ViewProjectDefaultReviewerHandler>();
+        services.AddTransient<Features.Workspaces.ViewWorkspaceMember.ViewWorkspaceMemberHandler>();
+        services.AddTransient<Features.Workspaces.ListWorkspaceRepositoryPermissions.ListWorkspaceRepositoryPermissionsHandler>();
+        services.AddTransient<Features.Workspaces.ViewWorkspaceGpgKey.ViewWorkspaceGpgKeyHandler>();
+        services.AddTransient<Features.Workspaces.ListWorkspacePullRequests.ListWorkspacePullRequestsHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ListWorkspaceVariables.ListWorkspaceVariablesHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.AddWorkspaceVariable.AddWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ViewWorkspaceVariable.ViewWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.UpdateWorkspaceVariable.UpdateWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.DeleteWorkspaceVariable.DeleteWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ViewWorkspaceOidcConfig.ViewWorkspaceOidcConfigHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ViewWorkspaceOidcKeys.ViewWorkspaceOidcKeysHandler>();
 
         services.AddTransient<Features.Users.ListUserEmails.ListUserEmailsHandler>();
         services.AddTransient<Features.Users.ListUserWorkspacePermissions.ListUserWorkspacePermissionsHandler>();
@@ -287,5 +303,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Users.SshKeys.ViewSshKey.ViewSshKeyHandler>();
         services.AddTransient<Features.Users.SshKeys.AddSshKey.AddSshKeyHandler>();
         services.AddTransient<Features.Users.SshKeys.DeleteSshKey.DeleteSshKeyHandler>();
+        services.AddTransient<Features.Users.ViewUserEmail.ViewUserEmailHandler>();
+        services.AddTransient<Features.Users.ListUserWorkspaces.ListUserWorkspacesHandler>();
+        services.AddTransient<Features.Users.ViewUserWorkspacePermission.ViewUserWorkspacePermissionHandler>();
+        services.AddTransient<Features.Users.ListUserWorkspaceRepositoryPermissions.ListUserWorkspaceRepositoryPermissionsHandler>();
+        services.AddTransient<Features.Users.GpgKeys.ListGpgKeys.ListGpgKeysHandler>();
+        services.AddTransient<Features.Users.GpgKeys.ViewGpgKey.ViewGpgKeyHandler>();
     }
 }

@@ -3,6 +3,8 @@ using Bbx.Features.Snippets.CreateSnippet;
 using Bbx.Features.Snippets.DeleteSnippet;
 using Bbx.Features.Snippets.ListSnippets;
 using Bbx.Features.Snippets.SnippetComments;
+using Bbx.Features.Snippets.SnippetCommits;
+using Bbx.Features.Snippets.SnippetDiff;
 using Bbx.Features.Snippets.SnippetFiles;
 using Bbx.Features.Snippets.SnippetWatch;
 using Bbx.Features.Snippets.UpdateSnippet;
@@ -25,6 +27,9 @@ public static class SnippetCommand
         command.Subcommands.Add(CreateFilesCommand(services));
         command.Subcommands.Add(CreateWatchCommand(services));
         command.Subcommands.Add(CreateCommentsCommand(services));
+        command.Subcommands.Add(CreateCommitsCommand(services));
+        command.Subcommands.Add(CreateDiffCommand(services, "diff", "Show a snippet revision as a diff", asPatch: false));
+        command.Subcommands.Add(CreateDiffCommand(services, "patch", "Show a snippet revision as a git-format patch", asPatch: true));
 
         return command;
     }
@@ -57,11 +62,14 @@ public static class SnippetCommand
         command.Arguments.Add(snippetIdArg);
         command.Options.Add(workspaceOption);
 
-        command.SetHandler((string snippetId, string? workspace) =>
+        var revisionOption = new Option<string?>("--revision")
+        { Description = "Pin to this revision rather than the latest" };
+        command.Options.Add(revisionOption);
+        command.SetHandler((string snippetId, string? workspace, string? revision) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ViewSnippetHandler>()
-                    .HandleAsync(new ViewSnippetRequest(snippetId, workspace), CommandBinding.CancellationToken)),
-            snippetIdArg, workspaceOption);
+                    .HandleAsync(new ViewSnippetRequest(snippetId, workspace, revision), CommandBinding.CancellationToken)),
+            snippetIdArg, workspaceOption, revisionOption);
         return command;
     }
 
@@ -100,12 +108,15 @@ public static class SnippetCommand
         command.Options.Add(fileOption);
         command.Options.Add(privateOption);
         command.Options.Add(workspaceOption);
+        var revisionOption = new Option<string?>("--revision")
+        { Description = "Pin to this revision. The write is refused if the snippet has moved on since." };
+        command.Options.Add(revisionOption);
 
-        command.SetHandler((string snippetId, string? title, string[]? files, bool? isPrivate, string? workspace) =>
+        command.SetHandler((string snippetId, string? title, string[]? files, bool? isPrivate, string? workspace, string? revision) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpdateSnippetHandler>()
-                    .HandleAsync(new UpdateSnippetRequest(snippetId, title, files, isPrivate, workspace), CommandBinding.CancellationToken)),
-            snippetIdArg, titleOption, fileOption, privateOption, workspaceOption);
+                    .HandleAsync(new UpdateSnippetRequest(snippetId, title, files, isPrivate, workspace, revision), CommandBinding.CancellationToken)),
+            snippetIdArg, titleOption, fileOption, privateOption, workspaceOption, revisionOption);
         return command;
     }
 
@@ -119,15 +130,18 @@ public static class SnippetCommand
         command.Arguments.Add(snippetIdArg);
         command.Options.Add(workspaceOption);
         command.Options.Add(yesOption);
+        var revisionOption = new Option<string?>("--revision")
+        { Description = "Pin to this revision. The write is refused if the snippet has moved on since." };
+        command.Options.Add(revisionOption);
 
-        command.SetHandler(async (string snippetId, string? workspace, bool yes) =>
+        command.SetHandler(async (string snippetId, string? workspace, bool yes, string? revision) =>
         {
             if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Delete snippet '{snippetId}'? [y/N]: "))
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<DeleteSnippetHandler>()
-                    .HandleAsync(new DeleteSnippetRequest(snippetId, workspace), CommandBinding.CancellationToken));
-        }, snippetIdArg, workspaceOption, yesOption);
+                    .HandleAsync(new DeleteSnippetRequest(snippetId, workspace, revision), CommandBinding.CancellationToken));
+        }, snippetIdArg, workspaceOption, yesOption, revisionOption);
         return command;
     }
 
@@ -143,13 +157,16 @@ public static class SnippetCommand
         command.Arguments.Add(fileNameArg);
         command.Options.Add(workspaceOption);
         command.Options.Add(rawOption);
+        var revisionOption = new Option<string?>("--revision")
+        { Description = "Read the file as it was at this revision" };
+        command.Options.Add(revisionOption);
 
-        command.SetHandler(async (string snippetId, string? fileName, string? workspace, bool raw) =>
+        command.SetHandler(async (string snippetId, string? fileName, string? workspace, bool raw, string? revision) =>
         {
             await CommandRunner.RunDirectAsync(() =>
                 services.GetRequiredService<SnippetFilesHandler>()
-                    .HandleAsync(new SnippetFilesRequest(snippetId, fileName, workspace, raw), CommandBinding.CancellationToken));
-        }, snippetIdArg, fileNameArg, workspaceOption, rawOption);
+                    .HandleAsync(new SnippetFilesRequest(snippetId, fileName, workspace, raw, revision), CommandBinding.CancellationToken));
+        }, snippetIdArg, fileNameArg, workspaceOption, rawOption, revisionOption);
         return command;
     }
 
@@ -181,17 +198,65 @@ public static class SnippetCommand
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
         var addOption = new Option<string?>("--add", "-a") { Description = "Add a new comment with this content" };
         var deleteOption = new Option<int?>("--delete", "-d") { Description = "Delete comment by ID" };
+        var updateOption = new Option<int?>("--update", "-u") { Description = "Edit comment by ID. Needs --content." };
+        var contentOption = new Option<string?>("--content") { Description = "Replacement text for --update" };
 
         command.Arguments.Add(snippetIdArg);
         command.Options.Add(workspaceOption);
         command.Options.Add(addOption);
         command.Options.Add(deleteOption);
+        command.Options.Add(updateOption);
+        command.Options.Add(contentOption);
 
-        command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId) =>
+        command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId, int? updateId, string? content) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<SnippetCommentsHandler>()
-                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId), CommandBinding.CancellationToken)),
-            snippetIdArg, workspaceOption, addOption, deleteOption);
+                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId, updateId, content), CommandBinding.CancellationToken)),
+            snippetIdArg, workspaceOption, addOption, deleteOption, updateOption, contentOption);
         return command;
     }
+
+    private static Command CreateCommitsCommand(IServiceProvider services)
+    {
+        var command = new Command("commits", "List a snippet's commits, or view one with --revision");
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var revisionOption = new Option<string?>("--revision") { Description = "View this commit rather than the log" };
+        var limitOption = new Option<int>("--limit") { Description = "Maximum commits to list", DefaultValueFactory = _ => 25 };
+
+        command.Arguments.Add(snippetIdArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(revisionOption);
+        command.Options.Add(limitOption);
+
+        command.SetHandler((string snippetId, string? workspace, string? revision, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<SnippetCommitsHandler>()
+                    .HandleAsync(new SnippetCommitsRequest(snippetId, workspace, revision, limit), CommandBinding.CancellationToken)),
+            snippetIdArg, workspaceOption, revisionOption, limitOption);
+        return command;
+    }
+
+    // Diff and patch are the same resource in two formats, so one builder makes
+    // both, the way `pr diff` and `pr patch` differ only in the trailing
+    // segment.
+    private static Command CreateDiffCommand(IServiceProvider services, string name, string description, bool asPatch)
+    {
+        var command = new Command(name, description);
+        var snippetIdArg = new Argument<string>("snippet-id") { Description = "Snippet ID" };
+        var revisionArg = new Argument<string>("revision") { Description = "Revision to render" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+
+        command.Arguments.Add(snippetIdArg);
+        command.Arguments.Add(revisionArg);
+        command.Options.Add(workspaceOption);
+
+        command.SetHandler((string snippetId, string revision, string? workspace) =>
+            CommandRunner.RunRawAsync(() =>
+                services.GetRequiredService<SnippetDiffHandler>()
+                    .HandleAsync(new SnippetDiffRequest(snippetId, workspace, revision, asPatch), CommandBinding.CancellationToken)),
+            snippetIdArg, revisionArg, workspaceOption);
+        return command;
+    }
+
 }

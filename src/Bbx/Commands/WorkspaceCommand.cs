@@ -1,4 +1,18 @@
 using System.CommandLine;
+using Bbx.Features.Workspaces.ListWorkspacePullRequests;
+using Bbx.Features.Workspaces.ListWorkspaceRepositoryPermissions;
+using Bbx.Features.Workspaces.Pipelines.AddWorkspaceVariable;
+using Bbx.Features.Workspaces.Pipelines.DeleteWorkspaceVariable;
+using Bbx.Features.Workspaces.Pipelines.ListWorkspaceVariables;
+using Bbx.Features.Workspaces.Pipelines.UpdateWorkspaceVariable;
+using Bbx.Features.Workspaces.Pipelines.ViewWorkspaceOidcConfig;
+using Bbx.Features.Workspaces.Pipelines.ViewWorkspaceOidcKeys;
+using Bbx.Features.Workspaces.Pipelines.ViewWorkspaceVariable;
+using Bbx.Features.Workspaces.Projects.BranchingModel.ViewProjectBranchingModelSettings;
+using Bbx.Features.Workspaces.Projects.DefaultReviewers.ViewProjectDefaultReviewer;
+using Bbx.Features.Workspaces.Projects.UpdateProject;
+using Bbx.Features.Workspaces.ViewWorkspaceGpgKey;
+using Bbx.Features.Workspaces.ViewWorkspaceMember;
 using Bbx.Features.Workspaces.Projects.Access.ListProjectGroupPermissions;
 using Bbx.Features.Workspaces.Projects.Access.ListProjectUserPermissions;
 using Bbx.Features.Workspaces.Projects.Access.RemoveProjectGroupPermission;
@@ -44,6 +58,11 @@ public static class WorkspaceCommand
         command.Subcommands.Add(CreateMembersCommand(services));
         command.Subcommands.Add(CreatePermissionsCommand(services));
         command.Subcommands.Add(CreateHooksCommand(services));
+        command.Subcommands.Add(CreateMemberCommand(services));
+        command.Subcommands.Add(CreateRepoPermissionsCommand(services));
+        command.Subcommands.Add(CreateGpgKeyCommand(services));
+        command.Subcommands.Add(CreateWorkspacePullRequestsCommand(services));
+        command.Subcommands.Add(CreateWorkspacePipelinesCommand(services));
         command.Subcommands.Add(CreateProjectCommand(services));
 
         return command;
@@ -69,6 +88,7 @@ public static class WorkspaceCommand
         projectCommand.Subcommands.Add(CreateProjectViewCommand(services, workspaceOption));
         projectCommand.Subcommands.Add(CreateProjectCreateCommand(services, workspaceOption));
         projectCommand.Subcommands.Add(CreateProjectDeleteCommand(services, workspaceOption));
+        projectCommand.Subcommands.Add(CreateProjectUpdateCommand(services, workspaceOption));
 
         var projectKeyOption = new Option<string>("--project-key") { Description = "Project key", Required = true };
         projectCommand.Subcommands.Add(CreateProjectDefaultReviewersCommand(services, workspaceOption, projectKeyOption));
@@ -160,6 +180,16 @@ public static class WorkspaceCommand
             workspaceOption, projectKeyOption, listLimitOption);
         drCommand.Subcommands.Add(listCommand);
 
+        var viewCommand = new Command("view", "Check whether a user is a project default reviewer");
+        var viewTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
+        viewCommand.Options.Add(viewTargetOption);
+        viewCommand.SetHandler((string? workspace, string projectKey, string target) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectDefaultReviewerHandler>()
+                    .HandleAsync(new ViewProjectDefaultReviewerRequest(workspace, projectKey, target), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, viewTargetOption);
+        drCommand.Subcommands.Add(viewCommand);
+
         var addCommand = new Command("add", "Add a project default reviewer");
         var addTargetOption = new Option<string>("--target") { Description = "Account ID or UUID of the user", Required = true };
         addCommand.Options.Add(addTargetOption);
@@ -193,6 +223,14 @@ public static class WorkspaceCommand
         var bmCommand = new Command("branching-model",
             "Inspect or update the project branching-model defaults");
         bmCommand.AddRecursiveOption(projectKeyOption);
+
+        var settingsCommand = new Command("settings", "Show the configured project branching-model settings");
+        settingsCommand.SetHandler((string? workspace, string projectKey) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectBranchingModelSettingsHandler>()
+                    .HandleAsync(new ViewProjectBranchingModelSettingsRequest(workspace, projectKey), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption);
+        bmCommand.Subcommands.Add(settingsCommand);
 
         var viewCommand = new Command("view", "Show the project branching-model defaults");
         viewCommand.SetHandler((string? workspace, string projectKey) =>
@@ -534,6 +572,217 @@ public static class WorkspaceCommand
         accessCommand.Subcommands.Add(usersCommand);
 
         return accessCommand;
+    }
+
+
+    private static Command CreateProjectUpdateCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var command = new Command("update", "Update a workspace project");
+        var keyArg = new Argument<string>("project-key") { Description = "Project key" };
+        var nameOption = new Option<string?>("--name") { Description = "New project name" };
+        var descOption = new Option<string?>("--description") { Description = "New description. Pass an empty string to clear it." };
+        var privateOption = new Option<bool>("--private") { Description = "Make the project private" };
+        var publicOption = new Option<bool>("--public") { Description = "Make the project public" };
+        var newKeyOption = new Option<string?>("--new-key")
+        { Description = "Rename the project key. Every repository in the project moves with it." };
+
+        command.Arguments.Add(keyArg);
+        command.Options.Add(nameOption);
+        command.Options.Add(descOption);
+        command.Options.Add(privateOption);
+        command.Options.Add(publicOption);
+        command.Options.Add(newKeyOption);
+
+        command.SetHandler((string? workspace, string projectKey, string? name, string? description, bool isPrivate, bool isPublic, string? newKey) =>
+            CommandRunner.RunJsonAsync(() =>
+            {
+                if (isPrivate && isPublic)
+                    throw new BbxUserException("Error: --private and --public are mutually exclusive.");
+                bool? visibility = isPrivate ? true : isPublic ? false : null;
+                return services.GetRequiredService<UpdateProjectHandler>()
+                    .HandleAsync(new UpdateProjectRequest(workspace, projectKey, name, description, visibility, newKey), CommandBinding.CancellationToken);
+            }),
+            workspaceOption, keyArg, nameOption, descOption, privateOption, publicOption, newKeyOption);
+        return command;
+    }
+
+    private static Command CreateMemberCommand(IServiceProvider services)
+    {
+        var command = new Command("member", "View one workspace member");
+        var memberArg = new Argument<string>("member")
+        { Description = "Account UUID or account ID. Usernames are no longer accepted by Bitbucket." };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        command.Arguments.Add(memberArg);
+        command.Options.Add(workspaceOption);
+        command.SetHandler((string member, string? workspace) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceMemberHandler>()
+                    .HandleAsync(new ViewWorkspaceMemberRequest(workspace, member), CommandBinding.CancellationToken)),
+            memberArg, workspaceOption);
+        return command;
+    }
+
+    private static Command CreateRepoPermissionsCommand(IServiceProvider services)
+    {
+        var command = new Command("repo-permissions",
+            "List repository permissions across the workspace, or for one repository with --repo");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var repoOption = new Option<string?>("--repo", "-r") { Description = "Narrow to one repository slug" };
+        var limitOption = new Option<int>("--limit", "-l") { Description = "Maximum grants to list", DefaultValueFactory = _ => 50 };
+        command.Options.Add(workspaceOption);
+        command.Options.Add(repoOption);
+        command.Options.Add(limitOption);
+        command.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspaceRepositoryPermissionsHandler>()
+                    .HandleAsync(new ListWorkspaceRepositoryPermissionsRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, limitOption);
+        return command;
+    }
+
+    private static Command CreateGpgKeyCommand(IServiceProvider services)
+    {
+        var command = new Command("gpg-key",
+            "Show the GPG key Bitbucket signs the workspace's web-edit commits with");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        command.Options.Add(workspaceOption);
+        command.SetHandler((string? workspace) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceGpgKeyHandler>()
+                    .HandleAsync(new ViewWorkspaceGpgKeyRequest(workspace), CommandBinding.CancellationToken)),
+            workspaceOption);
+        return command;
+    }
+
+    private static Command CreateWorkspacePullRequestsCommand(IServiceProvider services)
+    {
+        var command = new Command("pullrequests",
+            "List a user's pull requests across the whole workspace, not just one repository");
+        var userArg = new Argument<string>("user")
+        { Description = "Account UUID or account ID whose pull requests to list" };
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        var stateOption = new Option<string?>("--state") { Description = "Filter by state (OPEN, MERGED, DECLINED, SUPERSEDED)" };
+        var limitOption = new Option<int>("--limit", "-l") { Description = "Maximum pull requests to list", DefaultValueFactory = _ => 25 };
+        command.Arguments.Add(userArg);
+        command.Options.Add(workspaceOption);
+        command.Options.Add(stateOption);
+        command.Options.Add(limitOption);
+        command.SetHandler((string user, string? workspace, string? state, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspacePullRequestsHandler>()
+                    .HandleAsync(new ListWorkspacePullRequestsRequest(workspace, user, state, limit), CommandBinding.CancellationToken)),
+            userArg, workspaceOption, stateOption, limitOption);
+        return command;
+    }
+
+    /// <summary>
+    /// Pipeline settings that live on the workspace rather than a repository.
+    /// The repository-scoped equivalents are under `bbx pipeline`.
+    /// </summary>
+    private static Command CreateWorkspacePipelinesCommand(IServiceProvider services)
+    {
+        var pipelinesCommand = new Command("pipelines", "Workspace-wide pipeline variables and OIDC discovery");
+        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug (uses default if not specified)" };
+        pipelinesCommand.AddRecursiveOption(workspaceOption);
+
+        var variablesCommand = new Command("variables", "Variables every repository in the workspace inherits");
+
+        var listCommand = new Command("list", "List workspace pipeline variables");
+        var listLimitOption = new Option<int>("--limit") { Description = "Maximum variables to list", DefaultValueFactory = _ => 50 };
+        listCommand.Options.Add(listLimitOption);
+        listCommand.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListWorkspaceVariablesHandler>()
+                    .HandleAsync(new ListWorkspaceVariablesRequest(workspace, limit), CommandBinding.CancellationToken)),
+            workspaceOption, listLimitOption);
+        variablesCommand.Subcommands.Add(listCommand);
+
+        var addCommand = new Command("add", "Add a workspace pipeline variable");
+        var addKeyOption = new Option<string>("--key") { Description = "Variable name", Required = true };
+        var addValueOption = new Option<string>("--value") { Description = "Variable value", Required = true };
+        var addSecuredOption = new Option<bool>("--secured") { Description = "Hide the value from the API and the UI" };
+        addCommand.Options.Add(addKeyOption);
+        addCommand.Options.Add(addValueOption);
+        addCommand.Options.Add(addSecuredOption);
+        addCommand.SetHandler((string? workspace, string key, string value, bool secured) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddWorkspaceVariableHandler>()
+                    .HandleAsync(new AddWorkspaceVariableRequest(workspace, key, value, secured), CommandBinding.CancellationToken)),
+            workspaceOption, addKeyOption, addValueOption, addSecuredOption);
+        variablesCommand.Subcommands.Add(addCommand);
+
+        var viewCommand = new Command("view", "View one workspace pipeline variable");
+        var viewUuidArg = new Argument<string>("variable-uuid") { Description = "Variable UUID" };
+        viewCommand.Arguments.Add(viewUuidArg);
+        viewCommand.SetHandler((string? workspace, string variableUuid) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceVariableHandler>()
+                    .HandleAsync(new ViewWorkspaceVariableRequest(workspace, variableUuid), CommandBinding.CancellationToken)),
+            workspaceOption, viewUuidArg);
+        variablesCommand.Subcommands.Add(viewCommand);
+
+        var updateCommand = new Command("update", "Change a workspace pipeline variable");
+        var updateUuidArg = new Argument<string>("variable-uuid") { Description = "Variable UUID" };
+        var updateKeyOption = new Option<string?>("--key") { Description = "New variable name" };
+        var updateValueOption = new Option<string?>("--value") { Description = "New value" };
+        var updateSecuredOption = new Option<bool>("--secured") { Description = "Hide the value" };
+        var updateUnsecuredOption = new Option<bool>("--unsecured") { Description = "Show the value again" };
+        updateCommand.Arguments.Add(updateUuidArg);
+        updateCommand.Options.Add(updateKeyOption);
+        updateCommand.Options.Add(updateValueOption);
+        updateCommand.Options.Add(updateSecuredOption);
+        updateCommand.Options.Add(updateUnsecuredOption);
+        updateCommand.SetHandler((string? workspace, string variableUuid, string? key, string? value, bool secured, bool unsecured) =>
+            CommandRunner.RunJsonAsync(() =>
+            {
+                if (secured && unsecured)
+                    throw new BbxUserException("Error: --secured and --unsecured are mutually exclusive.");
+                bool? isSecured = secured ? true : unsecured ? false : null;
+                return services.GetRequiredService<UpdateWorkspaceVariableHandler>()
+                    .HandleAsync(new UpdateWorkspaceVariableRequest(workspace, variableUuid, key, value, isSecured), CommandBinding.CancellationToken);
+            }),
+            workspaceOption, updateUuidArg, updateKeyOption, updateValueOption, updateSecuredOption, updateUnsecuredOption);
+        variablesCommand.Subcommands.Add(updateCommand);
+
+        var deleteCommand = new Command("delete", "Delete a workspace pipeline variable");
+        var deleteUuidArg = new Argument<string>("variable-uuid") { Description = "Variable UUID" };
+        var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        deleteCommand.Arguments.Add(deleteUuidArg);
+        deleteCommand.Options.Add(yesOption);
+        deleteCommand.SetHandler(async (string? workspace, string variableUuid, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Delete workspace variable {variableUuid}? Every repository inherits it. [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteWorkspaceVariableHandler>()
+                    .HandleAsync(new DeleteWorkspaceVariableRequest(workspace, variableUuid), CommandBinding.CancellationToken));
+        }, workspaceOption, deleteUuidArg, yesOption);
+        variablesCommand.Subcommands.Add(deleteCommand);
+
+        pipelinesCommand.Subcommands.Add(variablesCommand);
+
+        var oidcCommand = new Command("oidc", "Workspace-level OIDC discovery and JWKS");
+
+        var oidcConfigCommand = new Command("config", "Show the workspace OpenID provider configuration");
+        oidcConfigCommand.SetHandler((string? workspace) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceOidcConfigHandler>()
+                    .HandleAsync(new ViewWorkspaceOidcConfigRequest(workspace), CommandBinding.CancellationToken)),
+            workspaceOption);
+        oidcCommand.Subcommands.Add(oidcConfigCommand);
+
+        var oidcKeysCommand = new Command("keys", "Show the workspace JWKS used to verify pipeline OIDC tokens");
+        oidcKeysCommand.SetHandler((string? workspace) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewWorkspaceOidcKeysHandler>()
+                    .HandleAsync(new ViewWorkspaceOidcKeysRequest(workspace), CommandBinding.CancellationToken)),
+            workspaceOption);
+        oidcCommand.Subcommands.Add(oidcKeysCommand);
+
+        pipelinesCommand.Subcommands.Add(oidcCommand);
+
+        return pipelinesCommand;
     }
 
 }
