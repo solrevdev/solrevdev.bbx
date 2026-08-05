@@ -159,6 +159,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Commits.ApproveCommit.ApproveCommitHandler>();
         services.AddTransient<Features.Commits.UnapproveCommit.UnapproveCommitHandler>();
         services.AddTransient<Features.Commits.CommitDiffstat.CommitDiffstatHandler>();
+        services.AddTransient<Features.Commits.ViewCommitStatus.ViewCommitStatusHandler>();
+        services.AddTransient<Features.Commits.Comments.AddCommitComment.AddCommitCommentHandler>();
+        services.AddTransient<Features.Commits.Comments.ViewCommitComment.ViewCommitCommentHandler>();
+        services.AddTransient<Features.Commits.Comments.UpdateCommitComment.UpdateCommitCommentHandler>();
+        services.AddTransient<Features.Commits.Comments.DeleteCommitComment.DeleteCommitCommentHandler>();
 
         services.AddTransient<Features.Issues.ListIssues.ListIssuesHandler>();
         services.AddTransient<Features.Issues.ViewIssue.ViewIssueHandler>();

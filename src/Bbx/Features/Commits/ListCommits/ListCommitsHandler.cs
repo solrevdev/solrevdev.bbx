@@ -20,15 +20,59 @@ public sealed class ListCommitsHandler(BitbucketClient client, CredentialManager
         if (!string.IsNullOrEmpty(request.Path)) queryParams.Add($"path={Uri.EscapeDataString(request.Path)}");
         if (queryParams.Count > 0) endpoint += "?" + string.Join("&", queryParams);
 
+        // An absent array option parses to an empty array rather than null, so
+        // both are tested for length. Length zero means the caller did not ask
+        // for a walk and the plain GET still applies.
+        var include = request.Include ?? [];
+        var exclude = request.Exclude ?? [];
+
+        var commits = include.Length > 0 || exclude.Length > 0
+            ? await WalkAsync(endpoint, include, exclude, request.Limit, ct)
+            : await ListAsync(endpoint, request.Limit, ct);
+
+        return new { workspace = ws, repository = repo, count = commits.Count, commits };
+    }
+
+    private async Task<List<object>> ListAsync(string endpoint, int limit, CancellationToken ct)
+    {
         var commits = new List<object>();
         var count = 0;
         await foreach (var commit in client.GetPaginatedAsync<JsonElement>(endpoint, ct))
         {
             commits.Add(CommitFormatter.Summary(commit));
-            if (++count >= request.Limit) break;
+            if (++count >= limit) break;
+        }
+        return commits;
+    }
+
+    /// <summary>
+    /// Walk the commits reachable from <paramref name="include"/> but not from
+    /// <paramref name="exclude"/>. Bitbucket takes those two lists in a POST
+    /// body only, so this cannot reuse the paginating GET helper.
+    /// </summary>
+    private async Task<List<object>> WalkAsync(
+        string endpoint, string[] include, string[] exclude, int limit, CancellationToken ct)
+    {
+        var body = new Dictionary<string, object>();
+        if (include.Length > 0) body["include"] = include;
+        if (exclude.Length > 0) body["exclude"] = exclude;
+
+        var commits = new List<object>();
+        var page = await client.PostAsync<PaginatedResponse<JsonElement>>(endpoint, body, ct);
+        while (page is not null)
+        {
+            foreach (var commit in page.Values)
+            {
+                commits.Add(CommitFormatter.Summary(commit));
+                if (commits.Count >= limit) return commits;
+            }
+            // The next link carries the walk in its query string, so following
+            // it is a plain GET even though the first page was a POST.
+            if (string.IsNullOrEmpty(page.Next)) break;
+            page = await client.GetAsync<PaginatedResponse<JsonElement>>(page.Next, ct);
         }
 
-        return new { workspace = ws, repository = repo, count = commits.Count, commits };
+        return commits;
     }
 }
 
