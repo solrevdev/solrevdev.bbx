@@ -1,4 +1,12 @@
 using System.CommandLine;
+using Bbx.Features.Workspaces.Projects.Access.ListProjectGroupPermissions;
+using Bbx.Features.Workspaces.Projects.Access.ListProjectUserPermissions;
+using Bbx.Features.Workspaces.Projects.Access.RemoveProjectGroupPermission;
+using Bbx.Features.Workspaces.Projects.Access.RemoveProjectUserPermission;
+using Bbx.Features.Workspaces.Projects.Access.SetProjectGroupPermission;
+using Bbx.Features.Workspaces.Projects.Access.SetProjectUserPermission;
+using Bbx.Features.Workspaces.Projects.Access.ViewProjectGroupPermission;
+using Bbx.Features.Workspaces.Projects.Access.ViewProjectUserPermission;
 using Bbx.Features.Workspaces.Hooks.CreateWorkspaceHook;
 using Bbx.Features.Workspaces.Hooks.DeleteWorkspaceHook;
 using Bbx.Features.Workspaces.Hooks.ListWorkspaceHooks;
@@ -66,6 +74,7 @@ public static class WorkspaceCommand
         projectCommand.Subcommands.Add(CreateProjectDefaultReviewersCommand(services, workspaceOption, projectKeyOption));
         projectCommand.Subcommands.Add(CreateProjectBranchingModelCommand(services, workspaceOption, projectKeyOption));
         projectCommand.Subcommands.Add(CreateProjectDeployKeysCommand(services, workspaceOption, projectKeyOption));
+        projectCommand.Subcommands.Add(CreateProjectAccessCommand(services, workspaceOption, projectKeyOption));
 
         return projectCommand;
     }
@@ -404,4 +413,127 @@ public static class WorkspaceCommand
 
         return hooksCommand;
     }
+
+    /// <summary>
+    /// The explicit permission grants on a project. Repository grants sit under
+    /// `bbx repo access`; these are the ones every repository in the project
+    /// inherits.
+    /// </summary>
+    private static Command CreateProjectAccessCommand(
+        IServiceProvider services, Option<string?> workspaceOption, Option<string> projectKeyOption)
+    {
+        var accessCommand = new Command("access", "Read and set explicit project permissions");
+        // The handlers bind this option, so it has to be registered here too,
+        // the same way the default-reviewers group does it.
+        accessCommand.AddRecursiveOption(projectKeyOption);
+
+        var groupsCommand = new Command("groups", "Explicit group permissions on the project");
+
+        var groupsListCommand = new Command("list", "List explicit group permissions");
+        var groupsLimitOption = new Option<int>("--limit") { Description = "Maximum grants to list", DefaultValueFactory = _ => 50 };
+        groupsListCommand.Options.Add(groupsLimitOption);
+        groupsListCommand.SetHandler((string? workspace, string projectKey, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectGroupPermissionsHandler>()
+                    .HandleAsync(new ListProjectGroupPermissionsRequest(workspace, projectKey, limit), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, groupsLimitOption);
+        groupsCommand.Subcommands.Add(groupsListCommand);
+
+        var groupsViewCommand = new Command("view", "View one group's explicit permission");
+        var groupsViewSlugArg = new Argument<string>("group-slug") { Description = "Group slug" };
+        groupsViewCommand.Arguments.Add(groupsViewSlugArg);
+        groupsViewCommand.SetHandler((string? workspace, string projectKey, string slug) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectGroupPermissionHandler>()
+                    .HandleAsync(new ViewProjectGroupPermissionRequest(workspace, projectKey, slug), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, groupsViewSlugArg);
+        groupsCommand.Subcommands.Add(groupsViewCommand);
+
+        var groupsSetCommand = new Command("set", "Grant a group a permission on the project");
+        var groupsSetSlugArg = new Argument<string>("group-slug") { Description = "Group slug" };
+        var groupsSetPermissionOption = new Option<string>("--permission")
+        { Description = "Permission to grant (read, write, create-repo, admin, none)", Required = true };
+        groupsSetCommand.Arguments.Add(groupsSetSlugArg);
+        groupsSetCommand.Options.Add(groupsSetPermissionOption);
+        groupsSetCommand.SetHandler((string? workspace, string projectKey, string slug, string permission) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<SetProjectGroupPermissionHandler>()
+                    .HandleAsync(new SetProjectGroupPermissionRequest(workspace, projectKey, slug, permission), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, groupsSetSlugArg, groupsSetPermissionOption);
+        groupsCommand.Subcommands.Add(groupsSetCommand);
+
+        var groupsRemoveCommand = new Command("remove", "Remove a group's explicit permission");
+        var groupsRemoveSlugArg = new Argument<string>("group-slug") { Description = "Group slug" };
+        var groupsYesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        groupsRemoveCommand.Arguments.Add(groupsRemoveSlugArg);
+        groupsRemoveCommand.Options.Add(groupsYesOption);
+        groupsRemoveCommand.SetHandler(async (string? workspace, string projectKey, string slug, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Remove the explicit permission for group '{slug}' on {projectKey}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveProjectGroupPermissionHandler>()
+                    .HandleAsync(new RemoveProjectGroupPermissionRequest(workspace, projectKey, slug), CommandBinding.CancellationToken));
+        }, workspaceOption, projectKeyOption, groupsRemoveSlugArg, groupsYesOption);
+        groupsCommand.Subcommands.Add(groupsRemoveCommand);
+
+        accessCommand.Subcommands.Add(groupsCommand);
+
+        var usersCommand = new Command("users", "Explicit user permissions on the project");
+
+        var usersListCommand = new Command("list", "List explicit user permissions");
+        var usersLimitOption = new Option<int>("--limit") { Description = "Maximum grants to list", DefaultValueFactory = _ => 50 };
+        usersListCommand.Options.Add(usersLimitOption);
+        usersListCommand.SetHandler((string? workspace, string projectKey, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListProjectUserPermissionsHandler>()
+                    .HandleAsync(new ListProjectUserPermissionsRequest(workspace, projectKey, limit), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, usersLimitOption);
+        usersCommand.Subcommands.Add(usersListCommand);
+
+        var usersViewCommand = new Command("view", "View one user's explicit permission");
+        var usersViewIdArg = new Argument<string>("account-id") { Description = "Account ID or UUID" };
+        usersViewCommand.Arguments.Add(usersViewIdArg);
+        usersViewCommand.SetHandler((string? workspace, string projectKey, string accountId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewProjectUserPermissionHandler>()
+                    .HandleAsync(new ViewProjectUserPermissionRequest(workspace, projectKey, accountId), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, usersViewIdArg);
+        usersCommand.Subcommands.Add(usersViewCommand);
+
+        var usersSetCommand = new Command("set", "Grant a user a permission on the project");
+        var usersSetIdArg = new Argument<string>("account-id") { Description = "Account ID or UUID" };
+        var usersSetPermissionOption = new Option<string>("--permission")
+        { Description = "Permission to grant (read, write, create-repo, admin, none)", Required = true };
+        usersSetCommand.Arguments.Add(usersSetIdArg);
+        usersSetCommand.Options.Add(usersSetPermissionOption);
+        usersSetCommand.SetHandler((string? workspace, string projectKey, string accountId, string permission) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<SetProjectUserPermissionHandler>()
+                    .HandleAsync(new SetProjectUserPermissionRequest(workspace, projectKey, accountId, permission), CommandBinding.CancellationToken)),
+            workspaceOption, projectKeyOption, usersSetIdArg, usersSetPermissionOption);
+        usersCommand.Subcommands.Add(usersSetCommand);
+
+        var usersRemoveCommand = new Command("remove", "Remove a user's explicit permission");
+        var usersRemoveIdArg = new Argument<string>("account-id") { Description = "Account ID or UUID" };
+        var usersYesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        usersRemoveCommand.Arguments.Add(usersRemoveIdArg);
+        usersRemoveCommand.Options.Add(usersYesOption);
+        usersRemoveCommand.SetHandler(async (string? workspace, string projectKey, string accountId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Remove the explicit permission for '{accountId}' on {projectKey}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveProjectUserPermissionHandler>()
+                    .HandleAsync(new RemoveProjectUserPermissionRequest(workspace, projectKey, accountId), CommandBinding.CancellationToken));
+        }, workspaceOption, projectKeyOption, usersRemoveIdArg, usersYesOption);
+        usersCommand.Subcommands.Add(usersRemoveCommand);
+
+        accessCommand.Subcommands.Add(usersCommand);
+
+        return accessCommand;
+    }
+
 }

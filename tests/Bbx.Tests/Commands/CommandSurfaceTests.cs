@@ -270,6 +270,29 @@ public class CommandSurfaceTests
         single.GetValue<int?>("id").Should().Be(7);
     }
 
+    // A recursive option only binds when the group it belongs to registers it.
+    // Missing that is what sent every default-reviewers call to
+    // /workspaces/{ws}/projects//default-reviewers.
+    [Fact]
+    public void Project_access_binds_the_project_key()
+    {
+        var result = Parse(WorkspaceCommand.Create(Services()),
+            "project", "access", "groups", "list", "--project-key", "PROJ");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--project-key").Should().Be("PROJ");
+    }
+
+    [Fact]
+    public void Repo_access_remove_defaults_to_prompting()
+    {
+        var result = Parse(RepoCommand.Create(Services()),
+            "access", "users", "remove", "557058:abc", "-r", "myrepo");
+
+        result.Errors.Should().BeEmpty();
+        BoolValue(result, "--yes").Should().BeFalse();
+    }
+
     [Fact]
     public void The_projects_alias_still_resolves()
     {

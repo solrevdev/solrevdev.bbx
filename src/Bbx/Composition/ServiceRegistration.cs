@@ -89,6 +89,13 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.OverrideSettings.ViewOverrideSettings.ViewOverrideSettingsHandler>();
         services.AddTransient<Features.Repos.OverrideSettings.UpdateOverrideSettings.UpdateOverrideSettingsHandler>();
         services.AddTransient<Features.Repos.FileConflicts.FileConflictsHandler>();
+        services.AddTransient<Features.Repos.Access.ListRepoGroupPermissions.ListRepoGroupPermissionsHandler>();
+        services.AddTransient<Features.Repos.Access.ViewRepoGroupPermission.ViewRepoGroupPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.SetRepoGroupPermission.SetRepoGroupPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.RemoveRepoGroupPermission.RemoveRepoGroupPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.ViewRepoUserPermission.ViewRepoUserPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.SetRepoUserPermission.SetRepoUserPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.RemoveRepoUserPermission.RemoveRepoUserPermissionHandler>();
 
         services.AddTransient<Features.Source.LsSource.LsSourceHandler>();
         services.AddTransient<Features.Source.CatSource.CatSourceHandler>();
@@ -228,6 +235,14 @@ public static class ServiceRegistration
         services.AddTransient<Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey.ViewProjectDeployKeyHandler>();
         services.AddTransient<Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey.AddProjectDeployKeyHandler>();
         services.AddTransient<Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey.DeleteProjectDeployKeyHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ListProjectGroupPermissions.ListProjectGroupPermissionsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ViewProjectGroupPermission.ViewProjectGroupPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.SetProjectGroupPermission.SetProjectGroupPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.RemoveProjectGroupPermission.RemoveProjectGroupPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ListProjectUserPermissions.ListProjectUserPermissionsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ViewProjectUserPermission.ViewProjectUserPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.SetProjectUserPermission.SetProjectUserPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.RemoveProjectUserPermission.RemoveProjectUserPermissionHandler>();
 
         services.AddTransient<Features.Users.ListUserEmails.ListUserEmailsHandler>();
         services.AddTransient<Features.Users.ListUserWorkspacePermissions.ListUserWorkspacePermissionsHandler>();

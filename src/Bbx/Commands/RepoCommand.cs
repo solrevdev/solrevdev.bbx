@@ -1,4 +1,11 @@
 using System.CommandLine;
+using Bbx.Features.Repos.Access.ListRepoGroupPermissions;
+using Bbx.Features.Repos.Access.RemoveRepoGroupPermission;
+using Bbx.Features.Repos.Access.RemoveRepoUserPermission;
+using Bbx.Features.Repos.Access.SetRepoGroupPermission;
+using Bbx.Features.Repos.Access.SetRepoUserPermission;
+using Bbx.Features.Repos.Access.ViewRepoGroupPermission;
+using Bbx.Features.Repos.Access.ViewRepoUserPermission;
 using Bbx.Features.Repos.BranchingModel.EffectiveBranchingModel;
 using Bbx.Features.Repos.BranchingModel.UpdateBranchingModelSettings;
 using Bbx.Features.Repos.BranchingModel.ViewBranchingModel;
@@ -157,6 +164,7 @@ public static class RepoCommand
         command.Subcommands.Add(fileConflictsCommand);
 
         command.Subcommands.Add(CreateOverrideSettingsCommand(services, workspaceOption));
+        command.Subcommands.Add(CreateAccessCommand(services, workspaceOption));
 
         var deleteCommand = new Command("delete", "Delete a repository");
         var deleteRepoArg = new Argument<string>("repository") { Description = "Repository to delete" };
@@ -567,6 +575,118 @@ public static class RepoCommand
         osCommand.Subcommands.Add(updateCommand);
 
         return osCommand;
+    }
+
+
+    /// <summary>
+    /// The explicit permission grants on a repository. `repo permissions`
+    /// already summarises the user list; this is the whole surface, groups
+    /// included, and the only way to change a grant.
+    /// </summary>
+    private static Command CreateAccessCommand(IServiceProvider services, Option<string?> workspaceOption)
+    {
+        var accessCommand = new Command("access", "Read and set explicit repository permissions");
+        var repoOption = CommandOptions.CreateRepoOption();
+        accessCommand.AddRecursiveOption(repoOption);
+
+        var groupsCommand = new Command("groups", "Explicit group permissions on the repository");
+
+        var groupsListCommand = new Command("list", "List explicit group permissions");
+        var groupsLimitOption = new Option<int>("--limit") { Description = "Maximum grants to list", DefaultValueFactory = _ => 50 };
+        groupsListCommand.Options.Add(groupsLimitOption);
+        groupsListCommand.SetHandler((string? workspace, string? repo, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListRepoGroupPermissionsHandler>()
+                    .HandleAsync(new ListRepoGroupPermissionsRequest(workspace, repo, limit), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, groupsLimitOption);
+        groupsCommand.Subcommands.Add(groupsListCommand);
+
+        var groupsViewCommand = new Command("view", "View one group's explicit permission");
+        var groupsViewSlugArg = new Argument<string>("group-slug") { Description = "Group slug" };
+        groupsViewCommand.Arguments.Add(groupsViewSlugArg);
+        groupsViewCommand.SetHandler((string? workspace, string? repo, string slug) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewRepoGroupPermissionHandler>()
+                    .HandleAsync(new ViewRepoGroupPermissionRequest(workspace, repo, slug), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, groupsViewSlugArg);
+        groupsCommand.Subcommands.Add(groupsViewCommand);
+
+        var groupsSetCommand = new Command("set", "Grant a group a permission on the repository");
+        var groupsSetSlugArg = new Argument<string>("group-slug") { Description = "Group slug" };
+        var groupsSetPermissionOption = new Option<string>("--permission")
+        { Description = "Permission to grant (read, write, admin, none)", Required = true };
+        groupsSetCommand.Arguments.Add(groupsSetSlugArg);
+        groupsSetCommand.Options.Add(groupsSetPermissionOption);
+        groupsSetCommand.SetHandler((string? workspace, string? repo, string slug, string permission) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<SetRepoGroupPermissionHandler>()
+                    .HandleAsync(new SetRepoGroupPermissionRequest(workspace, repo, slug, permission), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, groupsSetSlugArg, groupsSetPermissionOption);
+        groupsCommand.Subcommands.Add(groupsSetCommand);
+
+        var groupsRemoveCommand = new Command("remove", "Remove a group's explicit permission");
+        var groupsRemoveSlugArg = new Argument<string>("group-slug") { Description = "Group slug" };
+        var groupsYesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        groupsRemoveCommand.Arguments.Add(groupsRemoveSlugArg);
+        groupsRemoveCommand.Options.Add(groupsYesOption);
+        groupsRemoveCommand.SetHandler(async (string? workspace, string? repo, string slug, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Remove the explicit permission for group '{slug}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveRepoGroupPermissionHandler>()
+                    .HandleAsync(new RemoveRepoGroupPermissionRequest(workspace, repo, slug), CommandBinding.CancellationToken));
+        }, workspaceOption, repoOption, groupsRemoveSlugArg, groupsYesOption);
+        groupsCommand.Subcommands.Add(groupsRemoveCommand);
+
+        accessCommand.Subcommands.Add(groupsCommand);
+
+        var usersCommand = new Command("users",
+            "Explicit user permissions on the repository (bbx repo permissions lists them)");
+
+        var usersViewCommand = new Command("view", "View one user's explicit permission");
+        var usersViewIdArg = new Argument<string>("account-id") { Description = "Account ID or UUID" };
+        usersViewCommand.Arguments.Add(usersViewIdArg);
+        usersViewCommand.SetHandler((string? workspace, string? repo, string accountId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewRepoUserPermissionHandler>()
+                    .HandleAsync(new ViewRepoUserPermissionRequest(workspace, repo, accountId), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, usersViewIdArg);
+        usersCommand.Subcommands.Add(usersViewCommand);
+
+        var usersSetCommand = new Command("set", "Grant a user a permission on the repository");
+        var usersSetIdArg = new Argument<string>("account-id") { Description = "Account ID or UUID" };
+        var usersSetPermissionOption = new Option<string>("--permission")
+        { Description = "Permission to grant (read, write, admin, none)", Required = true };
+        usersSetCommand.Arguments.Add(usersSetIdArg);
+        usersSetCommand.Options.Add(usersSetPermissionOption);
+        usersSetCommand.SetHandler((string? workspace, string? repo, string accountId, string permission) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<SetRepoUserPermissionHandler>()
+                    .HandleAsync(new SetRepoUserPermissionRequest(workspace, repo, accountId, permission), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, usersSetIdArg, usersSetPermissionOption);
+        usersCommand.Subcommands.Add(usersSetCommand);
+
+        var usersRemoveCommand = new Command("remove", "Remove a user's explicit permission");
+        var usersRemoveIdArg = new Argument<string>("account-id") { Description = "Account ID or UUID" };
+        var usersYesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        usersRemoveCommand.Arguments.Add(usersRemoveIdArg);
+        usersRemoveCommand.Options.Add(usersYesOption);
+        usersRemoveCommand.SetHandler(async (string? workspace, string? repo, string accountId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Remove the explicit permission for '{accountId}'? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<RemoveRepoUserPermissionHandler>()
+                    .HandleAsync(new RemoveRepoUserPermissionRequest(workspace, repo, accountId), CommandBinding.CancellationToken));
+        }, workspaceOption, repoOption, usersRemoveIdArg, usersYesOption);
+        usersCommand.Subcommands.Add(usersRemoveCommand);
+
+        accessCommand.Subcommands.Add(usersCommand);
+
+        return accessCommand;
     }
 
 }
