@@ -7,6 +7,49 @@ internal static class PipelineFormat
     public static string? GetString(JsonElement element, string propertyName) =>
         element.GetStringOrNull(propertyName);
 
+    /// <summary>
+    /// A pipeline or deployment variable. A secured variable never comes back
+    /// with its value, so this reports the mask rather than an empty string,
+    /// which would read as "the value is blank".
+    /// </summary>
+    public static object Variable(JsonElement variable)
+    {
+        var secured = variable.TryGetProperty("secured", out var s) && s.ValueKind is JsonValueKind.True;
+        return new
+        {
+            uuid = GetString(variable, "uuid"),
+            key = GetString(variable, "key"),
+            secured,
+            value = secured ? "***" : GetString(variable, "value"),
+        };
+    }
+
+    public static object KnownHost(JsonElement host) => new
+    {
+        uuid = GetString(host, "uuid"),
+        hostname = GetString(host, "hostname"),
+        public_key = host.TryGetObject("public_key", out var key)
+            ? new { key_type = GetString(key, "key_type"), key = GetString(key, "key"), md5_fingerprint = GetString(key, "md5_fingerprint") }
+            : null,
+    };
+
+    /// <summary>
+    /// The body both known-host writes take. Bitbucket needs the type
+    /// discriminators on the outer object and the nested key, and answers a
+    /// body without them with "An invalid field was found in the JSON payload".
+    /// </summary>
+    public static object KnownHostBody(string hostname, string keyType, string key) => new
+    {
+        type = "pipeline_known_host",
+        hostname,
+        public_key = new
+        {
+            type = "pipeline_ssh_public_key",
+            key_type = keyType,
+            key,
+        },
+    };
+
     public static string BuildQuery(string? status, string? branch)
     {
         var conditions = new List<string>();

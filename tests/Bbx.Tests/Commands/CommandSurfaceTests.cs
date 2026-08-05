@@ -293,6 +293,50 @@ public class CommandSurfaceTests
         BoolValue(result, "--yes").Should().BeFalse();
     }
 
+    // caches clear took a required cache name. --all clears the lot through a
+    // different endpoint, so the name has to have become optional.
+    [Fact]
+    public void Pipeline_caches_clear_parses_with_a_name_or_with_all()
+    {
+        var command = PipelineCommand.Create(Services());
+
+        var named = Parse(command, "caches", "clear", "node", "-r", "myrepo");
+        named.Errors.Should().BeEmpty();
+        named.GetValue<string>("name").Should().Be("node");
+        BoolValue(named, "--all").Should().BeFalse();
+
+        var all = Parse(command, "caches", "clear", "--all", "-r", "myrepo");
+        all.Errors.Should().BeEmpty();
+        all.GetValue<string>("name").Should().BeNull();
+        BoolValue(all, "--all").Should().BeTrue();
+    }
+
+    // Deployment variables are scoped to an environment, and the option is
+    // recursive on the group rather than repeated on each verb.
+    [Fact]
+    public void Deployment_variables_bind_the_environment()
+    {
+        var result = Parse(PipelineCommand.Create(Services()),
+            "deployments", "variables", "list", "-r", "myrepo", "-e", "{env}");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--environment").Should().Be("{env}");
+    }
+
+    // annotation-update carries eleven bound symbols, past SetHandler's nine,
+    // so it reads the parse result itself.
+    [Fact]
+    public void Report_annotation_update_binds_its_options()
+    {
+        var result = Parse(PipelineCommand.Create(Services()),
+            "reports", "annotation-update", "abc123", "r1", "a1",
+            "--summary", "Unused import", "--path", "src/a.cs", "--line", "3");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--summary").Should().Be("Unused import");
+        result.GetValue<int?>("--line").Should().Be(3);
+    }
+
     [Fact]
     public void The_projects_alias_still_resolves()
     {
