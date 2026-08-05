@@ -254,6 +254,22 @@ public class CommandSurfaceTests
         given.GetValue<string[]>("--users").Should().Equal("{a}", "{b}");
     }
 
+    // pr activity took a required id. It now covers the repository-wide feed as
+    // well, which only works if the argument really is optional at parse time.
+    [Fact]
+    public void Pr_activity_parses_with_and_without_an_id()
+    {
+        var command = PrCommand.Create(Services());
+
+        var repoWide = Parse(command, "activity", "-r", "myrepo");
+        repoWide.Errors.Should().BeEmpty();
+        repoWide.GetValue<int?>("id").Should().BeNull();
+
+        var single = Parse(command, "activity", "7", "-r", "myrepo");
+        single.Errors.Should().BeEmpty();
+        single.GetValue<int?>("id").Should().Be(7);
+    }
+
     [Fact]
     public void The_projects_alias_still_resolves()
     {
