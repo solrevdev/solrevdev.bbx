@@ -92,6 +92,39 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
     request first and refuses rather than report a change that did not land.
     Only open pull requests can be updated at all.
 
+14. **A write that answers 204 has no body**, so the client deserializes it to
+    the default `JsonElement`. Serializing that throws "Operation is not valid
+    due to the current state of the object", which turns a call that worked
+    into an unexplained error. `CommandRunner` prints null instead;
+    `override-settings update` reads the settings back, because the caller
+    wanted to see them anyway.
+15. **Bitbucket resolves several payloads by a `type` discriminator.** A report
+    needs `"type": "report"`, an annotation `"report_annotation"`, a known host
+    `"pipeline_known_host"` with `"pipeline_ssh_public_key"` nested inside. A
+    body without one is answered with a 400 carrying no message at all.
+16. **A report needs `details`.** The spec marks nothing required and the field
+    reads as optional; Bitbucket answers "Cannot build Report, some of required
+    attributes are not set [details]". `--details` is therefore required.
+17. **`DELETE pipelines-config/caches` is not "clear everything".** It takes
+    `?name=` and clears every cache with that name whatever its UUID, and
+    answers a bare 400 without it.
+18. **`/user/workspaces` returns `workspace_access` records, not workspaces.**
+    The slug and uuid sit under a nested `workspace`; the top level carries only
+    whether the caller is an administrator. This is also the working
+    replacement for the withdrawn `/2.0/workspaces`.
+19. **`PUT deploy-keys/{id}` cannot succeed.** Without `key` Bitbucket says the
+    key is invalid; with it, that you may not change a key's contents. The
+    command exists because the endpoint is documented; there is no body that
+    works. Delete and re-add.
+20. **Some endpoints refuse an API token**, answering 403 "This resource does
+    not support authentication using the provided token". Pull request and file
+    conflicts and the OIDC discovery endpoints are the ones found so far. It is
+    not a scope problem and no scope fixes it.
+21. **Errors carry `detail` and `data.arguments` as well as the message.**
+    Bitbucket often answers a bare "Bad request" and puts the reason in an
+    argument, which is how "SSH for this hostname is already configured by
+    Bitbucket" stayed invisible until `EnsureSuccessAsync` printed it.
+
 ## Auth
 
 API tokens only. OAuth was removed: Bitbucket requires every user to create their

@@ -41,6 +41,39 @@ helpers it knows, and `CopyToAsync` and `GetRawAsync` are not among them, so it 
 Five further rows sit outside the Bitbucket surface a CLI drives at all: `addon` and
 `hook_events`. They are listed for completeness.
 
+## What the live run changed
+
+The 109 `cover` rows were built, then exercised against a throwaway repository
+in the personal `solrevdev` workspace, which was deleted afterwards. Seven
+things the documentation gets wrong turned up, and each is now handled:
+
+- A report needs `details`, though the spec marks nothing required.
+- Reports, annotations and known hosts need a `type` discriminator. Without one
+  the 400 carries no message at all.
+- `DELETE pipelines-config/caches` takes `?name=` and clears every cache with
+  that name. It is not "clear everything", and answers a bare 400 without it.
+- `PUT override-settings` answers 204 with no body.
+- `/user/workspaces` returns `workspace_access` records, so the slug sits one
+  level down.
+- `PUT deploy-keys/{id}` cannot succeed under any body. Delete and re-add.
+- `bitbucket.org` is rejected as a pipelines known host, because Bitbucket
+  already configures SSH for it.
+
+Three things could not be made to work and are recorded rather than hidden:
+
+- `pr conflicts`, `repo file-conflicts` and both OIDC discovery commands answer
+  403 "This resource does not support authentication using the provided token".
+  No scope changes that.
+- `POST environments/{uuid}/changes` rejected every body shape tried, including
+  an empty object. The spec documents no request body at all. `bbx pipeline
+  deployments changes` ships unverified.
+- The deployment variables list endpoint answers an empty page even when
+  variables exist. Add, update and delete all work.
+
+`pipeline config` and `pipeline ssh key-pair` answer 404 until Pipelines has
+been enabled on the repository once; both were confirmed working against a
+repository that had.
+
 ## Eight commands ship without a live run
 
 The `PUT` and `DELETE` verbs under `permissions-config` need a second Bitbucket account or a

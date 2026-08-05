@@ -198,11 +198,22 @@ bbx repo permissions myrepo -w myws
 bbx repo watchers -w myws -r myrepo
 bbx repo forks list -w myws -r myrepo
 
+bbx repo update myrepo -w myws --description "..." --main-branch trunk
+bbx repo file-conflicts 'feat/x..main' -w myws -r myrepo
+bbx repo override-settings view|update -w myws -r myrepo
+
 bbx repo hooks list|view|create|update|delete -w myws -r myrepo
-bbx repo deploy-keys list|view|add|delete -w myws -r myrepo
-bbx repo default-reviewers list|add|remove|effective -w myws -r myrepo
-bbx repo branching-model view|settings|update -w myws -r myrepo
+bbx repo deploy-keys list|view|add|update|delete -w myws -r myrepo
+bbx repo default-reviewers list|view|add|remove|effective -w myws -r myrepo
+bbx repo branching-model view|settings|update|effective -w myws -r myrepo
+bbx repo access groups list|view|set|remove -w myws -r myrepo
+bbx repo access users view|set|remove -w myws -r myrepo
 ```
+
+`repo update` changes only the fields you name, like `pr update`. Bitbucket
+rejects a `--language` it does not recognise, and `repo deploy-keys update`
+can only ever fail: Bitbucket refuses to change a key's contents and refuses a
+body without them. Delete and re-add instead.
 </details>
 
 <details>
@@ -223,11 +234,18 @@ bbx pr commits 42 -w myws -r myrepo
 bbx pr activity 42 -w myws -r myrepo
 bbx pr statuses 42 -w myws -r myrepo
 
+bbx pr diffstat 42 -w myws -r myrepo      # per-file line counts
+bbx pr conflicts 42 -w myws -r myrepo
+bbx pr merge-status 42 --task-id <id> -w myws -r myrepo
+bbx pr activity -w myws -r myrepo         # no ID: the whole repository
+
 bbx pr comment 42 --body "LGTM" -w myws -r myrepo
 bbx pr comments 42 -w myws -r myrepo
+bbx pr comment-view|comment-update|comment-delete 42 --comment-id <id> -w myws -r myrepo
+bbx pr comment-resolve|comment-unresolve 42 --comment-id <id> -w myws -r myrepo
 bbx pr approve|unapprove 42 -w myws -r myrepo
 bbx pr request-changes|unrequest-changes 42 -w myws -r myrepo
-bbx pr tasks list|add|update|complete|delete 42 -w myws -r myrepo
+bbx pr tasks list|view|add|update|complete|delete 42 -w myws -r myrepo
 ```
 
 Merge strategies: `merge_commit` (default), `squash`, `fast_forward`.
@@ -248,8 +266,11 @@ bbx branch view main -w myws -r myrepo
 bbx branch create feat/x --target main -w myws -r myrepo
 bbx branch delete feat/x --yes -w myws -r myrepo
 
-bbx branch restrictions list -w myws -r myrepo
+bbx branch refs -w myws -r myrepo         # branches and tags together
+
+bbx branch restrictions list|view -w myws -r myrepo
 bbx branch restrictions add --kind push --pattern main -w myws -r myrepo
+bbx branch restrictions update 12345 --pattern 'release/*' -w myws -r myrepo
 bbx branch restrictions delete 12345 --yes -w myws -r myrepo
 
 bbx branch tag list|view|create|delete -w myws -r myrepo
@@ -268,15 +289,25 @@ bbx commit approve|unapprove <hash> -w myws -r myrepo
 bbx commit filehistory main path/to/file -w myws -r myrepo
 bbx commit merge-base 'feat/x..main' -w myws -r myrepo
 
+bbx commit list --include feat/x --exclude main -w myws -r myrepo
+
+bbx commit comment <hash> --body "..." --path src/a.cs --line 3 -w myws -r myrepo
+bbx commit comment-view|comment-update|comment-delete <hash> --comment-id <id> -w myws -r myrepo
+
 bbx commit status create <hash> --key ci --state SUCCESSFUL --url https://ci/1 -w myws -r myrepo
 bbx commit status update <hash> --key ci --state FAILED --url https://ci/1 -w myws -r myrepo
+bbx commit status view <hash> --key ci -w myws -r myrepo
 ```
+
+`--include` and `--exclude` walk a commit range. Bitbucket takes them in a POST
+body only, so passing either switches the verb.
 </details>
 
 <details>
 <summary><strong>src</strong>: browse and write files</summary>
 
 ```bash
+bbx src ls -w myws -r myrepo             # root of the main branch
 bbx src ls --ref main -w myws -r myrepo
 bbx src ls src/ --ref main -w myws -r myrepo
 bbx src cat --ref main README.md -w myws -r myrepo
@@ -297,17 +328,37 @@ bbx pipeline logs '{pipeline-uuid}' '{step-uuid}' -w myws -r myrepo
 bbx pipeline trigger --branch main -w myws -r myrepo
 bbx pipeline stop '{uuid}' --yes -w myws -r myrepo
 
-bbx pipeline variables list|add|delete -w myws -r myrepo
-bbx pipeline schedules list|create|delete -w myws -r myrepo
-bbx pipeline caches list|clear -w myws -r myrepo
-bbx pipeline deployments list|view -w myws -r myrepo
-bbx pipeline reports list|view|annotations <hash> -w myws -r myrepo
+bbx pipeline step '{pipeline-uuid}' '{step-uuid}' -w myws -r myrepo
+bbx pipeline logs '{pipeline}' '{step}' --log-uuid '{log}' -w myws -r myrepo
+
+bbx pipeline config view|update|build-number -w myws -r myrepo
+bbx pipeline variables list|view|add|update|delete -w myws -r myrepo
+bbx pipeline schedules list|view|create|update|delete|executions -w myws -r myrepo
+bbx pipeline caches list|clear|content-uri -w myws -r myrepo
+bbx pipeline caches clear --name node --yes -w myws -r myrepo
+bbx pipeline ssh key-pair view|set|delete -w myws -r myrepo
+bbx pipeline ssh known-hosts list|view|add|update|delete -w myws -r myrepo
+
+bbx pipeline deployments list|view|create|delete|changes -w myws -r myrepo
+bbx pipeline deployments variables list|add|update|delete -e '{env}' -w myws -r myrepo
+bbx pipeline deploys list|view -w myws -r myrepo
+
+bbx pipeline reports list|view|update|delete <hash> -w myws -r myrepo
+bbx pipeline reports annotations|annotations-create <hash> <report-id> -w myws -r myrepo
+bbx pipeline reports annotation-view|annotation-update|annotation-delete <hash> <report-id> <ann-id> -w myws -r myrepo
 bbx pipeline test-reports '{pipeline}' '{step}' -w myws -r myrepo
 bbx pipeline test-cases '{pipeline}' '{step}' -w myws -r myrepo
+bbx pipeline test-case-reasons '{pipeline}' '{step}' '{test-case}' -w myws -r myrepo
 bbx pipeline oidc config|keys -w myws -r myrepo
 ```
 
 UUIDs include the braces. Quote them so your shell doesn't expand them.
+
+`deployments` manages the environments; `deploys` reads the records of what was
+released to them. `caches clear` takes a cache UUID, or `--name` to clear every
+cache with that name. `reports update` needs `--details`: Bitbucket refuses a
+report without it whatever the docs say. `pipeline config` answers 404 until
+Pipelines has been enabled on the repository at least once.
 </details>
 
 <details>
@@ -327,16 +378,26 @@ bbx download delete build.zip --yes -w myws -r myrepo
 ```bash
 bbx workspace view myws
 bbx workspace members -w myws
+bbx workspace member '{account-uuid}' -w myws
 bbx workspace permissions -w myws
+bbx workspace repo-permissions -w myws [--repo myrepo]
+bbx workspace gpg-key -w myws
+bbx workspace pullrequests '{account-uuid}' -w myws --state OPEN
 bbx workspace hooks list|view|create|update|delete -w myws
+
+bbx workspace pipelines variables list|view|add|update|delete -w myws
+bbx workspace pipelines oidc config|keys -w myws
 
 bbx workspace project list -w myws
 bbx workspace project view KEY -w myws
 bbx workspace project create --key KEY --name "Name" -w myws
+bbx workspace project update KEY --description "..." -w myws
 bbx workspace project delete KEY --yes -w myws
-bbx workspace project default-reviewers list|add|remove --project-key KEY -w myws
+bbx workspace project default-reviewers list|view|add|remove --project-key KEY -w myws
 bbx workspace project deploy-keys list|view|add|delete --project-key KEY -w myws
-bbx workspace project branching-model view|update --project-key KEY -w myws
+bbx workspace project branching-model view|settings|update --project-key KEY -w myws
+bbx workspace project access groups list|view|set|remove --project-key KEY -w myws
+bbx workspace project access users list|view|set|remove --project-key KEY -w myws
 ```
 </details>
 
@@ -345,10 +406,17 @@ bbx workspace project branching-model view|update --project-key KEY -w myws
 
 ```bash
 bbx snippet list|view|create|update|delete -w myws
+bbx snippet view|update|delete <id> --revision <rev> -w myws
 bbx snippet files|watch|comments <id> -w myws
+bbx snippet commits <id> -w myws
+bbx snippet diff|patch <id> <revision> -w myws
+bbx snippet comments <id> --update <comment-id> --content "..." -w myws
 
 bbx user view                       # the authenticated account
-bbx user emails
+bbx user emails [--email me@x.com]
+bbx user workspaces                 # replaces the withdrawn workspace list
+bbx user permissions workspace|workspace-repositories -w myws
+bbx user gpg-keys list|view
 bbx user ssh-keys list|view|add|delete
 
 bbx issue list|view|create|update|delete -w myws -r myrepo
@@ -368,6 +436,15 @@ bbx issue comment|comments <id> -w myws -r myrepo
 > **HTTP 410 Gone**. Atlassian removed the cross-workspace discovery endpoints
 > under CHANGE-2770. Nothing in `bbx` can bring them back. Name the workspace,
 > or set one with `bbx auth set-workspace`.
+>
+> `bbx user workspaces` is the account-scoped replacement for `workspace list`
+> and still works.
+
+A few endpoints refuse an API token outright, answering **HTTP 403 "This
+resource does not support authentication using the provided token"**. `bbx pr
+conflicts`, `bbx repo file-conflicts` and the OIDC discovery commands are the
+ones we found. Nothing in `bbx` can work around it; it needs a different
+credential type.
 
 ## Recipes
 
