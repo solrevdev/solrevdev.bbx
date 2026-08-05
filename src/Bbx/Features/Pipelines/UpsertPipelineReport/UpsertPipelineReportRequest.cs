@@ -6,7 +6,7 @@ public sealed record UpsertPipelineReportRequest(
     string Hash,
     string ReportId,
     string Title,
-    string? Details,
+    string Details,
     string? ReportType,
     string? Result,
     string? Link);

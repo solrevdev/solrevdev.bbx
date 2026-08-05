@@ -141,7 +141,8 @@ public static class PipelineCommand
         var upHashArg = new Argument<string>("hash") { Description = "Commit hash" };
         var upReportIdArg = new Argument<string>("report-id") { Description = "Report ID you choose" };
         var upTitleOption = new Option<string>("--title") { Description = "Report title", Required = true };
-        var upDetailsOption = new Option<string?>("--details") { Description = "Longer description" };
+        var upDetailsOption = new Option<string>("--details")
+        { Description = "Longer description. Required: Bitbucket refuses a report without it.", Required = true };
         var upTypeOption = new Option<string?>("--type") { Description = "Report type (SECURITY, COVERAGE, TEST, BUG). Defaults to TEST." };
         var upResultOption = new Option<string?>("--result") { Description = "Result (PASSED, FAILED, PENDING)" };
         var upLinkOption = new Option<string?>("--link") { Description = "URL to the full report" };
@@ -152,7 +153,7 @@ public static class PipelineCommand
         updateCommand.Options.Add(upTypeOption);
         updateCommand.Options.Add(upResultOption);
         updateCommand.Options.Add(upLinkOption);
-        updateCommand.SetHandler((string? workspace, string? repo, string hash, string reportId, string title, string? details, string? type, string? result, string? link) =>
+        updateCommand.SetHandler((string? workspace, string? repo, string hash, string reportId, string title, string details, string? type, string? result, string? link) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<UpsertPipelineReportHandler>()
                     .HandleAsync(new UpsertPipelineReportRequest(workspace, repo, hash, reportId, title, details, type, result, link), CommandBinding.CancellationToken)),
@@ -653,43 +654,46 @@ return command;
 
     private static Command CreateCachesClearCommand(IServiceProvider services)
     {
-        var command = new Command("clear", "Clear one pipeline cache, or all of them with --all");
+        var command = new Command("clear", "Clear one pipeline cache by UUID, or every cache with a given --name");
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
-        var nameArg = new Argument<string?>("name")
+        var nameArg = new Argument<string?>("cache-uuid")
         {
-            Description = "Cache name to clear. Omit and pass --all to clear every cache.",
+            Description = "Cache UUID to clear. Omit and pass --name to clear by name instead.",
             Arity = ArgumentArity.ZeroOrOne,
             DefaultValueFactory = _ => null,
         };
-        var allOption = new Option<bool>("--all") { Description = "Clear every cache in the repository" };
+        var nameOption = new Option<string?>("--name")
+        { Description = "Clear every cache with this name, whatever its UUID" };
         var yesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
 
         command.Options.Add(workspaceOption);
         command.Options.Add(repoOption);
         command.Arguments.Add(nameArg);
-        command.Options.Add(allOption);
+        command.Options.Add(nameOption);
         command.Options.Add(yesOption);
 
-        command.SetHandler(async (string? workspace, string? repo, string? name, bool all, bool yes) =>
+        command.SetHandler(async (string? workspace, string? repo, string? uuid, string? name, bool yes) =>
         {
-            // Clearing everything is its own endpoint, not a loop over the
-            // named one, so the two cannot be combined.
-            if (all && !string.IsNullOrEmpty(name))
-                throw new BbxUserException("Error: pass a cache name or --all, not both.");
-            if (!all && string.IsNullOrEmpty(name))
-                throw new BbxUserException("Error: name a cache to clear, or pass --all.");
+            // Two endpoints: one clears a single cache by UUID, the other
+            // clears every cache with a given name whatever its UUID.
+            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(uuid))
+                throw new BbxUserException("Error: pass a cache UUID or --name, not both.");
+            if (string.IsNullOrEmpty(name) && string.IsNullOrEmpty(uuid))
+                throw new BbxUserException("Error: name a cache UUID to clear, or pass --name.");
 
-            var prompt = all ? "Clear every pipeline cache? [y/N]: " : $"Clear cache '{name}'? [y/N]: ";
+            var prompt = string.IsNullOrEmpty(name)
+                ? $"Clear cache {uuid}? [y/N]: "
+                : $"Clear every cache named '{name}'? [y/N]: ";
             if (!yes && !CommandRunner.ConfirmOrCancelStderr(prompt))
                 return;
 
-            await CommandRunner.RunJsonAsync(() => all
-                ? services.GetRequiredService<ClearAllPipelineCachesHandler>()
-                    .HandleAsync(new ClearAllPipelineCachesRequest(workspace, repo), CommandBinding.CancellationToken)
-                : services.GetRequiredService<ClearPipelineCacheHandler>()
-                    .HandleAsync(new ClearPipelineCacheRequest(workspace, repo, name!), CommandBinding.CancellationToken));
-        }, workspaceOption, repoOption, nameArg, allOption, yesOption);
+            await CommandRunner.RunJsonAsync(() => string.IsNullOrEmpty(name)
+                ? services.GetRequiredService<ClearPipelineCacheHandler>()
+                    .HandleAsync(new ClearPipelineCacheRequest(workspace, repo, uuid!), CommandBinding.CancellationToken)
+                : services.GetRequiredService<ClearAllPipelineCachesHandler>()
+                    .HandleAsync(new ClearAllPipelineCachesRequest(workspace, repo, name), CommandBinding.CancellationToken));
+        }, workspaceOption, repoOption, nameArg, nameOption, yesOption);
         return command;
     }
 

@@ -26,6 +26,12 @@ public sealed class UpdateOverrideSettingsHandler(BitbucketClient client, Creden
 
         if (body.Count == 0) throw new BbxUserException(NothingToUpdate);
 
-        return await client.PutAsync<JsonElement>($"repositories/{ws}/{repo}/override-settings", body, ct);
+        // This PUT answers 204 with no body, so there is nothing to report back
+        // from it. Read the settings again and return those, which is what the
+        // caller wanted to see anyway.
+        // Verified against the live API on 2026-08-05.
+        var endpoint = $"repositories/{ws}/{repo}/override-settings";
+        await client.PutAsync<JsonElement>(endpoint, body, ct);
+        return await client.GetAsync<JsonElement>(endpoint, ct);
     }
 }

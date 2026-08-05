@@ -237,7 +237,7 @@ public class DeploymentAndReportHandlerTests
 
         await new UpsertPipelineReportHandler(Client(http), Creds()).HandleAsync(
             new UpsertPipelineReportRequest("ws", "repo", Hash, "coverage-1", "Coverage",
-                null, "coverage", "passed", null),
+                "Line coverage for the build", "coverage", "passed", null),
             TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
@@ -248,6 +248,39 @@ public class DeploymentAndReportHandlerTests
         body.GetProperty("result").GetString().Should().Be("PASSED");
     }
 
+    // The spec marks nothing required, but Bitbucket refuses a report without
+    // details: "Cannot build Report, some of required attributes are not set
+    // [details]". Verified live on 2026-08-05, which is why --details is a
+    // required option rather than an optional one.
+    [Fact]
+    public async Task Report_update_always_sends_details_and_the_type_discriminator()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.OK, """{"uuid":"r1"}""");
+
+        await new UpsertPipelineReportHandler(Client(http), Creds()).HandleAsync(
+            new UpsertPipelineReportRequest("ws", "repo", Hash, "r1", "T", "why it exists", null, null, null),
+            TestContext.Current.CancellationToken);
+
+        var body = Body(http);
+        body.GetProperty("type").GetString().Should().Be("report");
+        body.GetProperty("details").GetString().Should().Be("why it exists");
+    }
+
+    [Fact]
+    public async Task Annotation_update_sends_the_type_discriminator()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.OK, """{"uuid":"a1"}""");
+
+        await new UpsertReportAnnotationHandler(Client(http), Creds()).HandleAsync(
+            new UpsertReportAnnotationRequest("ws", "repo", Hash, "r1", "a1", "s",
+                null, null, null, null, null),
+            TestContext.Current.CancellationToken);
+
+        Body(http).GetProperty("type").GetString().Should().Be("report_annotation");
+    }
+
     [Fact]
     public async Task Report_update_defaults_the_type_to_test()
     {
@@ -255,7 +288,7 @@ public class DeploymentAndReportHandlerTests
         http.Enqueue(HttpStatusCode.OK, """{"uuid":"r1"}""");
 
         await new UpsertPipelineReportHandler(Client(http), Creds()).HandleAsync(
-            new UpsertPipelineReportRequest("ws", "repo", Hash, "r1", "T", null, null, null, null),
+            new UpsertPipelineReportRequest("ws", "repo", Hash, "r1", "T", "d", null, null, null),
             TestContext.Current.CancellationToken);
 
         Body(http).GetProperty("report_type").GetString().Should().Be("TEST");
@@ -269,7 +302,7 @@ public class DeploymentAndReportHandlerTests
         var http = new FakeHttpMessageHandler();
 
         var act = async () => await new UpsertPipelineReportHandler(Client(http), Creds()).HandleAsync(
-            new UpsertPipelineReportRequest("ws", "repo", Hash, "r1", "T", null, type, result, null),
+            new UpsertPipelineReportRequest("ws", "repo", Hash, "r1", "T", "d", type, result, null),
             TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>();

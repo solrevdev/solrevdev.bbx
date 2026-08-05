@@ -231,6 +231,22 @@ public class BitbucketClient : IDisposable
                         + " https://id.atlassian.com/manage-profile/security/api-tokens";
                 }
 
+                // The message is often a bare "Bad request" with the actual
+                // reason in detail, or in data.arguments for a validation
+                // failure. Without them a caller sees "HTTP 400 Bad request"
+                // and has no idea which field Bitbucket objected to.
+                var detail = error.Error.DetailText();
+                if (!string.IsNullOrWhiteSpace(detail) && detail != error.Error.Message)
+                {
+                    errorMessage += $" {detail}";
+                }
+
+                var reasons = error.Error.Data?.ArgumentValues().ToList() ?? [];
+                if (reasons.Count > 0)
+                {
+                    errorMessage += $" {string.Join(" ", reasons)}";
+                }
+
                 // Deprecation errors carry the changelog entry that explains them.
                 var announcement = error.Error.Data?.AnnouncementUrl;
                 if (!string.IsNullOrWhiteSpace(announcement))
@@ -297,6 +313,13 @@ public class BitbucketErrorDetail
     public BitbucketErrorData? Data { get; set; }
 
     /// <summary>
+    /// The free-form detail, when it is a string. For a scope failure it is an
+    /// object instead, and <see cref="MissingScopes"/> reads that.
+    /// </summary>
+    public string? DetailText() =>
+        Detail is { ValueKind: JsonValueKind.String } detail ? detail.GetString() : null;
+
+    /// <summary>
     /// The scopes a 403 says the credentials are missing, if it named any.
     /// </summary>
     public IEnumerable<string> MissingScopes()
@@ -323,4 +346,24 @@ public class BitbucketErrorDetail
 public class BitbucketErrorData
 {
     public string? AnnouncementUrl { get; set; }
+
+    /// <summary>
+    /// Free-form, keyed by reason. A validation failure puts the sentence that
+    /// explains it in here rather than in the message, so
+    /// "hostname-not-allowed" carries "SSH for this hostname is already
+    /// configured by Bitbucket" while the message says only "Bad request".
+    /// </summary>
+    public JsonElement? Arguments { get; set; }
+
+    public IEnumerable<string> ArgumentValues()
+    {
+        if (Arguments is not { ValueKind: JsonValueKind.Object } arguments) return [];
+
+        return arguments.EnumerateObject()
+            .Where(p => p.Value.ValueKind == JsonValueKind.String)
+            .Select(p => p.Value.GetString())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!)
+            .ToList();
+    }
 }

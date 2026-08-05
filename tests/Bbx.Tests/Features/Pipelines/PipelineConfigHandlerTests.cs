@@ -282,19 +282,22 @@ public class PipelineConfigHandlerTests
         Body(http).GetProperty("public_key").GetProperty("key").GetString().Should().Be("BBBB");
     }
 
-    // Clearing every cache is its own endpoint, with no cache name in the path.
+    // DELETE on the caches collection is not "clear everything": it takes a
+    // name in the query string and clears every cache with that name. Without
+    // the parameter Bitbucket answers a bare 400. Verified live on 2026-08-05.
     [Fact]
-    public async Task Clear_all_caches_deletes_the_collection()
+    public async Task Clearing_by_name_deletes_the_collection_with_a_name_query()
     {
         var http = new FakeHttpMessageHandler();
         http.Enqueue(HttpStatusCode.NoContent, "");
 
         await new ClearAllPipelineCachesHandler(Client(http), Creds()).HandleAsync(
-            new ClearAllPipelineCachesRequest("ws", "repo"), TestContext.Current.CancellationToken);
+            new ClearAllPipelineCachesRequest("ws", "repo", "node"), TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
         call.Method.Should().Be(HttpMethod.Delete);
         call.RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/repo/pipelines-config/caches");
+        call.RequestUri!.Query.Should().Be("?name=node");
     }
 
     [Fact]

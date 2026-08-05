@@ -8,7 +8,17 @@ internal static class CommandRunner
 {
     public static Task RunJsonAsync<T>(Func<Task<T>> handler) => RunAsync(
         requireAuth: true,
-        async () => Console.WriteLine(JsonSerializer.Serialize(await handler(), JsonOptions.Current)));
+        async () => Console.WriteLine(JsonSerializer.Serialize(NoBodyAsNull(await handler()), JsonOptions.Current)));
+
+    /// <summary>
+    /// A write that answers 204 has no body, so the client deserializes it to
+    /// the default <see cref="JsonElement"/>. That element has ValueKind
+    /// Undefined, and serializing it throws "Operation is not valid due to the
+    /// current state of the object" rather than writing anything, which turns a
+    /// successful call into an unexplained error. Print null instead.
+    /// </summary>
+    private static object? NoBodyAsNull<T>(T value) =>
+        value is JsonElement { ValueKind: JsonValueKind.Undefined } ? null : value;
 
     public static Task RunRawAsync(Func<Task<string>> handler) => RunAsync(
         requireAuth: true,

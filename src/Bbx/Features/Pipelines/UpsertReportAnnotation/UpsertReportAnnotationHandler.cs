@@ -26,7 +26,11 @@ public sealed class UpsertReportAnnotationHandler(BitbucketClient client, Creden
         var report = $"repositories/{ws}/{repo}/commit/{request.Hash}"
             + $"/reports/{Uri.EscapeDataString(request.ReportId)}";
 
-        var body = new Dictionary<string, object> { ["summary"] = request.Summary };
+        var body = new Dictionary<string, object>
+        {
+            ["type"] = "report_annotation",
+            ["summary"] = request.Summary,
+        };
         if (request.Details is not null) body["details"] = request.Details;
         if (request.AnnotationType is not null) body["annotation_type"] = request.AnnotationType.ToUpperInvariant();
         if (request.Severity is not null) body["severity"] = request.Severity.ToUpperInvariant();

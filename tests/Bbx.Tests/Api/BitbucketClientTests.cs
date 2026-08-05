@@ -161,7 +161,50 @@ public class BitbucketClientTests
         var client = new BitbucketClient(http, new NullAuthProvider());
 
         var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo", TestContext.Current.CancellationToken);
-        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("Not found (HTTP 404 Not Found)");
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("Not found (HTTP 404 Not Found) no such repository");
+    }
+
+    // Bitbucket often answers with a bare "Bad request" and puts the reason in
+    // data.arguments. Without it the caller sees "HTTP 400 Bad request" and has
+    // no idea which field was rejected: adding a known host for bitbucket.org
+    // failed that way until the argument was surfaced.
+    [Fact]
+    public async Task Validation_arguments_are_appended_to_the_message()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.BadRequest, """
+            {"type":"error","error":{"message":"Bad request","detail":"The request body contains invalid properties",
+            "data":{"key":"variable-service.request.validation-error",
+            "arguments":{"hostname-not-allowed":"SSH for this hostname is already configured by Bitbucket"}}}}
+            """);
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo", TestContext.Current.CancellationToken);
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("*The request body contains invalid properties*"
+                + "SSH for this hostname is already configured by Bitbucket*");
+    }
+
+    // A scope failure puts an object in detail, so appending it as text has to
+    // leave that path alone.
+    [Fact]
+    public async Task An_object_valued_detail_is_not_appended_as_text()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.Forbidden, """
+            {"type":"error","error":{"message":"Access denied",
+            "detail":{"required":["repository:write"],"granted":["repository"]}}}
+            """);
+
+        using var http = TestHttpClientFactory.Create(handler);
+        var client = new BitbucketClient(http, new NullAuthProvider());
+
+        var act = async () => await client.GetAsync<JsonElement>("repositories/ws/repo", TestContext.Current.CancellationToken);
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .WithMessage("*Missing token scopes: repository:write*");
     }
 
     [Fact]

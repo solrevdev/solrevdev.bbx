@@ -11,7 +11,12 @@ public sealed class ClearAllPipelineCachesHandler(BitbucketClient client, Creden
     {
         var (ws, repo) = Resolve.WorkspaceAndRepoFlexible(credentials, request.Workspace, request.Repository,
             "Workspace and repository are required.");
-        await client.DeleteAsync($"repositories/{ws}/{repo}/pipelines-config/caches", ct);
-        return new { message = "All pipeline caches cleared", workspace = ws, repository = repo };
+        // DELETE on the collection is not "clear everything": it takes a name
+        // in the query string and clears every cache with that name, whatever
+        // its UUID. Without the parameter it answers a bare 400.
+        // Verified live on 2026-08-05.
+        await client.DeleteAsync(
+            $"repositories/{ws}/{repo}/pipelines-config/caches?name={Uri.EscapeDataString(request.Name)}", ct);
+        return new { message = $"Cleared every pipeline cache named '{request.Name}'", workspace = ws, repository = repo };
     }
 }

@@ -293,22 +293,22 @@ public class CommandSurfaceTests
         BoolValue(result, "--yes").Should().BeFalse();
     }
 
-    // caches clear took a required cache name. --all clears the lot through a
-    // different endpoint, so the name has to have become optional.
+    // caches clear took a required argument. Clearing by name goes to a
+    // different endpoint, so the UUID had to become optional.
     [Fact]
-    public void Pipeline_caches_clear_parses_with_a_name_or_with_all()
+    public void Pipeline_caches_clear_parses_with_a_uuid_or_with_a_name()
     {
         var command = PipelineCommand.Create(Services());
 
-        var named = Parse(command, "caches", "clear", "node", "-r", "myrepo");
-        named.Errors.Should().BeEmpty();
-        named.GetValue<string>("name").Should().Be("node");
-        BoolValue(named, "--all").Should().BeFalse();
+        var byUuid = Parse(command, "caches", "clear", "{c1}", "-r", "myrepo");
+        byUuid.Errors.Should().BeEmpty();
+        byUuid.GetValue<string>("cache-uuid").Should().Be("{c1}");
+        byUuid.GetValue<string>("--name").Should().BeNull();
 
-        var all = Parse(command, "caches", "clear", "--all", "-r", "myrepo");
-        all.Errors.Should().BeEmpty();
-        all.GetValue<string>("name").Should().BeNull();
-        BoolValue(all, "--all").Should().BeTrue();
+        var byName = Parse(command, "caches", "clear", "--name", "node", "-r", "myrepo");
+        byName.Errors.Should().BeEmpty();
+        byName.GetValue<string>("cache-uuid").Should().BeNull();
+        byName.GetValue<string>("--name").Should().Be("node");
     }
 
     // Deployment variables are scoped to an environment, and the option is

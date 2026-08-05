@@ -52,18 +52,39 @@ public class RepoSettingsHandlerTests
     public async Task Override_settings_update_sends_only_the_flags_it_was_given()
     {
         var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.NoContent, "");
         http.Enqueue(HttpStatusCode.OK, """{"branching_model":false}""");
 
         await new UpdateOverrideSettingsHandler(Client(http), Creds()).HandleAsync(
             new UpdateOverrideSettingsRequest("ws", "repo", null, false, null),
             TestContext.Current.CancellationToken);
 
-        var call = http.Calls.Single();
-        call.Method.Should().Be(HttpMethod.Put);
+        http.Calls[0].Method.Should().Be(HttpMethod.Put);
         var body = Body(http);
         body.GetProperty("branching_model").GetBoolean().Should().BeFalse();
         body.TryGetProperty("default_reviewers", out _).Should().BeFalse();
         body.TryGetProperty("branch_restrictions", out _).Should().BeFalse();
+    }
+
+    // The PUT answers 204 with no body, so there is nothing to report from it.
+    // Reading the settings back gives the caller the state they just set
+    // instead of an empty JsonElement, which the serializer throws on.
+    // Verified against the live API on 2026-08-05.
+    [Fact]
+    public async Task Override_settings_update_reads_the_settings_back()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.NoContent, "");
+        http.Enqueue(HttpStatusCode.OK, """{"default_merge_strategy":true,"branching_model":true}""");
+
+        var result = await new UpdateOverrideSettingsHandler(Client(http), Creds()).HandleAsync(
+            new UpdateOverrideSettingsRequest("ws", "repo", null, true, null),
+            TestContext.Current.CancellationToken);
+
+        http.Calls.Should().HaveCount(2);
+        http.Calls[1].Method.Should().Be(HttpMethod.Get);
+        http.Calls[1].RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/repo/override-settings");
+        result.GetProperty("branching_model").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

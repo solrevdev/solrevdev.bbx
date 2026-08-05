@@ -27,10 +27,16 @@ public sealed class UpsertPipelineReportHandler(BitbucketClient client, Credenti
         // record of whether it has run before.
         var body = new Dictionary<string, object>
         {
+            // Bitbucket resolves the payload subtype from "type" and answers a
+            // body without it with a bare 400 carrying no message at all.
+            ["type"] = "report",
             ["title"] = request.Title,
+            // The spec marks nothing required, but Bitbucket refuses a report
+            // without details: "Cannot build Report, some of required
+            // attributes are not set [details]". Verified live on 2026-08-05.
+            ["details"] = request.Details,
             ["report_type"] = (request.ReportType ?? "TEST").ToUpperInvariant(),
         };
-        if (request.Details is not null) body["details"] = request.Details;
         if (request.Result is not null) body["result"] = request.Result.ToUpperInvariant();
         if (request.Link is not null) body["link"] = request.Link;
 
