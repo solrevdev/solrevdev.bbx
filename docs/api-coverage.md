@@ -304,7 +304,7 @@ Three things the spec gets wrong or leaves out:
 | Method | Path | Verdict | Command or reason |
 | --- | --- | --- | --- |
 | `POST` | `/snippets` | skip | Duplicate of the workspace-scoped create that bbx snippet create already uses |
-| `PUT` | `/snippets/{workspace}/{encoded_id}/comments/{comment_id}` | cover | `bbx snippet comments update` |
+| `PUT` | `/snippets/{workspace}/{encoded_id}/comments/{comment_id}` | cover | `bbx snippet comments --update` |
 | `GET` | `/snippets/{workspace}/{encoded_id}/commits` | cover | `bbx snippet commits` |
 | `GET` | `/snippets/{workspace}/{encoded_id}/commits/{revision}` | cover | `bbx snippet commits --revision` |
 | `DELETE` | `/snippets/{workspace}/{encoded_id}/{node_id}` | cover | `bbx snippet delete --revision` |

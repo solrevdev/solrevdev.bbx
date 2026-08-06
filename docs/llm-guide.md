@@ -143,10 +143,10 @@ they're available on `repo` / `pr` / `branch` / `commit` / `issue`.
 |---|---|
 | `list` | `GET repositories/{ws}` |
 | `view <slug>` | `GET repositories/{ws}/{repo}` |
-| `create <name>` | `POST repositories/{ws}/{repo}` — `--private`, `--description`, `--scm`, `--language`, `--main-branch`, `--fork-policy`, `--project-key` |
+| `create <name>` | `POST repositories/{ws}/{repo}` — `--private`, `--description`, `--project`, `--fork-policy` |
 | `delete <slug>` | `DELETE repositories/{ws}/{repo}` — `--yes` |
-| `fork <slug>` | `POST repositories/{ws}/{repo}/forks` — `--name`, `--workspace-target` |
-| `clone <slug>` | `GET repositories/{ws}/{repo}` (extracts clone URL) — `--protocol https|ssh` |
+| `fork <slug>` | `POST repositories/{ws}/{repo}/forks` — `--name`, `--to-workspace` |
+| `clone <slug>` | `GET repositories/{ws}/{repo}` (extracts clone URL) — `--ssh` for the SSH URL, HTTPS otherwise |
 | `permissions <slug>` | `GET repositories/{ws}/{repo}/permissions-config/users` |
 | `hooks {list,view,create,update,delete}` | `repositories/{ws}/{repo}/hooks[/{uid}]` |
 | `default-reviewers {list,add,remove,effective}` | `repositories/{ws}/{repo}/(effective-)?default-reviewers[/{user}]` |
@@ -174,7 +174,7 @@ offered; use `remove`.
 |---|---|
 | `list` | `GET repositories/{ws}/{repo}/pullrequests` — `--state OPEN\|MERGED\|DECLINED\|SUPERSEDED`, `--author <account-id>` |
 | `view <id>` | `GET repositories/{ws}/{repo}/pullrequests/{id}` |
-| `create` | `POST repositories/{ws}/{repo}/pullrequests` — `--title`, `--source`, `--dest`, `--body`, `--close-source-branch`, `--reviewer <account-id>` (repeatable) |
+| `create` | `POST repositories/{ws}/{repo}/pullrequests` — `--title`, `--source`, `--dest`, `--body`, `--close-source-branch`, `--reviewers <account-id>` |
 | `update <id>` | `PUT repositories/{ws}/{repo}/pullrequests/{id}` — `--title`, `--body`, `--dest`, `--reviewers <account-id>...`, `--close-source-branch`, `--no-close-source-branch`. Open pull requests only. |
 | `merge <id>` | `POST .../merge` — `--strategy merge_commit\|squash\|fast_forward`, `--message`, `--close-source-branch` |
 | `approve <id>` / `unapprove <id>` | `POST/DELETE .../approve` |

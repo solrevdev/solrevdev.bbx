@@ -181,6 +181,7 @@ bbx auth status                   # who am I, which workspace
 bbx auth token                    # print email:token (for curl -u)
 bbx auth set-workspace myws       # default for -w
 bbx auth logout                   # clear stored credentials
+bbx version                       # print the installed bbx version
 ```
 </details>
 
