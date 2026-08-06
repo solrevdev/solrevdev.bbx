@@ -1144,28 +1144,26 @@ return command;
 
     private static Command CreateDeploymentsChangesCommand(IServiceProvider services)
     {
-        var command = new Command("changes", "Rename a deployment environment, or lock and unlock it");
+        var command = new Command("changes", "Rename a deployment environment, or restrict who can deploy to it");
         var (workspaceOption, repoOption) = AddScope(command);
         var envArg = new Argument<string>("environment") { Description = "Environment UUID" };
         var nameOption = new Option<string?>("--name") { Description = "New environment name" };
-        var lockOption = new Option<bool>("--lock") { Description = "Lock the environment against further deployments" };
-        var unlockOption = new Option<bool>("--unlock") { Description = "Unlock the environment" };
-        var reasonOption = new Option<string?>("--reason") { Description = "Reason recorded against the change" };
+        var adminOnlyOption = new Option<bool>("--admin-only") { Description = "Let only admins deploy to the environment" };
+        var noAdminOnlyOption = new Option<bool>("--no-admin-only") { Description = "Let anyone with access deploy to the environment" };
         command.Arguments.Add(envArg);
         command.Options.Add(nameOption);
-        command.Options.Add(lockOption);
-        command.Options.Add(unlockOption);
-        command.Options.Add(reasonOption);
-        command.SetHandler((string? workspace, string? repo, string environment, string? name, bool locked, bool unlocked, string? reason) =>
+        command.Options.Add(adminOnlyOption);
+        command.Options.Add(noAdminOnlyOption);
+        command.SetHandler((string? workspace, string? repo, string environment, string? name, bool adminOnly, bool noAdminOnly) =>
             CommandRunner.RunActionAsync(() =>
             {
-                if (locked && unlocked)
-                    throw new BbxUserException("Error: --lock and --unlock are mutually exclusive.");
-                bool? isLocked = locked ? true : unlocked ? false : null;
+                if (adminOnly && noAdminOnly)
+                    throw new BbxUserException("Error: --admin-only and --no-admin-only are mutually exclusive.");
+                bool? restricted = adminOnly ? true : noAdminOnly ? false : null;
                 return services.GetRequiredService<ChangeDeploymentEnvironmentHandler>()
-                    .HandleAsync(new ChangeDeploymentEnvironmentRequest(workspace, repo, environment, name, isLocked, reason), CommandBinding.CancellationToken);
+                    .HandleAsync(new ChangeDeploymentEnvironmentRequest(workspace, repo, environment, name, restricted), CommandBinding.CancellationToken);
             }),
-            workspaceOption, repoOption, envArg, nameOption, lockOption, unlockOption, reasonOption);
+            workspaceOption, repoOption, envArg, nameOption, adminOnlyOption, noAdminOnlyOption);
         return command;
     }
 

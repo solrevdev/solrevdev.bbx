@@ -5,5 +5,4 @@ public sealed record ChangeDeploymentEnvironmentRequest(
     string? Repository,
     string Environment,
     string? Name,
-    bool? Lock,
-    string? Reason);
+    bool? AdminOnly);

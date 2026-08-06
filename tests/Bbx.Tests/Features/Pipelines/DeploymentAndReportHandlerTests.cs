@@ -92,34 +92,55 @@ public class DeploymentAndReportHandlerTests
     }
 
     // Environments are changed through a changes endpoint rather than a PUT on
-    // the environment itself.
+    // the environment itself, and the body is a change envelope. The spec
+    // documents no body at all, so this shape was read off the Bitbucket web
+    // UI, which posts exactly this, trailing slash included. Confirmed live on
+    // 2026-08-06: it answers 202 with an empty body.
     [Fact]
-    public async Task Environment_changes_post_to_the_changes_endpoint()
+    public async Task Environment_changes_post_a_change_envelope()
     {
         var http = new FakeHttpMessageHandler();
-        http.Enqueue(HttpStatusCode.NoContent, "");
+        http.Enqueue(HttpStatusCode.Accepted, "");
 
         await new ChangeDeploymentEnvironmentHandler(Client(http), Creds()).HandleAsync(
-            new ChangeDeploymentEnvironmentRequest("ws", "repo", "e1", "Prod", true, "freeze"),
+            new ChangeDeploymentEnvironmentRequest("ws", "repo", "e1", "Prod", true),
             TestContext.Current.CancellationToken);
 
         var call = http.Calls.Single();
         call.Method.Should().Be(HttpMethod.Post);
-        call.RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/repo/environments/e1/changes");
-        var body = Body(http);
-        body.GetProperty("name").GetString().Should().Be("Prod");
-        body.GetProperty("lock").GetProperty("locked").GetBoolean().Should().BeTrue();
-        body.GetProperty("change_request").GetProperty("reason").GetString().Should().Be("freeze");
+        call.RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/repo/environments/e1/changes/");
+        var change = Body(http).GetProperty("change");
+        change.GetProperty("name").GetString().Should().Be("Prod");
+        change.GetProperty("restrictions").GetProperty("admin_only").GetBoolean().Should().BeTrue();
     }
 
-    // A reason on its own changes nothing, so it does not count as a change.
+    // Only name and restrictions can change. Everything else, the lock
+    // included, is answered with 400 change-not-supported, so nothing else is
+    // offered.
     [Fact]
-    public async Task A_reason_alone_is_not_a_change()
+    public async Task Clearing_the_restriction_sends_admin_only_false()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.Accepted, "");
+
+        await new ChangeDeploymentEnvironmentHandler(Client(http), Creds()).HandleAsync(
+            new ChangeDeploymentEnvironmentRequest("ws", "repo", "e1", null, false),
+            TestContext.Current.CancellationToken);
+
+        var change = Body(http).GetProperty("change");
+        change.TryGetProperty("name", out _).Should().BeFalse();
+        change.GetProperty("restrictions").GetProperty("admin_only").GetBoolean().Should().BeFalse();
+    }
+
+    // An empty change envelope is answered with a bare 400, so the handler
+    // refuses before the call rather than passing one on.
+    [Fact]
+    public async Task An_empty_change_is_refused_before_the_call()
     {
         var http = new FakeHttpMessageHandler();
 
         var act = async () => await new ChangeDeploymentEnvironmentHandler(Client(http), Creds()).HandleAsync(
-            new ChangeDeploymentEnvironmentRequest("ws", "repo", "e1", null, null, "because"),
+            new ChangeDeploymentEnvironmentRequest("ws", "repo", "e1", null, null),
             TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<BbxUserException>()

@@ -25,7 +25,9 @@ public sealed class ViewDeploymentEnvironmentHandler(BitbucketClient client, Cre
                 rank = et.TryGetProperty("rank", out var r) ? r.GetInt32() : 0,
             } : null!,
             deployment_gate_enabled = env.TryGetProperty("deployment_gate_enabled", out var dg) && dg.GetBoolean(),
-            lock_ = env.TryGetObject("lock", out var l) ? (object)new
+            // @lock, not lock_: lock is a C# keyword, and the trailing
+            // underscore was leaking into the JSON as a field named "lock_".
+            @lock = env.TryGetObject("lock", out var l) ? (object)new
             {
                 type = PipelineFormat.GetString(l, "type"),
                 name = PipelineFormat.GetString(l, "name"),
