@@ -100,10 +100,12 @@ jobs:
           PATCH=${BASH_REMATCH[3]}
           BUMP=${REQUESTED_BUMP:-patch}
 
-          # The very first release ships the version already in the csproj.
-          # Every run after that bumps, so a later run can never try to push a
-          # version NuGet already has.
-          if git ls-remote --exit-code --tags origin 'refs/tags/v*' >/dev/null 2>&1; then
+          # The csproj version is the release number. If it has no tag yet it
+          # ships as it stands, so raising it by hand is how you choose a minor
+          # or a major. Only once that version has been released does a push
+          # bump, which is what stops a later run pushing a version NuGet
+          # already has.
+          if git ls-remote --exit-code --tags origin "refs/tags/v$CURRENT" >/dev/null 2>&1; then
             case "$BUMP" in
               major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
               minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
@@ -114,9 +116,10 @@ jobs:
                 ;;
             esac
             VERSION="$MAJOR.$MINOR.$PATCH"
+            echo "v$CURRENT is already released; bumping $BUMP."
           else
             VERSION="$CURRENT"
-            echo "No release tags yet; publishing the initial version as-is."
+            echo "v$CURRENT has not been released; publishing the csproj version as-is."
           fi
 
           TAG="v$VERSION"
