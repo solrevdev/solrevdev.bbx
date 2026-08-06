@@ -118,18 +118,48 @@ rules below are; it is still the right place to start.
     The slug and uuid sit under a nested `workspace`; the top level carries only
     whether the caller is an administrator. This is also the working
     replacement for the withdrawn `/2.0/workspaces`.
-19. **`PUT deploy-keys/{id}` cannot succeed.** Without `key` Bitbucket says the
-    key is invalid; with it, that you may not change a key's contents. The
-    command exists because the endpoint is documented; there is no body that
-    works. Delete and re-add.
+19. **`PUT deploy-keys/{id}` cannot succeed, and the command is gone.** Without
+    `key` Bitbucket says the key is invalid; with it, that you may not change a
+    key's contents. Eight bodies were tried on 2026-08-06, including the key
+    with its comment appended exactly as `ssh-keygen` wrote it, an empty key, a
+    different key and a `type` discriminator. All 400. The web UI offers no
+    rename control either, only view and delete. Do not add the verb back.
+    Delete and re-add.
 20. **Some endpoints refuse an API token**, answering 403 "This resource does
     not support authentication using the provided token". Pull request and file
-    conflicts and the OIDC discovery endpoints are the ones found so far. It is
-    not a scope problem and no scope fixes it.
+    conflicts and the *workspace* OIDC discovery endpoints are the ones found so
+    far. It is not a scope problem and no scope fixes it. Do not confuse this
+    with a path that does not exist: the repository-scoped
+    `repositories/{ws}/{repo}/pipelines-config/identity/oidc/...` answers 404
+    "There is no API hosted at this URL", because only the workspace form is
+    real.
 21. **Errors carry `detail` and `data.arguments` as well as the message.**
     Bitbucket often answers a bare "Bad request" and puts the reason in an
     argument, which is how "SSH for this hostname is already configured by
     Bitbucket" stayed invisible until `EnsureSuccessAsync` printed it.
+22. **`POST environments/{uuid}/changes/` takes a change envelope.** The body is
+    `{"change": {...}}`, not a set of fields, and it answers 202 with an empty
+    body because the change is queued. The spec documents no body at all; this
+    was read off the web UI, which posts exactly that. Only `name` and
+    `restrictions.admin_only` can be changed. `lock`, `rank`, `hidden`,
+    `environment_type` and `environment_lock_enabled` are all answered with 400
+    `deploy-service.environment.change-not-supported`, and there is no lock
+    resource anywhere in 2.0. A body without `change` gets a different 400,
+    `deploy-service.request.validation-error`, which is how you tell a wrong
+    envelope from an unchangeable field. The trailing slash is optional.
+23. **`none` is not a permission.** `permissions-config` takes `read`, `write`,
+    `admin`, and `create-repo` on projects. `none` is answered with 400 "none is
+    not a valid permission". Use `DELETE` to clear a grant.
+24. **The permissions-config spec text about app passwords is stale.** All eight
+    operations claim "The only authentication method for this endpoint is via
+    app passwords". App passwords were withdrawn on 28 July 2026 and an API
+    token drives them fine. A user-keyed grant cannot name the workspace owner:
+    Bitbucket answers 400 "This user is linked to this workspace, so their
+    access ... cannot be modified or removed".
+25. **Groups live only in the 1.0 API.** No 2.0 path mentions groups outside
+    `permissions-config`, so there is no way to list a group slug from 2.0.
+    `GET /1.0/groups/{workspace}/` still answers 200 with an API token and is
+    the only way to read one. It is a probe, not a feature: do not build on it.
 
 ## Auth
 

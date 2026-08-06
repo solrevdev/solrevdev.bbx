@@ -16,8 +16,8 @@ Refresh it with `scripts/fetch-spec.sh`.
 | Missing | 182 |
 | Deprecated in the spec, ignored | 40 |
 | Live gaps triaged below | 142 |
-| Verdict `cover` | 109 |
-| Verdict `skip` | 33 |
+| Verdict `cover` | 108 |
+| Verdict `skip` | 34 |
 
 The `bbx` command named against a `cover` row is the one that now calls the endpoint.
 
@@ -48,7 +48,7 @@ Five further rows sit outside the Bitbucket surface a CLI drives at all: `addon`
 
 ## What the live run changed
 
-The 109 `cover` rows were built, then exercised against a throwaway repository
+The `cover` rows were built, then exercised against a throwaway repository
 in the personal `solrevdev` workspace, which was deleted afterwards. Seven
 things the documentation gets wrong turned up, and each is now handled:
 
@@ -64,14 +64,13 @@ things the documentation gets wrong turned up, and each is now handled:
 - `bitbucket.org` is rejected as a pipelines known host, because Bitbucket
   already configures SSH for it.
 
-Three things could not be made to work and are recorded rather than hidden:
+Two things could not be made to work and are recorded rather than hidden:
 
-- `pr conflicts`, `repo file-conflicts` and both OIDC discovery commands answer
-  403 "This resource does not support authentication using the provided token".
-  No scope changes that.
-- `POST environments/{uuid}/changes` rejected every body shape tried, including
-  an empty object. The spec documents no request body at all. `bbx pipeline
-  deployments changes` ships unverified.
+- `pr conflicts`, `repo file-conflicts` and the workspace OIDC discovery
+  commands answer 403 "This resource does not support authentication using the
+  provided token". No scope changes that. The repository-scoped OIDC pair is a
+  separate fault: it answers 404 "There is no API hosted at this URL", because
+  only the workspace form of that path exists.
 - The deployment variables list endpoint answers an empty page even when
   variables exist. Add, update and delete all work.
 
@@ -79,12 +78,31 @@ Three things could not be made to work and are recorded rather than hidden:
 been enabled on the repository once; both were confirmed working against a
 repository that had.
 
-## Eight commands ship without a live run
+## The permissions-config writes
 
-The `PUT` and `DELETE` verbs under `permissions-config` need a second Bitbucket account or a
-group, and neither exists on this machine. They are built and unit-tested against the fake
-HTTP handler, and were never exercised against the live API. The matching `GET`s were: they
-return an empty list on a throwaway repository, which is a real answer.
+Run live on 2026-08-06 against a throwaway repository and a disposable, empty group in the
+personal `solrevdev` workspace. Four of the eight are now confirmed end to end:
+
+| Verb | Target | Result |
+| --- | --- | --- |
+| `PUT`/`DELETE` `permissions-config/groups/{slug}` | repository | Confirmed. `read`, `write` and `admin` all land |
+| `PUT`/`DELETE` `permissions-config/groups/{slug}` | project | Confirmed. `create-repo` lands too |
+| `PUT`/`DELETE` `permissions-config/users/{id}` | repository | Reachable, not confirmed |
+| `PUT`/`DELETE` `permissions-config/users/{id}` | project | Reachable, not confirmed |
+
+The body is `{"permission": "..."}`, as documented. Two things the spec gets wrong:
+
+- It says of all eight "The only authentication method for this endpoint is via app
+  passwords". That is stale. App passwords were withdrawn on 28 July 2026, and an API
+  token drives these fine.
+- `none` is not a permission. All four `set` verbs offered it; Bitbucket answers 400
+  "none is not a valid permission". It has been dropped, and `remove` does that job.
+
+The user-keyed pair stays unconfirmed because the target must be a workspace member and
+cannot be the workspace owner, and `solrevdev` has one member. Aimed at the owner they
+answer 400 "This user is linked to this workspace, so their access on any of the
+repositories cannot be modified or removed", which proves the path resolves and the body
+parses but not that a grant lands.
 
 ## Repository
 
@@ -153,7 +171,7 @@ return an empty list on a throwaway repository, which is a real answer.
 
 | Method | Path | Verdict | Command or reason |
 | --- | --- | --- | --- |
-| `PUT` | `/repositories/{workspace}/{repo_slug}/deploy-keys/{key_id}` | cover | `bbx repo deploy-keys update` |
+| `PUT` | `/repositories/{workspace}/{repo_slug}/deploy-keys/{key_id}` | skip | Cannot succeed. Demands `key`, then refuses it whatever the value. Eight bodies tried live on 2026-08-06; the command was removed |
 
 ## Effective branching model
 
@@ -259,7 +277,7 @@ return an empty list on a throwaway repository, which is a real answer.
 | --- | --- | --- | --- |
 | `POST` | `/repositories/{workspace}/{repo_slug}/environments` | cover | `bbx pipeline deployments create` |
 | `DELETE` | `/repositories/{workspace}/{repo_slug}/environments/{environment_uuid}` | cover | `bbx pipeline deployments delete` |
-| `POST` | `/repositories/{workspace}/{repo_slug}/environments/{environment_uuid}/changes` | cover | `bbx pipeline deployments changes` |
+| `POST` | `/repositories/{workspace}/{repo_slug}/environments/{environment_uuid}/changes` | cover | `bbx pipeline deployments changes`, confirmed live 2026-08-06 |
 
 ## Deployment variables
 

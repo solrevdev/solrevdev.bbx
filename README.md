@@ -211,9 +211,9 @@ bbx repo access users view|set|remove -w myws -r myrepo
 ```
 
 `repo update` changes only the fields you name, like `pr update`. Bitbucket
-rejects a `--language` it does not recognise, and `repo deploy-keys update`
-can only ever fail: Bitbucket refuses to change a key's contents and refuses a
-body without them. Delete and re-add instead.
+rejects a `--language` it does not recognise. There is no `repo deploy-keys
+update`: Bitbucket refuses to change a key's contents and refuses a body
+without them, so delete and re-add instead.
 </details>
 
 <details>
@@ -355,10 +355,14 @@ bbx pipeline oidc config|keys -w myws -r myrepo
 UUIDs include the braces. Quote them so your shell doesn't expand them.
 
 `deployments` manages the environments; `deploys` reads the records of what was
-released to them. `caches clear` takes a cache UUID, or `--name` to clear every
-cache with that name. `reports update` needs `--details`: Bitbucket refuses a
-report without it whatever the docs say. `pipeline config` answers 404 until
-Pipelines has been enabled on the repository at least once.
+released to them. `deployments changes` takes `--name`, `--admin-only` and
+`--no-admin-only`, and nothing else: Bitbucket refuses to change an
+environment's lock, rank, type or hidden flag through it. `caches clear` takes a
+cache UUID, or `--name` to clear every cache with that name. `reports update`
+needs `--details`: Bitbucket refuses a report without it whatever the docs say.
+`pipeline config` answers 404 until Pipelines has been enabled on the repository
+at least once. `pipeline oidc` answers 404: only the workspace form of that
+path exists, and `workspace pipelines oidc` reaches it.
 </details>
 
 <details>

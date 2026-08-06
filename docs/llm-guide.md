@@ -153,19 +153,20 @@ they're available on `repo` / `pr` / `branch` / `commit` / `issue`.
 | `forks list` | `GET repositories/{ws}/{repo}/forks` |
 | `watchers` | `GET repositories/{ws}/{repo}/watchers` |
 | `branching-model {view,settings,update}` | `repositories/{ws}/{repo}/branching-model[/settings]` (PUT goes to `/settings`) |
-| `deploy-keys {list,view,add,update,delete}` | `repositories/{ws}/{repo}/deploy-keys[/{id}]` |
+| `deploy-keys {list,view,add,delete}` | `repositories/{ws}/{repo}/deploy-keys[/{id}]` |
 | `update <slug>` | `PUT repositories/{ws}/{repo}` — `--name`, `--description`, `--private`/`--public`, `--fork-policy`, `--language`, `--website`, `--project`, `--main-branch`, `--issues`/`--no-issues`, `--wiki`/`--no-wiki` |
 | `file-conflicts <spec>` | `GET repositories/{ws}/{repo}/file-conflicts/{spec}` — spec is `source..destination` |
 | `override-settings {view,update}` | `GET/PUT repositories/{ws}/{repo}/override-settings` — `--default-reviewers`, `--branching-model`, `--branch-restrictions`, each `true` or `false` |
 | `branching-model effective` | `GET repositories/{ws}/{repo}/effective-branching-model` |
 | `default-reviewers view` | `GET repositories/{ws}/{repo}/default-reviewers/{user}` — `--target` |
-| `access groups {list,view,set,remove}` | `repositories/{ws}/{repo}/permissions-config/groups[/{slug}]` — `--permission read\|write\|admin\|none` |
-| `access users {view,set,remove}` | `repositories/{ws}/{repo}/permissions-config/users/{account-id}` — `--permission read\|write\|admin\|none` |
+| `access groups {list,view,set,remove}` | `repositories/{ws}/{repo}/permissions-config/groups[/{slug}]` — `--permission read\|write\|admin` |
+| `access users {view,set,remove}` | `repositories/{ws}/{repo}/permissions-config/users/{account-id}` — `--permission read\|write\|admin` |
 
-`repo update` merges: anything you leave out keeps its value. `repo
-deploy-keys update` cannot succeed. Bitbucket refuses to change a key's
-contents and refuses a body without them, so delete and re-add instead.
-`repo file-conflicts` answers 403 to an API token.
+`repo update` merges: anything you leave out keeps its value. There is no
+`repo deploy-keys update`: Bitbucket refuses to change a key's contents and
+refuses a body without them, so delete and re-add instead. `repo
+file-conflicts` answers 403 to an API token. `--permission none` is not
+offered; use `remove`.
 
 ### 4.3 `bbx pr`
 
@@ -291,7 +292,7 @@ Each command prints a deprecation warning on stderr.
 | `ssh key-pair {view,set,delete}` | `.../pipelines_config/ssh/key_pair` — `--private-key`, `--public-key`. The private half is write-only. |
 | `ssh known-hosts {list,view,add,update,delete}` | `.../pipelines_config/ssh/known_hosts[/{uuid}]` — `--hostname`, `--key-type`, `--key`. `bitbucket.org` is rejected: Bitbucket configures it already. |
 | `caches {list,clear,content-uri}` | `.../pipelines-config/caches[/{uuid}[/content-uri]]`. `clear <uuid>` clears one; `clear --name node` clears every cache with that name through `DELETE .../caches?name=`. |
-| `deployments {list,view,create,delete,changes}` | `.../environments[/{env}[/changes]]` — `--name`, `--type Test\|Staging\|Production`, `--rank`. `changes` is unverified: Bitbucket rejects every body shape we tried. |
+| `deployments {list,view,create,delete,changes}` | `.../environments[/{env}[/changes/]]` — `--name`, `--type Test\|Staging\|Production`, `--rank`. `changes` takes `--name`, `--admin-only`, `--no-admin-only` and nothing else: the lock, rank, type and hidden flag cannot be changed through it. |
 | `deployments variables {list,add,update,delete}` | `.../deployments_config/environments/{env}/variables[/{uuid}]` — `--environment`/`-e`. The list endpoint always answers empty, whatever variables exist. |
 | `deploys {list,view}` | `.../deployments[/{uuid}]` — the records of what was released where, as opposed to the environments |
 | `reports {list,view,update,delete} <hash>` | `.../commit/{hash}/reports[/{report-id}]` — `update` takes a report ID of your choosing, so it creates as well as updates. `--title` and `--details` are both required. |
@@ -301,7 +302,7 @@ Each command prints a deprecation warning on stderr.
 | `test-case-reasons <pipeline> <step> <test-case>` | `.../test_reports/test_cases/{uuid}/test_case_reasons` |
 | `test-reports <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports` |
 | `test-cases <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports/test_cases` |
-| `oidc {config,keys}` | `.../pipelines-config/identity/oidc/.well-known/openid-configuration` / `.../keys.json` |
+| `oidc {config,keys}` | `.../pipelines-config/identity/oidc/.well-known/openid-configuration` / `.../keys.json` — answers 404: only the workspace form of this path exists, use `workspace pipelines oidc` |
 
 ### 4.10 `bbx snippet`
 
@@ -343,7 +344,7 @@ endpoints under `snippets/{workspace}[/{id}]`.
 | `project update <key>` | `PUT workspaces/{ws}/projects/{key}` — `--name`, `--description`, `--private`/`--public`, `--new-key` |
 | `project branching-model settings` | `GET .../projects/{key}/branching-model/settings` |
 | `project default-reviewers view` | `GET .../projects/{key}/default-reviewers/{user}` — `--target` |
-| `project access groups {list,view,set,remove}` | `.../projects/{key}/permissions-config/groups[/{slug}]` — `--permission read\|write\|create-repo\|admin\|none` |
+| `project access groups {list,view,set,remove}` | `.../projects/{key}/permissions-config/groups[/{slug}]` — `--permission read\|write\|create-repo\|admin` |
 | `project access users {list,view,set,remove}` | `.../projects/{key}/permissions-config/users[/{account-id}]` — same permissions |
 
 ### 4.12 `bbx user`
