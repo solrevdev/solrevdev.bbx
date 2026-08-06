@@ -18,7 +18,8 @@ public sealed class SnippetFilesHandler(BitbucketClient client, CredentialManage
         {
             // There is no /files collection endpoint (it 404s). The file list is
             // a "files" object on the snippet itself, keyed by path.
-            var snippet = await client.GetAsync<JsonElement>($"snippets/{workspace}/{request.SnippetId}", ct);
+            var snippet = await client.GetAsync<JsonElement>(
+                SnippetPath.For(workspace, request.SnippetId, request.Revision), ct);
 
             var files = new List<object>();
             if (snippet.TryGetObject("files", out var fileMap))
@@ -41,7 +42,7 @@ public sealed class SnippetFilesHandler(BitbucketClient client, CredentialManage
         else
         {
             var content = await client.GetRawAsync(
-                $"snippets/{workspace}/{request.SnippetId}/files/{EndpointPath.EscapeSegments(request.FileName)}", ct);
+                $"{SnippetPath.For(workspace, request.SnippetId, request.Revision)}/files/{EndpointPath.EscapeSegments(request.FileName)}", ct);
 
             if (request.Raw)
             {

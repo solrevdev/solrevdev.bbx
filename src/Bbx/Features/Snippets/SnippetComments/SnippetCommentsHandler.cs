@@ -27,6 +27,24 @@ public sealed class SnippetCommentsHandler(BitbucketClient client, CredentialMan
             };
         }
 
+        if (request.UpdateId.HasValue)
+        {
+            if (string.IsNullOrEmpty(request.UpdateContent))
+                throw new BbxUserException("Error: --update needs --content to say what the comment should say.");
+
+            var updated = await client.PutAsync<JsonElement>(
+                $"snippets/{workspace}/{request.SnippetId}/comments/{request.UpdateId}",
+                new { content = new { raw = request.UpdateContent } }, ct);
+
+            return new
+            {
+                id = updated.TryGetProperty("id", out var ui) ? ui.GetInt32() : request.UpdateId.Value,
+                content = updated.TryGetObject("content", out var uc) && uc.TryGetProperty("raw", out var ur)
+                    ? ur.GetString() : null,
+                updated_on = updated.TryGetProperty("updated_on", out var uo) ? uo.GetString() : null,
+            };
+        }
+
         if (request.DeleteId.HasValue)
         {
             await client.DeleteAsync($"snippets/{workspace}/{request.SnippetId}/comments/{request.DeleteId}", ct);

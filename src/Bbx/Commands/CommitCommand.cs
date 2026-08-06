@@ -3,6 +3,10 @@ using Bbx.Features.Commits.ApproveCommit;
 using Bbx.Features.Commits.CommitDiff;
 using Bbx.Features.Commits.CommitDiffstat;
 using Bbx.Features.Commits.CommitPatch;
+using Bbx.Features.Commits.Comments.AddCommitComment;
+using Bbx.Features.Commits.Comments.DeleteCommitComment;
+using Bbx.Features.Commits.Comments.UpdateCommitComment;
+using Bbx.Features.Commits.Comments.ViewCommitComment;
 using Bbx.Features.Commits.CreateCommitStatus;
 using Bbx.Features.Commits.FileHistory;
 using Bbx.Features.Commits.ListCommitComments;
@@ -13,6 +17,7 @@ using Bbx.Features.Commits.MergeBase;
 using Bbx.Features.Commits.UnapproveCommit;
 using Bbx.Features.Commits.UpdateCommitStatus;
 using Bbx.Features.Commits.ViewCommit;
+using Bbx.Features.Commits.ViewCommitStatus;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bbx.Commands;
@@ -33,12 +38,18 @@ public static class CommitCommand
         var limitOption = new Option<int>("--limit") { Description = "Maximum commits to list", DefaultValueFactory = _ => 25 };
         listCommand.Options.Add(branchOption);
         listCommand.Options.Add(pathOption);
+        var includeOption = new Option<string[]?>("--include")
+        { Description = "Walk commits reachable from these refs. Repeatable. Switches to the POST form of the endpoint." };
+        var excludeOption = new Option<string[]?>("--exclude")
+        { Description = "Stop at commits reachable from these refs. Repeatable." };
         listCommand.Options.Add(limitOption);
-        listCommand.SetHandler((string? workspace, string? repo, string? branch, string? path, int limit) =>
+        listCommand.Options.Add(includeOption);
+        listCommand.Options.Add(excludeOption);
+        listCommand.SetHandler((string? workspace, string? repo, string? branch, string? path, int limit, string[]? include, string[]? exclude) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<ListCommitsHandler>()
-                    .HandleAsync(new ListCommitsRequest(workspace, repo, branch, path, limit), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption, branchOption, pathOption, limitOption);
+                    .HandleAsync(new ListCommitsRequest(workspace, repo, branch, path, limit, include, exclude), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, branchOption, pathOption, limitOption, includeOption, excludeOption);
         command.Subcommands.Add(listCommand);
 
         var viewCommand = new Command("view", "View commit details");
@@ -90,6 +101,66 @@ public static class CommitCommand
                     .HandleAsync(new ListCommitStatusesRequest(workspace, repo, hash), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, statusesHashArg);
         command.Subcommands.Add(statusesCommand);
+
+        var commentCommand = new Command("comment", "Add a comment to a commit");
+        var commentHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var commentBodyOption = new Option<string>("--body") { Description = "Comment text", Required = true };
+        var commentPathOption = new Option<string?>("--path") { Description = "Anchor the comment to this file" };
+        var commentLineOption = new Option<int?>("--line") { Description = "Anchor the comment to this line of --path" };
+        commentCommand.Arguments.Add(commentHashArg);
+        commentCommand.Options.Add(commentBodyOption);
+        commentCommand.Options.Add(commentPathOption);
+        commentCommand.Options.Add(commentLineOption);
+        commentCommand.SetHandler((string? workspace, string? repo, string hash, string body, string? path, int? line) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<AddCommitCommentHandler>()
+                    .HandleAsync(new AddCommitCommentRequest(workspace, repo, hash, body, path, line), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, commentHashArg, commentBodyOption, commentPathOption, commentLineOption);
+        command.Subcommands.Add(commentCommand);
+
+        var commentViewCommand = new Command("comment-view", "View a single commit comment");
+        var cvHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var cvCommentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        commentViewCommand.Arguments.Add(cvHashArg);
+        commentViewCommand.Options.Add(cvCommentOption);
+        commentViewCommand.SetHandler((string? workspace, string? repo, string hash, int commentId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewCommitCommentHandler>()
+                    .HandleAsync(new ViewCommitCommentRequest(workspace, repo, hash, commentId), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, cvHashArg, cvCommentOption);
+        command.Subcommands.Add(commentViewCommand);
+
+        var commentUpdateCommand = new Command("comment-update", "Edit a commit comment");
+        var cuHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var cuCommentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        var cuBodyOption = new Option<string>("--body") { Description = "Replacement comment text", Required = true };
+        commentUpdateCommand.Arguments.Add(cuHashArg);
+        commentUpdateCommand.Options.Add(cuCommentOption);
+        commentUpdateCommand.Options.Add(cuBodyOption);
+        commentUpdateCommand.SetHandler((string? workspace, string? repo, string hash, int commentId, string body) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateCommitCommentHandler>()
+                    .HandleAsync(new UpdateCommitCommentRequest(workspace, repo, hash, commentId, body), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, cuHashArg, cuCommentOption, cuBodyOption);
+        command.Subcommands.Add(commentUpdateCommand);
+
+        var commentDeleteCommand = new Command("comment-delete", "Delete a commit comment");
+        var cdHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var cdCommentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        var cdYesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        commentDeleteCommand.Arguments.Add(cdHashArg);
+        commentDeleteCommand.Options.Add(cdCommentOption);
+        commentDeleteCommand.Options.Add(cdYesOption);
+        commentDeleteCommand.SetHandler(async (string? workspace, string? repo, string hash, int commentId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Delete comment #{commentId} on commit {hash}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeleteCommitCommentHandler>()
+                    .HandleAsync(new DeleteCommitCommentRequest(workspace, repo, hash, commentId), CommandBinding.CancellationToken));
+        }, workspaceOption, repoOption, cdHashArg, cdCommentOption, cdYesOption);
+        command.Subcommands.Add(commentDeleteCommand);
 
         command.Subcommands.Add(CreateStatusCommand(services, workspaceOption, repoOption));
 
@@ -189,6 +260,18 @@ public static class CommitCommand
                     .HandleAsync(new CreateCommitStatusRequest(workspace, repo, hash, key, state, url, name, description), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, createHashArg, createKeyOption, createStateOption, createUrlOption, createNameOption, createDescriptionOption);
         statusCommand.Subcommands.Add(createCommand);
+
+        var viewCommand = new Command("view", "View one build status on a commit by its key");
+        var viewHashArg = new Argument<string>("hash") { Description = "Commit hash" };
+        var viewKeyOption = new Option<string>("--key") { Description = "Build status key", Required = true };
+        viewCommand.Arguments.Add(viewHashArg);
+        viewCommand.Options.Add(viewKeyOption);
+        viewCommand.SetHandler((string? workspace, string? repo, string hash, string key) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewCommitStatusHandler>()
+                    .HandleAsync(new ViewCommitStatusRequest(workspace, repo, hash, key), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, viewHashArg, viewKeyOption);
+        statusCommand.Subcommands.Add(viewCommand);
 
         var updateCommand = new Command("update", "Update an existing build status on a commit");
         var updateHashArg = new Argument<string>("hash") { Description = "Commit hash" };

@@ -82,6 +82,19 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.DeployKeys.ViewRepoDeployKey.ViewRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.DeployKeys.AddRepoDeployKey.AddRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.DeployKeys.DeleteRepoDeployKey.DeleteRepoDeployKeyHandler>();
+        services.AddTransient<Features.Repos.UpdateRepo.UpdateRepoHandler>();
+        services.AddTransient<Features.Repos.DefaultReviewers.ViewDefaultReviewer.ViewDefaultReviewerHandler>();
+        services.AddTransient<Features.Repos.BranchingModel.EffectiveBranchingModel.EffectiveBranchingModelHandler>();
+        services.AddTransient<Features.Repos.OverrideSettings.ViewOverrideSettings.ViewOverrideSettingsHandler>();
+        services.AddTransient<Features.Repos.OverrideSettings.UpdateOverrideSettings.UpdateOverrideSettingsHandler>();
+        services.AddTransient<Features.Repos.FileConflicts.FileConflictsHandler>();
+        services.AddTransient<Features.Repos.Access.ListRepoGroupPermissions.ListRepoGroupPermissionsHandler>();
+        services.AddTransient<Features.Repos.Access.ViewRepoGroupPermission.ViewRepoGroupPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.SetRepoGroupPermission.SetRepoGroupPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.RemoveRepoGroupPermission.RemoveRepoGroupPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.ViewRepoUserPermission.ViewRepoUserPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.SetRepoUserPermission.SetRepoUserPermissionHandler>();
+        services.AddTransient<Features.Repos.Access.RemoveRepoUserPermission.RemoveRepoUserPermissionHandler>();
 
         services.AddTransient<Features.Source.LsSource.LsSourceHandler>();
         services.AddTransient<Features.Source.CatSource.CatSourceHandler>();
@@ -100,6 +113,7 @@ public static class ServiceRegistration
         services.AddTransient<Features.PullRequests.ListPullRequests.ListPullRequestsHandler>();
         services.AddTransient<Features.PullRequests.ViewPullRequest.ViewPullRequestHandler>();
         services.AddTransient<Features.PullRequests.CreatePullRequest.CreatePullRequestHandler>();
+        services.AddTransient<Features.PullRequests.UpdatePullRequest.UpdatePullRequestHandler>();
         services.AddTransient<Features.PullRequests.MergePullRequest.MergePullRequestHandler>();
         services.AddTransient<Features.PullRequests.ApprovePullRequest.ApprovePullRequestHandler>();
         services.AddTransient<Features.PullRequests.UnapprovePullRequest.UnapprovePullRequestHandler>();
@@ -117,6 +131,14 @@ public static class ServiceRegistration
         services.AddTransient<Features.PullRequests.UnrequestChanges.UnrequestChangesHandler>();
         services.AddTransient<Features.PullRequests.ListPullRequestCommits.ListPullRequestCommitsHandler>();
         services.AddTransient<Features.PullRequests.PullRequestPatch.PullRequestPatchHandler>();
+        services.AddTransient<Features.PullRequests.PullRequestConflicts.PullRequestConflictsHandler>();
+        services.AddTransient<Features.PullRequests.PullRequestDiffstat.PullRequestDiffstatHandler>();
+        services.AddTransient<Features.PullRequests.PullRequestMergeStatus.PullRequestMergeStatusHandler>();
+        services.AddTransient<Features.PullRequests.Comments.ViewPullRequestComment.ViewPullRequestCommentHandler>();
+        services.AddTransient<Features.PullRequests.Comments.UpdatePullRequestComment.UpdatePullRequestCommentHandler>();
+        services.AddTransient<Features.PullRequests.Comments.DeletePullRequestComment.DeletePullRequestCommentHandler>();
+        services.AddTransient<Features.PullRequests.Comments.ResolvePullRequestComment.ResolvePullRequestCommentHandler>();
+        services.AddTransient<Features.PullRequests.Tasks.ViewPullRequestTask.ViewPullRequestTaskHandler>();
 
         services.AddTransient<Features.Branches.ListBranches.ListBranchesHandler>();
         services.AddTransient<Features.Branches.ViewBranch.ViewBranchHandler>();
@@ -125,6 +147,9 @@ public static class ServiceRegistration
         services.AddTransient<Features.Branches.ListBranchRestrictions.ListBranchRestrictionsHandler>();
         services.AddTransient<Features.Branches.AddBranchRestriction.AddBranchRestrictionHandler>();
         services.AddTransient<Features.Branches.DeleteBranchRestriction.DeleteBranchRestrictionHandler>();
+        services.AddTransient<Features.Branches.ViewBranchRestriction.ViewBranchRestrictionHandler>();
+        services.AddTransient<Features.Branches.UpdateBranchRestriction.UpdateBranchRestrictionHandler>();
+        services.AddTransient<Features.Branches.ListRefs.ListRefsHandler>();
 
         services.AddTransient<Features.Commits.ListCommits.ListCommitsHandler>();
         services.AddTransient<Features.Commits.ViewCommit.ViewCommitHandler>();
@@ -140,6 +165,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Commits.ApproveCommit.ApproveCommitHandler>();
         services.AddTransient<Features.Commits.UnapproveCommit.UnapproveCommitHandler>();
         services.AddTransient<Features.Commits.CommitDiffstat.CommitDiffstatHandler>();
+        services.AddTransient<Features.Commits.ViewCommitStatus.ViewCommitStatusHandler>();
+        services.AddTransient<Features.Commits.Comments.AddCommitComment.AddCommitCommentHandler>();
+        services.AddTransient<Features.Commits.Comments.ViewCommitComment.ViewCommitCommentHandler>();
+        services.AddTransient<Features.Commits.Comments.UpdateCommitComment.UpdateCommitCommentHandler>();
+        services.AddTransient<Features.Commits.Comments.DeleteCommitComment.DeleteCommitCommentHandler>();
 
         services.AddTransient<Features.Issues.ListIssues.ListIssuesHandler>();
         services.AddTransient<Features.Issues.ViewIssue.ViewIssueHandler>();
@@ -170,8 +200,41 @@ public static class ServiceRegistration
         services.AddTransient<Features.Pipelines.ListReportAnnotations.ListReportAnnotationsHandler>();
         services.AddTransient<Features.Pipelines.ListTestReports.ListTestReportsHandler>();
         services.AddTransient<Features.Pipelines.ListTestCases.ListTestCasesHandler>();
-        services.AddTransient<Features.Pipelines.OidcConfig.OidcConfigHandler>();
-        services.AddTransient<Features.Pipelines.OidcKeys.OidcKeysHandler>();
+        services.AddTransient<Features.Pipelines.ViewPipelinesConfig.ViewPipelinesConfigHandler>();
+        services.AddTransient<Features.Pipelines.UpdatePipelinesConfig.UpdatePipelinesConfigHandler>();
+        services.AddTransient<Features.Pipelines.SetPipelineBuildNumber.SetPipelineBuildNumberHandler>();
+        services.AddTransient<Features.Pipelines.ViewPipelineSchedule.ViewPipelineScheduleHandler>();
+        services.AddTransient<Features.Pipelines.UpdatePipelineSchedule.UpdatePipelineScheduleHandler>();
+        services.AddTransient<Features.Pipelines.ListPipelineScheduleExecutions.ListPipelineScheduleExecutionsHandler>();
+        services.AddTransient<Features.Pipelines.ViewPipelineVariable.ViewPipelineVariableHandler>();
+        services.AddTransient<Features.Pipelines.UpdatePipelineVariable.UpdatePipelineVariableHandler>();
+        services.AddTransient<Features.Pipelines.ViewPipelineSshKeyPair.ViewPipelineSshKeyPairHandler>();
+        services.AddTransient<Features.Pipelines.SetPipelineSshKeyPair.SetPipelineSshKeyPairHandler>();
+        services.AddTransient<Features.Pipelines.DeletePipelineSshKeyPair.DeletePipelineSshKeyPairHandler>();
+        services.AddTransient<Features.Pipelines.ListPipelineKnownHosts.ListPipelineKnownHostsHandler>();
+        services.AddTransient<Features.Pipelines.AddPipelineKnownHost.AddPipelineKnownHostHandler>();
+        services.AddTransient<Features.Pipelines.ViewPipelineKnownHost.ViewPipelineKnownHostHandler>();
+        services.AddTransient<Features.Pipelines.UpdatePipelineKnownHost.UpdatePipelineKnownHostHandler>();
+        services.AddTransient<Features.Pipelines.DeletePipelineKnownHost.DeletePipelineKnownHostHandler>();
+        services.AddTransient<Features.Pipelines.ClearAllPipelineCaches.ClearAllPipelineCachesHandler>();
+        services.AddTransient<Features.Pipelines.PipelineCacheContentUri.PipelineCacheContentUriHandler>();
+        services.AddTransient<Features.Pipelines.ViewPipelineStep.ViewPipelineStepHandler>();
+        services.AddTransient<Features.Pipelines.ListTestCaseReasons.ListTestCaseReasonsHandler>();
+        services.AddTransient<Features.Pipelines.CreateDeploymentEnvironment.CreateDeploymentEnvironmentHandler>();
+        services.AddTransient<Features.Pipelines.DeleteDeploymentEnvironment.DeleteDeploymentEnvironmentHandler>();
+        services.AddTransient<Features.Pipelines.ChangeDeploymentEnvironment.ChangeDeploymentEnvironmentHandler>();
+        services.AddTransient<Features.Pipelines.ListDeploymentVariables.ListDeploymentVariablesHandler>();
+        services.AddTransient<Features.Pipelines.AddDeploymentVariable.AddDeploymentVariableHandler>();
+        services.AddTransient<Features.Pipelines.UpdateDeploymentVariable.UpdateDeploymentVariableHandler>();
+        services.AddTransient<Features.Pipelines.DeleteDeploymentVariable.DeleteDeploymentVariableHandler>();
+        services.AddTransient<Features.Pipelines.ListDeployments.ListDeploymentsHandler>();
+        services.AddTransient<Features.Pipelines.ViewDeployment.ViewDeploymentHandler>();
+        services.AddTransient<Features.Pipelines.UpsertPipelineReport.UpsertPipelineReportHandler>();
+        services.AddTransient<Features.Pipelines.DeletePipelineReport.DeletePipelineReportHandler>();
+        services.AddTransient<Features.Pipelines.CreateReportAnnotations.CreateReportAnnotationsHandler>();
+        services.AddTransient<Features.Pipelines.ViewReportAnnotation.ViewReportAnnotationHandler>();
+        services.AddTransient<Features.Pipelines.UpsertReportAnnotation.UpsertReportAnnotationHandler>();
+        services.AddTransient<Features.Pipelines.DeleteReportAnnotation.DeleteReportAnnotationHandler>();
 
         services.AddTransient<Features.Snippets.ListSnippets.ListSnippetsHandler>();
         services.AddTransient<Features.Snippets.ViewSnippet.ViewSnippetHandler>();
@@ -181,6 +244,8 @@ public static class ServiceRegistration
         services.AddTransient<Features.Snippets.SnippetFiles.SnippetFilesHandler>();
         services.AddTransient<Features.Snippets.SnippetWatch.SnippetWatchHandler>();
         services.AddTransient<Features.Snippets.SnippetComments.SnippetCommentsHandler>();
+        services.AddTransient<Features.Snippets.SnippetCommits.SnippetCommitsHandler>();
+        services.AddTransient<Features.Snippets.SnippetDiff.SnippetDiffHandler>();
 
         services.AddTransient<Features.Workspaces.ListWorkspaces.ListWorkspacesHandler>();
         services.AddTransient<Features.Workspaces.ViewWorkspace.ViewWorkspaceHandler>();
@@ -204,6 +269,28 @@ public static class ServiceRegistration
         services.AddTransient<Features.Workspaces.Projects.DeployKeys.ViewProjectDeployKey.ViewProjectDeployKeyHandler>();
         services.AddTransient<Features.Workspaces.Projects.DeployKeys.AddProjectDeployKey.AddProjectDeployKeyHandler>();
         services.AddTransient<Features.Workspaces.Projects.DeployKeys.DeleteProjectDeployKey.DeleteProjectDeployKeyHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ListProjectGroupPermissions.ListProjectGroupPermissionsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ViewProjectGroupPermission.ViewProjectGroupPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.SetProjectGroupPermission.SetProjectGroupPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.RemoveProjectGroupPermission.RemoveProjectGroupPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ListProjectUserPermissions.ListProjectUserPermissionsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.ViewProjectUserPermission.ViewProjectUserPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.SetProjectUserPermission.SetProjectUserPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.Access.RemoveProjectUserPermission.RemoveProjectUserPermissionHandler>();
+        services.AddTransient<Features.Workspaces.Projects.UpdateProject.UpdateProjectHandler>();
+        services.AddTransient<Features.Workspaces.Projects.BranchingModel.ViewProjectBranchingModelSettings.ViewProjectBranchingModelSettingsHandler>();
+        services.AddTransient<Features.Workspaces.Projects.DefaultReviewers.ViewProjectDefaultReviewer.ViewProjectDefaultReviewerHandler>();
+        services.AddTransient<Features.Workspaces.ViewWorkspaceMember.ViewWorkspaceMemberHandler>();
+        services.AddTransient<Features.Workspaces.ListWorkspaceRepositoryPermissions.ListWorkspaceRepositoryPermissionsHandler>();
+        services.AddTransient<Features.Workspaces.ViewWorkspaceGpgKey.ViewWorkspaceGpgKeyHandler>();
+        services.AddTransient<Features.Workspaces.ListWorkspacePullRequests.ListWorkspacePullRequestsHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ListWorkspaceVariables.ListWorkspaceVariablesHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.AddWorkspaceVariable.AddWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ViewWorkspaceVariable.ViewWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.UpdateWorkspaceVariable.UpdateWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.DeleteWorkspaceVariable.DeleteWorkspaceVariableHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ViewWorkspaceOidcConfig.ViewWorkspaceOidcConfigHandler>();
+        services.AddTransient<Features.Workspaces.Pipelines.ViewWorkspaceOidcKeys.ViewWorkspaceOidcKeysHandler>();
 
         services.AddTransient<Features.Users.ListUserEmails.ListUserEmailsHandler>();
         services.AddTransient<Features.Users.ListUserWorkspacePermissions.ListUserWorkspacePermissionsHandler>();
@@ -213,5 +300,11 @@ public static class ServiceRegistration
         services.AddTransient<Features.Users.SshKeys.ViewSshKey.ViewSshKeyHandler>();
         services.AddTransient<Features.Users.SshKeys.AddSshKey.AddSshKeyHandler>();
         services.AddTransient<Features.Users.SshKeys.DeleteSshKey.DeleteSshKeyHandler>();
+        services.AddTransient<Features.Users.ViewUserEmail.ViewUserEmailHandler>();
+        services.AddTransient<Features.Users.ListUserWorkspaces.ListUserWorkspacesHandler>();
+        services.AddTransient<Features.Users.ViewUserWorkspacePermission.ViewUserWorkspacePermissionHandler>();
+        services.AddTransient<Features.Users.ListUserWorkspaceRepositoryPermissions.ListUserWorkspaceRepositoryPermissionsHandler>();
+        services.AddTransient<Features.Users.GpgKeys.ListGpgKeys.ListGpgKeysHandler>();
+        services.AddTransient<Features.Users.GpgKeys.ViewGpgKey.ViewGpgKeyHandler>();
     }
 }

@@ -39,7 +39,8 @@ public class NullNestedObjectHandlerTests
             TestContext.Current.CancellationToken);
         var json = System.Text.Json.JsonSerializer.Serialize(result);
 
-        json.Should().Contain("\"environment_type\":null").And.Contain("\"lock_\":null");
+        // "lock", not "lock_": lock is a C# keyword, so the property is @lock.
+        json.Should().Contain("\"environment_type\":null").And.Contain("\"lock\":null");
     }
 
     [Fact]

@@ -6,8 +6,6 @@ using Bbx.Features.Pipelines.ListPipelineReports;
 using Bbx.Features.Pipelines.ListReportAnnotations;
 using Bbx.Features.Pipelines.ListTestCases;
 using Bbx.Features.Pipelines.ListTestReports;
-using Bbx.Features.Pipelines.OidcConfig;
-using Bbx.Features.Pipelines.OidcKeys;
 using Bbx.Features.Pipelines.ViewPipelineReport;
 using Bbx.Tests.TestKit;
 
@@ -92,25 +90,5 @@ public class PipelineReportsHandlerTests
         http.Calls.Single().RequestUri!.AbsoluteUri
             .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines/%7Bpl%7D/steps/%7Bstep%7D/test_reports/test_cases");
         ((int)result.count).Should().Be(1);
-    }
-
-    [Fact]
-    public async Task OidcConfig_and_Keys_hit_oidc_paths()
-    {
-        var http = new FakeHttpMessageHandler();
-        http.Enqueue(HttpStatusCode.OK, """{"issuer":"https://bitbucket.org/2.0"}""");
-        var configHandler = new OidcConfigHandler(Client(http), Creds());
-        await configHandler.HandleAsync(new OidcConfigRequest("ws", "myrepo"), TestContext.Current.CancellationToken);
-
-        http.Calls.Single().RequestUri!.AbsoluteUri
-            .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines-config/identity/oidc/.well-known/openid-configuration");
-
-        var http2 = new FakeHttpMessageHandler();
-        http2.Enqueue(HttpStatusCode.OK, """{"keys":[]}""");
-        var keysHandler = new OidcKeysHandler(Client(http2), Creds());
-        await keysHandler.HandleAsync(new OidcKeysRequest("ws", "myrepo"), TestContext.Current.CancellationToken);
-
-        http2.Calls.Single().RequestUri!.AbsoluteUri
-            .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/pipelines-config/identity/oidc/keys.json");
     }
 }

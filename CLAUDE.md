@@ -28,7 +28,13 @@ src/Bbx/
   Features/<Area>/<Verb>/   Request record + Handler, co-located
   Composition/      ServiceRegistration (DI), JsonOptions
 tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureConsole
+docs/spec/          pinned Bitbucket API spec; query it, do not fetch the docs site
 ```
+
+Before guessing at an endpoint, read it: `jq '.paths["<path>"]' docs/spec/swagger.json`.
+`scripts/fetch-spec.sh` refreshes the copy and records the date beside it. The
+spec is often wrong about bodies and required fields, which is what most of the
+rules below are; it is still the right place to start.
 
 ## Rules that bite
 
@@ -78,6 +84,88 @@ tests/Bbx.Tests/    FakeHttpMessageHandler, InMemoryCredentialStore, CaptureCons
     compile-time check that each bound symbol matches its handler parameter.
     A broken command definition still compiles, so parse-level behaviour is
     covered by `CommandSurfaceTests`.
+12. **An absent array option parses to an empty array, not null.** A handler that
+    keys off null therefore treats "flag not given" as "set this to nothing".
+    `UpdatePullRequestHandler` only sends `reviewers` when the array is non-empty,
+    because the null check shipped a bug that stripped the reviewers off every
+    pull request it touched.
+13. **`PUT pullrequests/{id}` merges, and drops `close_source_branch` on its own.**
+    Fields left out of the body keep their value, so send only what changed.
+    `close_source_branch` is the exception: Bitbucket applies it only when the
+    same call also moves another field to a *new* value. On its own, or beside a
+    field set to what it already holds, it is discarded, and the 200 response
+    still echoes the value you sent. `UpdatePullRequestHandler` reads the pull
+    request first and refuses rather than report a change that did not land.
+    Only open pull requests can be updated at all.
+
+14. **A write that answers 204 has no body**, so the client deserializes it to
+    the default `JsonElement`. Serializing that throws "Operation is not valid
+    due to the current state of the object", which turns a call that worked
+    into an unexplained error. `CommandRunner` prints null instead;
+    `override-settings update` reads the settings back, because the caller
+    wanted to see them anyway.
+15. **Bitbucket resolves several payloads by a `type` discriminator.** A report
+    needs `"type": "report"`, an annotation `"report_annotation"`, a known host
+    `"pipeline_known_host"` with `"pipeline_ssh_public_key"` nested inside. A
+    body without one is answered with a 400 carrying no message at all.
+16. **A report needs `details`.** The spec marks nothing required and the field
+    reads as optional; Bitbucket answers "Cannot build Report, some of required
+    attributes are not set [details]". `--details` is therefore required.
+17. **`DELETE pipelines-config/caches` is not "clear everything".** It takes
+    `?name=` and clears every cache with that name whatever its UUID, and
+    answers a bare 400 without it.
+18. **`/user/workspaces` returns `workspace_access` records, not workspaces.**
+    The slug and uuid sit under a nested `workspace`; the top level carries only
+    whether the caller is an administrator. This is also the working
+    replacement for the withdrawn `/2.0/workspaces`.
+19. **`PUT deploy-keys/{id}` cannot succeed, and the command is gone.** Without
+    `key` Bitbucket says the key is invalid; with it, that you may not change a
+    key's contents. Eight bodies were tried on 2026-08-06, including the key
+    with its comment appended exactly as `ssh-keygen` wrote it, an empty key, a
+    different key and a `type` discriminator. All 400. The web UI offers no
+    rename control either, only view and delete. Do not add the verb back.
+    Delete and re-add.
+20. **Some endpoints refuse an API token**, answering 403 "This resource does
+    not support authentication using the provided token". Pull request and file
+    conflicts and the *workspace* OIDC discovery endpoints are the ones found so
+    far. It is not a scope problem and no scope fixes it. Do not confuse this
+    with a path that does not exist: the repository-scoped
+    `repositories/{ws}/{repo}/pipelines-config/identity/oidc/...` answers 404
+    "There is no API hosted at this URL", because only the workspace form is
+    real. `bbx pipeline oidc` called it and has been removed; do not add it
+    back. `bbx workspace pipelines oidc` is the one that reaches a real path.
+21. **Errors carry `detail` and `data.arguments` as well as the message.**
+    Bitbucket often answers a bare "Bad request" and puts the reason in an
+    argument, which is how "SSH for this hostname is already configured by
+    Bitbucket" stayed invisible until `EnsureSuccessAsync` printed it.
+22. **`POST environments/{uuid}/changes/` takes a change envelope.** The body is
+    `{"change": {...}}`, not a set of fields, and it answers 202 with an empty
+    body because the change is queued. The spec documents no body at all; this
+    was read off the web UI, which posts exactly that. Only `name` and
+    `restrictions.admin_only` can be changed. `lock`, `rank`, `hidden`,
+    `environment_type` and `environment_lock_enabled` are all answered with 400
+    `deploy-service.environment.change-not-supported`, and there is no lock
+    resource anywhere in 2.0. A body without `change` gets a different 400,
+    `deploy-service.request.validation-error`, which is how you tell a wrong
+    envelope from an unchangeable field. The trailing slash is optional.
+23. **`none` is not a permission.** `permissions-config` takes `read`, `write`,
+    `admin`, and `create-repo` on projects. `none` is answered with 400 "none is
+    not a valid permission". Use `DELETE` to clear a grant.
+24. **The permissions-config spec text about app passwords is stale.** All eight
+    operations claim "The only authentication method for this endpoint is via
+    app passwords". App passwords were withdrawn on 28 July 2026 and an API
+    token drives them fine; all eight were run live on 2026-08-06. A user-keyed
+    grant cannot name the workspace owner: Bitbucket answers 400 "This user is
+    linked to this workspace, so their access ... cannot be modified or
+    removed", so a second member is the only way to test those four. The
+    selector may be an account UUID with its braces or an account ID; both
+    work, and a username does not.
+25. **Groups live only in the 1.0 API.** No 2.0 path mentions groups outside
+    `permissions-config`, so there is no way to list a group slug from 2.0.
+    `GET /1.0/groups/{workspace}/` still answers 200 with an API token and is
+    the only way to read one. `GET /1.0/users/{workspace}/invitations` answers
+    too, and lists invitations that have been sent but not accepted. Both are
+    probes, not features: do not build on them.
 
 ## Auth
 

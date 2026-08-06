@@ -13,8 +13,22 @@ public sealed class LsSourceHandler(BitbucketClient client, CredentialManager cr
             "Error: Workspace and repository required.");
 
         var path = EndpointPath.EscapeSegments(request.Path);
-        var refSegment = Uri.EscapeDataString(request.Ref);
-        var endpoint = $"/repositories/{ws}/{repo}/src/{refSegment}/{path}";
+
+        // With no ref, Bitbucket serves the root of the main branch from the
+        // bare /src endpoint by redirecting to src/{commit}/. That saves the
+        // caller having to look up whether the branch is called main or master.
+        // A path without a ref has nothing to hang off, so it is refused.
+        string endpoint;
+        if (string.IsNullOrEmpty(request.Ref))
+        {
+            if (!string.IsNullOrEmpty(request.Path))
+                throw new BbxUserException("Error: --ref is required when a path is given.");
+            endpoint = $"repositories/{ws}/{repo}/src";
+        }
+        else
+        {
+            endpoint = $"repositories/{ws}/{repo}/src/{Uri.EscapeDataString(request.Ref)}/{path}";
+        }
 
         var entries = new List<object>();
         var count = 0;
@@ -38,7 +52,7 @@ public sealed class LsSourceHandler(BitbucketClient client, CredentialManager cr
         {
             workspace = ws,
             repository = repo,
-            @ref = request.Ref,
+            @ref = request.Ref ?? "(main branch)",
             path = request.Path ?? "",
             count = entries.Count,
             entries,

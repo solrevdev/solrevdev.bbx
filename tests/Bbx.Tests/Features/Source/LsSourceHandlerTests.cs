@@ -58,6 +58,38 @@ public class LsSourceHandlerTests
         ((string)result.@ref).Should().Be("main");
     }
 
+    // Without a ref, Bitbucket serves the root of the main branch from the bare
+    // /src endpoint, which saves the caller looking up whether the branch is
+    // called main or master.
+    [Fact]
+    public async Task HandleAsync_lists_the_main_branch_root_when_no_ref_is_given()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
+        http.Enqueue(HttpStatusCode.OK, """{"values":[],"next":null}""");
+
+        await handler.HandleAsync(new LsSourceRequest("ws", "myrepo", null, null, 100),
+            TestContext.Current.CancellationToken);
+
+        http.Calls.Single().RequestUri!.AbsoluteUri
+            .Should().Be("https://api.bitbucket.org/2.0/repositories/ws/myrepo/src");
+    }
+
+    // A path with no ref has nothing to hang off, and the bare endpoint ignores
+    // one rather than failing, so it is refused here instead.
+    [Fact]
+    public async Task HandleAsync_refuses_a_path_without_a_ref()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { DefaultWorkspace = "ws", Username = "u", ApiToken = "t" });
+
+        var act = async () => await handler.HandleAsync(
+            new LsSourceRequest("ws", "myrepo", null, "src", 100), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<BbxUserException>();
+        http.Calls.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task HandleAsync_throws_when_workspace_or_repo_missing()
     {

@@ -1,6 +1,10 @@
 using System.CommandLine;
 using Bbx.Features.PullRequests.AddPullRequestComment;
 using Bbx.Features.PullRequests.ApprovePullRequest;
+using Bbx.Features.PullRequests.Comments.DeletePullRequestComment;
+using Bbx.Features.PullRequests.Comments.ResolvePullRequestComment;
+using Bbx.Features.PullRequests.Comments.UpdatePullRequestComment;
+using Bbx.Features.PullRequests.Comments.ViewPullRequestComment;
 using Bbx.Features.PullRequests.CreatePullRequest;
 using Bbx.Features.PullRequests.DeclinePullRequest;
 using Bbx.Features.PullRequests.ListPullRequestComments;
@@ -8,7 +12,10 @@ using Bbx.Features.PullRequests.ListPullRequestCommits;
 using Bbx.Features.PullRequests.ListPullRequests;
 using Bbx.Features.PullRequests.MergePullRequest;
 using Bbx.Features.PullRequests.PullRequestActivity;
+using Bbx.Features.PullRequests.PullRequestConflicts;
 using Bbx.Features.PullRequests.PullRequestDiff;
+using Bbx.Features.PullRequests.PullRequestDiffstat;
+using Bbx.Features.PullRequests.PullRequestMergeStatus;
 using Bbx.Features.PullRequests.PullRequestPatch;
 using Bbx.Features.PullRequests.PullRequestStatuses;
 using Bbx.Features.PullRequests.RequestChanges;
@@ -16,7 +23,9 @@ using Bbx.Features.PullRequests.Tasks.AddPullRequestTask;
 using Bbx.Features.PullRequests.Tasks.DeletePullRequestTask;
 using Bbx.Features.PullRequests.Tasks.ListPullRequestTasks;
 using Bbx.Features.PullRequests.Tasks.UpdatePullRequestTask;
+using Bbx.Features.PullRequests.Tasks.ViewPullRequestTask;
 using Bbx.Features.PullRequests.UnapprovePullRequest;
+using Bbx.Features.PullRequests.UpdatePullRequest;
 using Bbx.Features.PullRequests.UnrequestChanges;
 using Bbx.Features.PullRequests.ViewPullRequest;
 using Bbx.Features.Repos.DefaultReviewers.EffectiveDefaultReviewers;
@@ -77,6 +86,34 @@ public static class PrCommand
                     .HandleAsync(new CreatePullRequestRequest(workspace, repo, title, source, dest, body, reviewers, closeSource), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, titleOption, sourceOption, destOption, bodyOption, reviewersOption, closeSourceOption);
         command.Subcommands.Add(createCommand);
+
+        var updateCommand = new Command("update", "Update an open pull request");
+        var updateIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var updateTitleOption = new Option<string?>("--title") { Description = "New title" };
+        var updateBodyOption = new Option<string?>("--body") { Description = "New description. Pass an empty string to clear it." };
+        var updateDestOption = new Option<string?>("--dest") { Description = "Retarget the pull request at this destination branch" };
+        var updateReviewersOption = new Option<string[]?>("--reviewers") { Description = "Replace reviewers with these account IDs" };
+        var updateCloseSourceOption = new Option<bool>("--close-source-branch") { Description = "Close the source branch after merge" };
+        var updateKeepSourceOption = new Option<bool>("--no-close-source-branch") { Description = "Keep the source branch after merge" };
+        updateCommand.Arguments.Add(updateIdArg);
+        updateCommand.Options.Add(updateTitleOption);
+        updateCommand.Options.Add(updateBodyOption);
+        updateCommand.Options.Add(updateDestOption);
+        updateCommand.Options.Add(updateReviewersOption);
+        updateCommand.Options.Add(updateCloseSourceOption);
+        updateCommand.Options.Add(updateKeepSourceOption);
+        updateCommand.SetHandler((string? workspace, string? repo, int id, string? title, string? body, string? dest, string[]? reviewers, bool closeSource, bool keepSource) =>
+            CommandRunner.RunJsonAsync(() =>
+            {
+                if (closeSource && keepSource)
+                    throw new BbxUserException(
+                        "Error: --close-source-branch and --no-close-source-branch are mutually exclusive.");
+                bool? closeSourceBranch = closeSource ? true : keepSource ? false : null;
+                return services.GetRequiredService<UpdatePullRequestHandler>()
+                    .HandleAsync(new UpdatePullRequestRequest(workspace, repo, id, title, body, dest, reviewers, closeSourceBranch), CommandBinding.CancellationToken);
+            }),
+            workspaceOption, repoOption, updateIdArg, updateTitleOption, updateBodyOption, updateDestOption, updateReviewersOption, updateCloseSourceOption, updateKeepSourceOption);
+        command.Subcommands.Add(updateCommand);
 
         var mergeCommand = new Command("merge", "Merge a pull request");
         var mergeIdArg = new Argument<int>("id") { Description = "Pull request ID" };
@@ -169,15 +206,113 @@ public static class PrCommand
             workspaceOption, repoOption, diffIdArg);
         command.Subcommands.Add(diffCommand);
 
-        var activityCommand = new Command("activity", "Show pull request activity log");
-        var activityIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var activityCommand = new Command("activity",
+            "Show pull request activity. With no ID, the whole repository's feed.");
+        var activityIdArg = new Argument<int?>("id")
+        {
+            Description = "Pull request ID. Omit for repository-wide activity.",
+            Arity = ArgumentArity.ZeroOrOne,
+            DefaultValueFactory = _ => null,
+        };
+        var activityLimitOption = new Option<int>("--limit")
+        { Description = "Maximum activity entries to list", DefaultValueFactory = _ => 50 };
         activityCommand.Arguments.Add(activityIdArg);
-        activityCommand.SetHandler((string? workspace, string? repo, int id) =>
+        activityCommand.Options.Add(activityLimitOption);
+        activityCommand.SetHandler((string? workspace, string? repo, int? id, int limit) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<PullRequestActivityHandler>()
-                    .HandleAsync(new PullRequestActivityRequest(workspace, repo, id), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption, activityIdArg);
+                    .HandleAsync(new PullRequestActivityRequest(workspace, repo, id, limit), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, activityIdArg, activityLimitOption);
         command.Subcommands.Add(activityCommand);
+
+        var conflictsCommand = new Command("conflicts", "List the files a merge of this PR would conflict on");
+        var conflictsIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var conflictsLimitOption = new Option<int>("--limit")
+        { Description = "Maximum conflicts to list", DefaultValueFactory = _ => 100 };
+        conflictsCommand.Arguments.Add(conflictsIdArg);
+        conflictsCommand.Options.Add(conflictsLimitOption);
+        conflictsCommand.SetHandler((string? workspace, string? repo, int id, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<PullRequestConflictsHandler>()
+                    .HandleAsync(new PullRequestConflictsRequest(workspace, repo, id, limit), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, conflictsIdArg, conflictsLimitOption);
+        command.Subcommands.Add(conflictsCommand);
+
+        var diffstatCommand = new Command("diffstat", "Show per-file line counts for a pull request");
+        var diffstatIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var diffstatLimitOption = new Option<int>("--limit")
+        { Description = "Maximum files to list", DefaultValueFactory = _ => 500 };
+        diffstatCommand.Arguments.Add(diffstatIdArg);
+        diffstatCommand.Options.Add(diffstatLimitOption);
+        diffstatCommand.SetHandler((string? workspace, string? repo, int id, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<PullRequestDiffstatHandler>()
+                    .HandleAsync(new PullRequestDiffstatRequest(workspace, repo, id, limit), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, diffstatIdArg, diffstatLimitOption);
+        command.Subcommands.Add(diffstatCommand);
+
+        var mergeStatusCommand = new Command("merge-status",
+            "Report on a merge that was accepted asynchronously and returned a task ID");
+        var mergeStatusIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var mergeStatusTaskOption = new Option<string>("--task-id")
+        { Description = "Merge task ID, as returned by an asynchronous merge", Required = true };
+        mergeStatusCommand.Arguments.Add(mergeStatusIdArg);
+        mergeStatusCommand.Options.Add(mergeStatusTaskOption);
+        mergeStatusCommand.SetHandler((string? workspace, string? repo, int id, string taskId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<PullRequestMergeStatusHandler>()
+                    .HandleAsync(new PullRequestMergeStatusRequest(workspace, repo, id, taskId), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, mergeStatusIdArg, mergeStatusTaskOption);
+        command.Subcommands.Add(mergeStatusCommand);
+
+        var commentViewCommand = new Command("comment-view", "View a single pull request comment");
+        var cvIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var cvCommentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        commentViewCommand.Arguments.Add(cvIdArg);
+        commentViewCommand.Options.Add(cvCommentOption);
+        commentViewCommand.SetHandler((string? workspace, string? repo, int id, int commentId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewPullRequestCommentHandler>()
+                    .HandleAsync(new ViewPullRequestCommentRequest(workspace, repo, id, commentId), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, cvIdArg, cvCommentOption);
+        command.Subcommands.Add(commentViewCommand);
+
+        var commentUpdateCommand = new Command("comment-update", "Edit a pull request comment");
+        var cuIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var cuCommentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        var cuBodyOption = new Option<string>("--body") { Description = "Replacement comment text", Required = true };
+        commentUpdateCommand.Arguments.Add(cuIdArg);
+        commentUpdateCommand.Options.Add(cuCommentOption);
+        commentUpdateCommand.Options.Add(cuBodyOption);
+        commentUpdateCommand.SetHandler((string? workspace, string? repo, int id, int commentId, string body) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdatePullRequestCommentHandler>()
+                    .HandleAsync(new UpdatePullRequestCommentRequest(workspace, repo, id, commentId, body), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, cuIdArg, cuCommentOption, cuBodyOption);
+        command.Subcommands.Add(commentUpdateCommand);
+
+        var commentDeleteCommand = new Command("comment-delete", "Delete a pull request comment");
+        var cdIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var cdCommentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        var cdYesOption = new Option<bool>("--yes") { Description = "Skip confirmation" };
+        commentDeleteCommand.Arguments.Add(cdIdArg);
+        commentDeleteCommand.Options.Add(cdCommentOption);
+        commentDeleteCommand.Options.Add(cdYesOption);
+        commentDeleteCommand.SetHandler(async (string? workspace, string? repo, int id, int commentId, bool yes) =>
+        {
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr(
+                    $"Delete comment #{commentId} on PR #{id}? [y/N]: "))
+                return;
+            await CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<DeletePullRequestCommentHandler>()
+                    .HandleAsync(new DeletePullRequestCommentRequest(workspace, repo, id, commentId), CommandBinding.CancellationToken));
+        }, workspaceOption, repoOption, cdIdArg, cdCommentOption, cdYesOption);
+        command.Subcommands.Add(commentDeleteCommand);
+
+        command.Subcommands.Add(CreateResolveCommand(services, workspaceOption, repoOption,
+            "comment-resolve", "Mark a pull request comment as resolved", resolve: true));
+        command.Subcommands.Add(CreateResolveCommand(services, workspaceOption, repoOption,
+            "comment-unresolve", "Reopen a resolved pull request comment", resolve: false));
 
         var statusesCommand = new Command("statuses", "Show pull request commit statuses");
         var statusesIdArg = new Argument<int>("id") { Description = "Pull request ID" };
@@ -267,6 +402,18 @@ public static class PrCommand
             workspaceOption, repoOption, listIdArg, listLimitOption);
         tasksCommand.Subcommands.Add(listCommand);
 
+        var viewCommand = new Command("view", "View a single task on a PR");
+        var viewIdArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var viewTaskIdOption = new Option<int>("--task-id") { Description = "Task ID", Required = true };
+        viewCommand.Arguments.Add(viewIdArg);
+        viewCommand.Options.Add(viewTaskIdOption);
+        viewCommand.SetHandler((string? workspace, string? repo, int id, int taskId) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewPullRequestTaskHandler>()
+                    .HandleAsync(new ViewPullRequestTaskRequest(workspace, repo, id, taskId), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, viewIdArg, viewTaskIdOption);
+        tasksCommand.Subcommands.Add(viewCommand);
+
         var addCommand = new Command("add", "Add a task to a PR");
         var addIdArg = new Argument<int>("id") { Description = "Pull request ID" };
         var addContentOption = new Option<string>("--content") { Description = "Task body (markdown)", Required = true };
@@ -326,4 +473,28 @@ public static class PrCommand
 
         return tasksCommand;
     }
+
+    // Resolve and reopen are the same resource under POST and DELETE, so one
+    // builder makes both rather than two near-identical blocks.
+    private static Command CreateResolveCommand(
+        IServiceProvider services,
+        Option<string?> workspaceOption,
+        Option<string?> repoOption,
+        string name,
+        string description,
+        bool resolve)
+    {
+        var command = new Command(name, description);
+        var idArg = new Argument<int>("id") { Description = "Pull request ID" };
+        var commentOption = new Option<int>("--comment-id") { Description = "Comment ID", Required = true };
+        command.Arguments.Add(idArg);
+        command.Options.Add(commentOption);
+        command.SetHandler((string? workspace, string? repo, int id, int commentId) =>
+            CommandRunner.RunActionAsync(() =>
+                services.GetRequiredService<ResolvePullRequestCommentHandler>()
+                    .HandleAsync(new ResolvePullRequestCommentRequest(workspace, repo, id, commentId, resolve), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, idArg, commentOption);
+        return command;
+    }
+
 }

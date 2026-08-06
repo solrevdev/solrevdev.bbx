@@ -5,6 +5,9 @@ using Bbx.Features.Branches.DeleteBranch;
 using Bbx.Features.Branches.DeleteBranchRestriction;
 using Bbx.Features.Branches.ListBranches;
 using Bbx.Features.Branches.ListBranchRestrictions;
+using Bbx.Features.Branches.ListRefs;
+using Bbx.Features.Branches.UpdateBranchRestriction;
+using Bbx.Features.Branches.ViewBranchRestriction;
 using Bbx.Features.Branches.ViewBranch;
 using Bbx.Features.Tags.CreateTag;
 using Bbx.Features.Tags.DeleteTag;
@@ -97,6 +100,34 @@ public static class BranchCommand
             workspaceOption, repoOption, kindOption, patternOption);
         restrictionsCommand.Subcommands.Add(restrictionsAddCommand);
 
+        var restrictionsViewCommand = new Command("view", "View a branch restriction");
+        var restrictionsViewIdArg = new Argument<int>("id") { Description = "Restriction ID" };
+        restrictionsViewCommand.Arguments.Add(restrictionsViewIdArg);
+        restrictionsViewCommand.SetHandler((string? workspace, string? repo, int id) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewBranchRestrictionHandler>()
+                    .HandleAsync(new ViewBranchRestrictionRequest(workspace, repo, id), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, restrictionsViewIdArg);
+        restrictionsCommand.Subcommands.Add(restrictionsViewCommand);
+
+        var restrictionsUpdateCommand = new Command("update", "Update a branch restriction");
+        var restrictionsUpdateIdArg = new Argument<int>("id") { Description = "Restriction ID" };
+        var restrictionsPatternOption = new Option<string?>("--pattern") { Description = "New branch pattern (glob)" };
+        var restrictionsValueOption = new Option<int?>("--value") { Description = "New numeric value, for the kinds that take one (e.g. require_approvals_to_merge)" };
+        var restrictionsUsersOption = new Option<string[]?>("--users") { Description = "Replace the exempt users with these account UUIDs" };
+        var restrictionsGroupsOption = new Option<string[]?>("--groups") { Description = "Replace the exempt groups with these slugs" };
+        restrictionsUpdateCommand.Arguments.Add(restrictionsUpdateIdArg);
+        restrictionsUpdateCommand.Options.Add(restrictionsPatternOption);
+        restrictionsUpdateCommand.Options.Add(restrictionsValueOption);
+        restrictionsUpdateCommand.Options.Add(restrictionsUsersOption);
+        restrictionsUpdateCommand.Options.Add(restrictionsGroupsOption);
+        restrictionsUpdateCommand.SetHandler((string? workspace, string? repo, int id, string? pattern, int? value, string[]? users, string[]? groups) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<UpdateBranchRestrictionHandler>()
+                    .HandleAsync(new UpdateBranchRestrictionRequest(workspace, repo, id, pattern, value, users, groups), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, restrictionsUpdateIdArg, restrictionsPatternOption, restrictionsValueOption, restrictionsUsersOption, restrictionsGroupsOption);
+        restrictionsCommand.Subcommands.Add(restrictionsUpdateCommand);
+
         var restrictionsDeleteCommand = new Command("delete", "Delete a branch restriction");
         var restrictionIdArg = new Argument<int>("id") { Description = "Restriction ID" };
         // Confirms like the other delete verbs; removing a restriction relaxes
@@ -115,6 +146,18 @@ public static class BranchCommand
         restrictionsCommand.Subcommands.Add(restrictionsDeleteCommand);
 
         command.Subcommands.Add(restrictionsCommand);
+
+        var refsCommand = new Command("refs", "List branches and tags together");
+        var refsQueryOption = new Option<string?>("--query") { Description = "BBQL query filter" };
+        var refsLimitOption = new Option<int>("--limit") { Description = "Maximum refs to list", DefaultValueFactory = _ => 100 };
+        refsCommand.Options.Add(refsQueryOption);
+        refsCommand.Options.Add(refsLimitOption);
+        refsCommand.SetHandler((string? workspace, string? repo, string? query, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListRefsHandler>()
+                    .HandleAsync(new ListRefsRequest(workspace, repo, query, limit), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, refsQueryOption, refsLimitOption);
+        command.Subcommands.Add(refsCommand);
 
         command.Subcommands.Add(CreateTagCommand(services, workspaceOption, repoOption));
 

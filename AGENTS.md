@@ -43,6 +43,19 @@ Break these and something fails in production but not in the tests:
 - Destructive verbs take `--yes` and confirm otherwise.
 - New behaviour ships with a test.
 
+## The API spec
+
+`docs/spec/swagger.json` is a pinned copy of the Bitbucket Cloud spec. Read it
+before guessing at an endpoint, and do not fetch the documentation site:
+
+```bash
+jq '.paths["/repositories/{workspace}/{repo_slug}/deploy-keys/{key_id}"]' docs/spec/swagger.json
+```
+
+`scripts/fetch-spec.sh` refreshes it and records the date beside it. The spec is
+often wrong about request bodies and required fields, so confirm anything it
+tells you against a real call before writing it down as fact.
+
 ## Live testing
 
 If you test against real Bitbucket:

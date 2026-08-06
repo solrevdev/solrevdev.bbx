@@ -13,7 +13,8 @@ public sealed class ViewSnippetHandler(BitbucketClient client, CredentialManager
         var workspace = Resolve.Workspace(credentials, request.Workspace,
             "Error: Workspace required. Use --workspace or set default with 'bbx auth set-workspace'.");
 
-        var snippet = await client.GetAsync<JsonElement>($"snippets/{workspace}/{request.SnippetId}", ct);
+        var snippet = await client.GetAsync<JsonElement>(
+            SnippetPath.For(workspace, request.SnippetId, request.Revision), ct);
 
         return new
         {

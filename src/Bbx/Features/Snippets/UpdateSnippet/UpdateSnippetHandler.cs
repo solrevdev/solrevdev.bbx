@@ -34,8 +34,10 @@ public sealed class UpdateSnippetHandler(BitbucketClient client, CredentialManag
             }
         }
 
+        // With a revision, Bitbucket refuses the write if the snippet has
+        // moved on since, rather than clobbering the newer version.
         var snippet = await client.PutMultipartAsync<JsonElement>(
-            $"snippets/{workspace}/{request.SnippetId}", content, ct);
+            SnippetPath.For(workspace, request.SnippetId, request.Revision), content, ct);
 
         return new
         {

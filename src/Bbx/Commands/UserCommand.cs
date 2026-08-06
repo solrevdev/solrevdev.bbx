@@ -1,4 +1,10 @@
 using System.CommandLine;
+using Bbx.Features.Users.GpgKeys.ListGpgKeys;
+using Bbx.Features.Users.GpgKeys.ViewGpgKey;
+using Bbx.Features.Users.ListUserWorkspaceRepositoryPermissions;
+using Bbx.Features.Users.ListUserWorkspaces;
+using Bbx.Features.Users.ViewUserEmail;
+using Bbx.Features.Users.ViewUserWorkspacePermission;
 using Bbx.Features.Users.ListUserEmails;
 using Bbx.Features.Users.ListUserRepositoryPermissions;
 using Bbx.Features.Users.ListUserWorkspacePermissions;
@@ -19,12 +25,17 @@ public static class UserCommand
 
         var emailsCommand = new Command("emails", "List your account email addresses");
         var emailsLimitOption = new Option<int>("--limit") { Description = "Maximum emails to list", DefaultValueFactory = _ => 25 };
+        var emailOption = new Option<string?>("--email")
+        { Description = "Look up one address instead, to see whether it is confirmed and primary" };
         emailsCommand.Options.Add(emailsLimitOption);
-        emailsCommand.SetHandler((int limit) =>
-            CommandRunner.RunJsonAsync(() =>
-                services.GetRequiredService<ListUserEmailsHandler>()
-                    .HandleAsync(new ListUserEmailsRequest(limit), CommandBinding.CancellationToken)),
-            emailsLimitOption);
+        emailsCommand.Options.Add(emailOption);
+        emailsCommand.SetHandler((int limit, string? email) =>
+            CommandRunner.RunJsonAsync<object>(async () => string.IsNullOrEmpty(email)
+                ? await services.GetRequiredService<ListUserEmailsHandler>()
+                    .HandleAsync(new ListUserEmailsRequest(limit), CommandBinding.CancellationToken)
+                : await services.GetRequiredService<ViewUserEmailHandler>()
+                    .HandleAsync(new ViewUserEmailRequest(email), CommandBinding.CancellationToken)),
+            emailsLimitOption, emailOption);
         command.Subcommands.Add(emailsCommand);
 
         var permissionsCommand = new Command("permissions",
@@ -50,7 +61,49 @@ public static class UserCommand
             permsRepoLimitOption);
         permissionsCommand.Subcommands.Add(permsRepoCommand);
 
+        var permsOneWsCommand = new Command("workspace",
+            "Show your role in one workspace");
+        var permsOneWsOption = new Option<string?>("--workspace", "-w")
+        { Description = "Workspace slug (uses default if not specified)" };
+        permsOneWsCommand.Options.Add(permsOneWsOption);
+        permsOneWsCommand.SetHandler((string? workspace) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewUserWorkspacePermissionHandler>()
+                    .HandleAsync(new ViewUserWorkspacePermissionRequest(workspace), CommandBinding.CancellationToken)),
+            permsOneWsOption);
+        permissionsCommand.Subcommands.Add(permsOneWsCommand);
+
+        var permsWsReposCommand = new Command("workspace-repositories",
+            "List your repository permissions within one workspace");
+        var permsWsReposWsOption = new Option<string?>("--workspace", "-w")
+        { Description = "Workspace slug (uses default if not specified)" };
+        var permsWsReposLimitOption = new Option<int>("--limit")
+        { Description = "Maximum entries to list", DefaultValueFactory = _ => 50 };
+        permsWsReposCommand.Options.Add(permsWsReposWsOption);
+        permsWsReposCommand.Options.Add(permsWsReposLimitOption);
+        permsWsReposCommand.SetHandler((string? workspace, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListUserWorkspaceRepositoryPermissionsHandler>()
+                    .HandleAsync(new ListUserWorkspaceRepositoryPermissionsRequest(workspace, limit), CommandBinding.CancellationToken)),
+            permsWsReposWsOption, permsWsReposLimitOption);
+        permissionsCommand.Subcommands.Add(permsWsReposCommand);
+
         command.Subcommands.Add(permissionsCommand);
+
+        // The account-scoped workspace list. `workspace list` reads
+        // /2.0/workspaces, which Bitbucket withdrew.
+        var workspacesCommand = new Command("workspaces", "List the workspaces your account belongs to");
+        var workspacesLimitOption = new Option<int>("--limit")
+        { Description = "Maximum workspaces to list", DefaultValueFactory = _ => 50 };
+        workspacesCommand.Options.Add(workspacesLimitOption);
+        workspacesCommand.SetHandler((int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListUserWorkspacesHandler>()
+                    .HandleAsync(new ListUserWorkspacesRequest(limit), CommandBinding.CancellationToken)),
+            workspacesLimitOption);
+        command.Subcommands.Add(workspacesCommand);
+
+        command.Subcommands.Add(CreateGpgKeysCommand(services));
 
         var viewCommand = new Command("view", "View a user profile (defaults to the authenticated account)");
         var viewUserArg = new Argument<string>("selected-user")
@@ -129,4 +182,38 @@ public static class UserCommand
 
         return sshCommand;
     }
+
+    private static Command CreateGpgKeysCommand(IServiceProvider services)
+    {
+        // Read-only. Adding and deleting a GPG key would mutate the only real
+        // account on this machine, and there is no throwaway user to test
+        // against.
+        var gpgCommand = new Command("gpg-keys", "List and view account GPG keys");
+        var userOption = new Option<string?>("--user")
+        { Description = "Account UUID or account ID (defaults to the authenticated account)" };
+        gpgCommand.AddRecursiveOption(userOption);
+
+        var listCommand = new Command("list", "List GPG keys");
+        var limitOption = new Option<int>("--limit") { Description = "Maximum keys to list", DefaultValueFactory = _ => 25 };
+        listCommand.Options.Add(limitOption);
+        listCommand.SetHandler((string? user, int limit) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ListGpgKeysHandler>()
+                    .HandleAsync(new ListGpgKeysRequest(user, limit), CommandBinding.CancellationToken)),
+            userOption, limitOption);
+        gpgCommand.Subcommands.Add(listCommand);
+
+        var viewCommand = new Command("view", "View a GPG key");
+        var fingerprintArg = new Argument<string>("fingerprint") { Description = "Key fingerprint" };
+        viewCommand.Arguments.Add(fingerprintArg);
+        viewCommand.SetHandler((string? user, string fingerprint) =>
+            CommandRunner.RunJsonAsync(() =>
+                services.GetRequiredService<ViewGpgKeyHandler>()
+                    .HandleAsync(new ViewGpgKeyRequest(user, fingerprint), CommandBinding.CancellationToken)),
+            userOption, fingerprintArg);
+        gpgCommand.Subcommands.Add(viewCommand);
+
+        return gpgCommand;
+    }
+
 }
