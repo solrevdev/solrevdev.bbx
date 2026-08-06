@@ -49,8 +49,6 @@ using Bbx.Features.Pipelines.ListPipelineVariables;
 using Bbx.Features.Pipelines.ListReportAnnotations;
 using Bbx.Features.Pipelines.ListTestCases;
 using Bbx.Features.Pipelines.ListTestReports;
-using Bbx.Features.Pipelines.OidcConfig;
-using Bbx.Features.Pipelines.OidcKeys;
 using Bbx.Features.Pipelines.PipelineLogs;
 using Bbx.Features.Pipelines.StopPipeline;
 using Bbx.Features.Pipelines.TriggerPipeline;
@@ -85,8 +83,6 @@ public static class PipelineCommand
         command.Subcommands.Add(CreateStepCommand(services));
         command.Subcommands.Add(CreateTestCaseReasonsCommand(services));
         command.Subcommands.Add(CreateDeploysCommand(services));
-        command.Subcommands.Add(CreateOidcCommand(services));
-
         return command;
     }
 
@@ -310,33 +306,6 @@ public static class PipelineCommand
                     .HandleAsync(new ListTestCasesRequest(workspace, repo, pipelineUuid, stepUuid, limit), CommandBinding.CancellationToken)),
             workspaceOption, repoOption, pipelineUuidArg, stepUuidArg, limitOption);
         return command;
-    }
-
-    private static Command CreateOidcCommand(IServiceProvider services)
-    {
-        var oidcCommand = new Command("oidc", "Pipelines OIDC discovery and JWKS");
-        var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
-        var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
-        oidcCommand.AddRecursiveOption(workspaceOption);
-        oidcCommand.AddRecursiveOption(repoOption);
-
-        var configCommand = new Command("config", "Show the OpenID provider configuration");
-        configCommand.SetHandler((string? workspace, string? repo) =>
-            CommandRunner.RunJsonAsync(() =>
-                services.GetRequiredService<OidcConfigHandler>()
-                    .HandleAsync(new OidcConfigRequest(workspace, repo), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption);
-        oidcCommand.Subcommands.Add(configCommand);
-
-        var keysCommand = new Command("keys", "Show the JWKS used to verify pipeline OIDC tokens");
-        keysCommand.SetHandler((string? workspace, string? repo) =>
-            CommandRunner.RunJsonAsync(() =>
-                services.GetRequiredService<OidcKeysHandler>()
-                    .HandleAsync(new OidcKeysRequest(workspace, repo), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption);
-        oidcCommand.Subcommands.Add(keysCommand);
-
-        return oidcCommand;
     }
 
     private static Command CreateListCommand(IServiceProvider services)

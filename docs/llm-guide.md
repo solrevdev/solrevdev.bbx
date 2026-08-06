@@ -302,7 +302,6 @@ Each command prints a deprecation warning on stderr.
 | `test-case-reasons <pipeline> <step> <test-case>` | `.../test_reports/test_cases/{uuid}/test_case_reasons` |
 | `test-reports <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports` |
 | `test-cases <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports/test_cases` |
-| `oidc {config,keys}` | `.../pipelines-config/identity/oidc/.well-known/openid-configuration` / `.../keys.json` — answers 404: only the workspace form of this path exists, use `workspace pipelines oidc` |
 
 ### 4.10 `bbx snippet`
 

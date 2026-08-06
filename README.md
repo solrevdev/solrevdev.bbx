@@ -349,7 +349,6 @@ bbx pipeline reports annotation-view|annotation-update|annotation-delete <hash> 
 bbx pipeline test-reports '{pipeline}' '{step}' -w myws -r myrepo
 bbx pipeline test-cases '{pipeline}' '{step}' -w myws -r myrepo
 bbx pipeline test-case-reasons '{pipeline}' '{step}' '{test-case}' -w myws -r myrepo
-bbx pipeline oidc config|keys -w myws -r myrepo
 ```
 
 UUIDs include the braces. Quote them so your shell doesn't expand them.
@@ -361,8 +360,8 @@ environment's lock, rank, type or hidden flag through it. `caches clear` takes a
 cache UUID, or `--name` to clear every cache with that name. `reports update`
 needs `--details`: Bitbucket refuses a report without it whatever the docs say.
 `pipeline config` answers 404 until Pipelines has been enabled on the repository
-at least once. `pipeline oidc` answers 404: only the workspace form of that
-path exists, and `workspace pipelines oidc` reaches it.
+at least once. There is no `pipeline oidc`: only the
+workspace form of that path exists, and `workspace pipelines oidc` reaches it.
 </details>
 
 <details>

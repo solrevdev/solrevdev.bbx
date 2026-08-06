@@ -127,6 +127,17 @@ public class CommandSurfaceTests
             .Errors.Should().NotBeEmpty();
     }
 
+    // Only the workspace form of the OIDC path exists. The repository form
+    // answered 404 "There is no API hosted at this URL", so the command is gone.
+    [Fact]
+    public void Pipeline_has_no_repository_scoped_oidc_command()
+    {
+        Parse(PipelineCommand.Create(Services()), "oidc", "config", "-r", "widgets")
+            .Errors.Should().NotBeEmpty();
+        Parse(WorkspaceCommand.Create(Services()), "pipelines", "oidc", "config", "-w", "acme")
+            .Errors.Should().BeEmpty();
+    }
+
     // PUT deploy-keys/{key_id} cannot succeed, so there is no update verb.
     [Fact]
     public void Deploy_keys_has_no_update_verb()

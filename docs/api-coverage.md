@@ -68,9 +68,11 @@ Two things could not be made to work and are recorded rather than hidden:
 
 - `pr conflicts`, `repo file-conflicts` and the workspace OIDC discovery
   commands answer 403 "This resource does not support authentication using the
-  provided token". No scope changes that. The repository-scoped OIDC pair is a
-  separate fault: it answers 404 "There is no API hosted at this URL", because
-  only the workspace form of that path exists.
+  provided token". No scope changes that. `bbx pipeline oidc` used to be listed
+  alongside them and was a separate fault: it answered 404 "There is no API
+  hosted at this URL", because the spec defines only the workspace form of that
+  path. The command has been removed; it never appeared in the table below,
+  because the path it called is not in the spec.
 - The deployment variables list endpoint answers an empty page even when
   variables exist. Add, update and delete all work.
 

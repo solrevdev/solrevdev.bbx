@@ -132,7 +132,8 @@ rules below are; it is still the right place to start.
     with a path that does not exist: the repository-scoped
     `repositories/{ws}/{repo}/pipelines-config/identity/oidc/...` answers 404
     "There is no API hosted at this URL", because only the workspace form is
-    real.
+    real. `bbx pipeline oidc` called it and has been removed; do not add it
+    back. `bbx workspace pipelines oidc` is the one that reaches a real path.
 21. **Errors carry `detail` and `data.arguments` as well as the message.**
     Bitbucket often answers a bare "Bad request" and puts the reason in an
     argument, which is how "SSH for this hostname is already configured by
@@ -159,7 +160,9 @@ rules below are; it is still the right place to start.
 25. **Groups live only in the 1.0 API.** No 2.0 path mentions groups outside
     `permissions-config`, so there is no way to list a group slug from 2.0.
     `GET /1.0/groups/{workspace}/` still answers 200 with an API token and is
-    the only way to read one. It is a probe, not a feature: do not build on it.
+    the only way to read one. `GET /1.0/users/{workspace}/invitations` answers
+    too, and lists invitations that have been sent but not accepted. Both are
+    probes, not features: do not build on them.
 
 ## Auth
 

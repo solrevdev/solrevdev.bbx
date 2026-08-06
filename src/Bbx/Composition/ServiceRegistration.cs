@@ -200,8 +200,6 @@ public static class ServiceRegistration
         services.AddTransient<Features.Pipelines.ListReportAnnotations.ListReportAnnotationsHandler>();
         services.AddTransient<Features.Pipelines.ListTestReports.ListTestReportsHandler>();
         services.AddTransient<Features.Pipelines.ListTestCases.ListTestCasesHandler>();
-        services.AddTransient<Features.Pipelines.OidcConfig.OidcConfigHandler>();
-        services.AddTransient<Features.Pipelines.OidcKeys.OidcKeysHandler>();
         services.AddTransient<Features.Pipelines.ViewPipelinesConfig.ViewPipelinesConfigHandler>();
         services.AddTransient<Features.Pipelines.UpdatePipelinesConfig.UpdatePipelinesConfigHandler>();
         services.AddTransient<Features.Pipelines.SetPipelineBuildNumber.SetPipelineBuildNumberHandler>();
