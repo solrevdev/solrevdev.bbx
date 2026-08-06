@@ -21,7 +21,6 @@ using Bbx.Features.Repos.DeleteRepo;
 using Bbx.Features.Repos.DeployKeys.AddRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.DeleteRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.ListRepoDeployKeys;
-using Bbx.Features.Repos.DeployKeys.UpdateRepoDeployKey;
 using Bbx.Features.Repos.DeployKeys.ViewRepoDeployKey;
 using Bbx.Features.Repos.FileConflicts;
 using Bbx.Features.Repos.ForkRepo;
@@ -350,19 +349,8 @@ public static class RepoCommand
             workspaceOption, repoOption, addKeyOption, addLabelOption);
         dkCommand.Subcommands.Add(addCommand);
 
-        var updateKeyCommand = new Command("update", "Replace a deploy key");
-        var updateKeyIdArg = new Argument<int>("key-id") { Description = "Deploy key ID" };
-        var updateKeyOption = new Option<string>("--key") { Description = "Public SSH key body. Required: this PUT replaces rather than merges.", Required = true };
-        var updateKeyLabelOption = new Option<string?>("--label") { Description = "Friendly label" };
-        updateKeyCommand.Arguments.Add(updateKeyIdArg);
-        updateKeyCommand.Options.Add(updateKeyOption);
-        updateKeyCommand.Options.Add(updateKeyLabelOption);
-        updateKeyCommand.SetHandler((string? workspace, string? repo, int keyId, string key, string? label) =>
-            CommandRunner.RunJsonAsync(() =>
-                services.GetRequiredService<UpdateRepoDeployKeyHandler>()
-                    .HandleAsync(new UpdateRepoDeployKeyRequest(workspace, repo, keyId, key, label), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption, updateKeyIdArg, updateKeyOption, updateKeyLabelOption);
-        dkCommand.Subcommands.Add(updateKeyCommand);
+        // No update command. PUT deploy-keys/{key_id} cannot succeed: it demands
+        // key and then refuses it, whatever you send. See CLAUDE.md rule 19.
 
         var deleteCommand = new Command("delete", "Delete a deploy key");
         var deleteIdArg = new Argument<int>("key-id") { Description = "Deploy key ID" };

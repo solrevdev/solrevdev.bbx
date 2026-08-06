@@ -109,6 +109,33 @@ public class CommandSurfaceTests
         result.Errors.Should().NotBeEmpty("--cron is required");
     }
 
+    // The lock cannot be changed through this endpoint, so --lock and --unlock
+    // were dropped for --admin-only and --no-admin-only. A stale flag would
+    // still compile, so the parse is asserted here.
+    [Fact]
+    public void Environment_changes_takes_admin_only_and_no_longer_takes_lock()
+    {
+        var command = PipelineCommand.Create(Services());
+
+        Parse(command, "deployments", "changes", "e1", "-r", "widgets", "--admin-only")
+            .Errors.Should().BeEmpty();
+        Parse(command, "deployments", "changes", "e1", "-r", "widgets", "--no-admin-only")
+            .Errors.Should().BeEmpty();
+        Parse(command, "deployments", "changes", "e1", "-r", "widgets", "--lock")
+            .Errors.Should().NotBeEmpty();
+        Parse(command, "deployments", "changes", "e1", "-r", "widgets", "--reason", "freeze")
+            .Errors.Should().NotBeEmpty();
+    }
+
+    // PUT deploy-keys/{key_id} cannot succeed, so there is no update verb.
+    [Fact]
+    public void Deploy_keys_has_no_update_verb()
+    {
+        Parse(RepoCommand.Create(Services()),
+                "deploy-keys", "update", "7", "-r", "widgets", "--key", "ssh-ed25519 AAAA")
+            .Errors.Should().NotBeEmpty();
+    }
+
     [Fact]
     public void Recursive_options_reach_nested_subcommands()
     {

@@ -82,7 +82,6 @@ public static class ServiceRegistration
         services.AddTransient<Features.Repos.DeployKeys.ViewRepoDeployKey.ViewRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.DeployKeys.AddRepoDeployKey.AddRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.DeployKeys.DeleteRepoDeployKey.DeleteRepoDeployKeyHandler>();
-        services.AddTransient<Features.Repos.DeployKeys.UpdateRepoDeployKey.UpdateRepoDeployKeyHandler>();
         services.AddTransient<Features.Repos.UpdateRepo.UpdateRepoHandler>();
         services.AddTransient<Features.Repos.DefaultReviewers.ViewDefaultReviewer.ViewDefaultReviewerHandler>();
         services.AddTransient<Features.Repos.BranchingModel.EffectiveBranchingModel.EffectiveBranchingModelHandler>();

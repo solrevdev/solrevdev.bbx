@@ -5,7 +5,6 @@ using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Repos.BranchingModel.EffectiveBranchingModel;
 using Bbx.Features.Repos.DefaultReviewers.ViewDefaultReviewer;
-using Bbx.Features.Repos.DeployKeys.UpdateRepoDeployKey;
 using Bbx.Features.Repos.FileConflicts;
 using Bbx.Features.Repos.OverrideSettings.UpdateOverrideSettings;
 using Bbx.Features.Repos.OverrideSettings.ViewOverrideSettings;
@@ -141,26 +140,6 @@ public class RepoSettingsHandlerTests
         http.Calls.Single().RequestUri!.AbsoluteUri.Should()
             .Be("https://api.bitbucket.org/2.0/repositories/ws/repo/default-reviewers/557058%3Aabc");
         ((string)result.display_name).Should().Be("Jane");
-    }
-
-    // Unlike the merging PUTs elsewhere, this one replaces, so the key body has
-    // to go out even when only the label is changing.
-    [Fact]
-    public async Task Deploy_key_update_always_sends_the_key()
-    {
-        var http = new FakeHttpMessageHandler();
-        http.Enqueue(HttpStatusCode.OK, """{"id":7,"label":"ci","key":"ssh-rsa AAAA"}""");
-
-        await new UpdateRepoDeployKeyHandler(Client(http), Creds()).HandleAsync(
-            new UpdateRepoDeployKeyRequest("ws", "repo", 7, "ssh-rsa AAAA", "ci"),
-            TestContext.Current.CancellationToken);
-
-        var call = http.Calls.Single();
-        call.Method.Should().Be(HttpMethod.Put);
-        call.RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/repo/deploy-keys/7");
-        var body = Body(http);
-        body.GetProperty("key").GetString().Should().Be("ssh-rsa AAAA");
-        body.GetProperty("label").GetString().Should().Be("ci");
     }
 
     [Fact]
