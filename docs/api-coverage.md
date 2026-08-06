@@ -82,29 +82,30 @@ repository that had.
 
 ## The permissions-config writes
 
-Run live on 2026-08-06 against a throwaway repository and a disposable, empty group in the
-personal `solrevdev` workspace. Four of the eight are now confirmed end to end:
+Run live on 2026-08-06 against a throwaway repository, a disposable empty group, a
+throwaway project and a second workspace member, all in the personal `solrevdev`
+workspace and all removed afterwards. **All eight are confirmed end to end:**
 
 | Verb | Target | Result |
 | --- | --- | --- |
-| `PUT`/`DELETE` `permissions-config/groups/{slug}` | repository | Confirmed. `read`, `write` and `admin` all land |
-| `PUT`/`DELETE` `permissions-config/groups/{slug}` | project | Confirmed. `create-repo` lands too |
-| `PUT`/`DELETE` `permissions-config/users/{id}` | repository | Reachable, not confirmed |
-| `PUT`/`DELETE` `permissions-config/users/{id}` | project | Reachable, not confirmed |
+| `PUT`/`DELETE` `permissions-config/groups/{slug}` | repository | `read`, `write`, `admin` |
+| `PUT`/`DELETE` `permissions-config/groups/{slug}` | project | and `create-repo` |
+| `PUT`/`DELETE` `permissions-config/users/{id}` | repository | `read`, `write`, `admin` |
+| `PUT`/`DELETE` `permissions-config/users/{id}` | project | and `create-repo` |
 
-The body is `{"permission": "..."}`, as documented. Two things the spec gets wrong:
+The body is `{"permission": "..."}`, as documented. The user forms accept either an
+account UUID with its braces or an account ID as the selector; both were exercised.
+
+Three things the spec gets wrong or leaves out:
 
 - It says of all eight "The only authentication method for this endpoint is via app
   passwords". That is stale. App passwords were withdrawn on 28 July 2026, and an API
   token drives these fine.
 - `none` is not a permission. All four `set` verbs offered it; Bitbucket answers 400
   "none is not a valid permission". It has been dropped, and `remove` does that job.
-
-The user-keyed pair stays unconfirmed because the target must be a workspace member and
-cannot be the workspace owner, and `solrevdev` has one member. Aimed at the owner they
-answer 400 "This user is linked to this workspace, so their access on any of the
-repositories cannot be modified or removed", which proves the path resolves and the body
-parses but not that a grant lands.
+- A user-keyed grant cannot name the workspace owner. Bitbucket answers 400 "This user
+  is linked to this workspace, so their access on any of the repositories cannot be
+  modified or removed", so testing these needs a second member and nothing else will do.
 
 ## Repository
 

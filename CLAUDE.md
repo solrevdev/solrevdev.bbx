@@ -154,9 +154,12 @@ rules below are; it is still the right place to start.
 24. **The permissions-config spec text about app passwords is stale.** All eight
     operations claim "The only authentication method for this endpoint is via
     app passwords". App passwords were withdrawn on 28 July 2026 and an API
-    token drives them fine. A user-keyed grant cannot name the workspace owner:
-    Bitbucket answers 400 "This user is linked to this workspace, so their
-    access ... cannot be modified or removed".
+    token drives them fine; all eight were run live on 2026-08-06. A user-keyed
+    grant cannot name the workspace owner: Bitbucket answers 400 "This user is
+    linked to this workspace, so their access ... cannot be modified or
+    removed", so a second member is the only way to test those four. The
+    selector may be an account UUID with its braces or an account ID; both
+    work, and a username does not.
 25. **Groups live only in the 1.0 API.** No 2.0 path mentions groups outside
     `permissions-config`, so there is no way to list a group slug from 2.0.
     `GET /1.0/groups/{workspace}/` still answers 200 with an API token and is
