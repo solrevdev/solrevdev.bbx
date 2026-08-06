@@ -7,7 +7,9 @@ namespace Bbx.Features.Workspaces.Projects.Access.SetProjectGroupPermission;
 
 public sealed class SetProjectGroupPermissionHandler(BitbucketClient client, CredentialManager credentials)
 {
-    public static readonly string[] Allowed = ["read", "write", "create-repo", "admin", "none"];
+    // "none" is not a permission Bitbucket accepts here; it answers 400
+    // "none is not a valid permission". Use the remove verb instead.
+    public static readonly string[] Allowed = ["read", "write", "create-repo", "admin"];
 
     public async Task<object> HandleAsync(SetProjectGroupPermissionRequest request, CancellationToken ct)
     {

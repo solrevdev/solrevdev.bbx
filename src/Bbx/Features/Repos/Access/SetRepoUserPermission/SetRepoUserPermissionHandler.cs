@@ -7,7 +7,9 @@ namespace Bbx.Features.Repos.Access.SetRepoUserPermission;
 
 public sealed class SetRepoUserPermissionHandler(BitbucketClient client, CredentialManager credentials)
 {
-    public static readonly string[] Allowed = ["read", "write", "admin", "none"];
+    // "none" is not a permission Bitbucket accepts here; it answers 400
+    // "none is not a valid permission". Use the remove verb instead.
+    public static readonly string[] Allowed = ["read", "write", "admin"];
 
     public async Task<object> HandleAsync(SetRepoUserPermissionRequest request, CancellationToken ct)
     {
