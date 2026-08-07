@@ -359,15 +359,15 @@ public static class PipelineCommand
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
         var branchOption = new Option<string?>("--branch")
         {
-            Description = "Branch to run the pipeline on. Defaults to the repository's main branch, "
-                          + "or to the pull request's source branch when --pull-request is set.",
+            Description = "Branch to run the pipeline on. Defaults to the repository's main branch. "
+                          + "Cannot be combined with --pull-request, which brings its own branches.",
         };
         var commitOption = new Option<string?>("--commit") { Description = "Specific commit hash to run on (branch trigger only)" };
         var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern (selector) to run" };
         var pullRequestOption = new Option<string?>("--pull-request")
         {
-            Description = "Trigger the pull-request pipeline for this PR id. Runs on the pull request's "
-                          + "own source branch unless --branch says otherwise.",
+            Description = "Trigger the pull-request pipeline for this PR id. Both branches and both "
+                          + "commits come from the pull request, so this sets BITBUCKET_PR_ID in the run.",
         };
         var variablesOption = new Option<string[]>("--variable") { Description = "Pipeline variables in key=value format", AllowMultipleArgumentsPerToken = true };
 

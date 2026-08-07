@@ -7,6 +7,15 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.3.3]
+
+### Fixed
+
+- `pipeline trigger --help` told you to do something the command refuses.
+  `--branch` still claimed it overrode the pull request's source branch, and
+  `--pull-request` still said `--branch` could override it, both written before
+  the two flags were made mutually exclusive.
+
 ## [1.3.1]
 
 ### Changed
