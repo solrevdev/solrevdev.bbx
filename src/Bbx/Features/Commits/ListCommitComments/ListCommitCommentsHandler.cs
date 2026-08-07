@@ -22,6 +22,7 @@ public sealed class ListCommitCommentsHandler(BitbucketClient client, Credential
                 user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var dn) ? dn.GetString() : null,
                 content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
                 created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null,
+                deleted = comment.TryGetProperty("deleted", out var del) && del.ValueKind == JsonValueKind.True,
             });
         }
 

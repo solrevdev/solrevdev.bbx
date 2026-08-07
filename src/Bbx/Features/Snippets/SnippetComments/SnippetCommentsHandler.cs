@@ -51,6 +51,24 @@ public sealed class SnippetCommentsHandler(BitbucketClient client, CredentialMan
             return new { deleted = true, comment_id = request.DeleteId };
         }
 
+        if (request.ViewId.HasValue)
+        {
+            var one = await client.GetAsync<JsonElement>(
+                $"snippets/{workspace}/{request.SnippetId}/comments/{request.ViewId}", ct);
+
+            return new
+            {
+                id = one.TryGetProperty("id", out var vi) ? vi.GetInt32() : request.ViewId.Value,
+                content = one.TryGetObject("content", out var vc) && vc.TryGetProperty("raw", out var vr)
+                    ? vr.GetString() : null,
+                user = one.TryGetObject("user", out var vu) && vu.TryGetProperty("display_name", out var vd)
+                    ? vd.GetString() : null,
+                created_on = one.TryGetProperty("created_on", out var vco) ? vco.GetString() : null,
+                updated_on = one.TryGetProperty("updated_on", out var vuo) ? vuo.GetString() : null,
+                deleted = one.TryGetProperty("deleted", out var vdel) && vdel.ValueKind == JsonValueKind.True,
+            };
+        }
+
         var comments = new List<object>();
         await foreach (var comment in client.GetPaginatedAsync<JsonElement>(
             $"snippets/{workspace}/{request.SnippetId}/comments", ct))
@@ -61,6 +79,7 @@ public sealed class SnippetCommentsHandler(BitbucketClient client, CredentialMan
                 content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var r) ? r.GetString() : null,
                 user = comment.TryGetObject("user", out var u) && u.TryGetProperty("display_name", out var d) ? d.GetString() : null,
                 created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null,
+                deleted = comment.TryGetProperty("deleted", out var del) && del.ValueKind == JsonValueKind.True,
             });
         }
 

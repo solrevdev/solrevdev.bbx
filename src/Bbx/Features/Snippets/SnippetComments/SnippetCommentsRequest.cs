@@ -6,4 +6,5 @@ public sealed record SnippetCommentsRequest(
     string? AddContent,
     int? DeleteId,
     int? UpdateId = null,
-    string? UpdateContent = null);
+    string? UpdateContent = null,
+    int? ViewId = null);

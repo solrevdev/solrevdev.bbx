@@ -166,12 +166,17 @@ rules below are; it is still the right place to start.
     the only way to read one. `GET /1.0/users/{workspace}/invitations` answers
     too, and lists invitations that have been sent but not accepted. Both are
     probes, not features: do not build on them.
-26. **Deleting a comment leaves a tombstone.** `DELETE .../comments/{id}`
-    answers 204 and clears the text, but the row stays. A later `pr comments`
-    still counts it and returns `"content": ""`. Confirmed on 2026-08-07
-    against a comment deleted the day before. Do not treat a non-zero count as
-    proof the delete failed, and do not filter the empty rows out: the caller
-    needs to see that something was there.
+26. **Deleting a pull request or commit comment leaves a tombstone; deleting a
+    snippet comment does not.** `DELETE .../comments/{id}` answers 204 either
+    way, but on pull requests and commits the row stays: a later `comments`
+    still counts it and returns `"content": ""` with `"deleted": true`. On
+    snippets the row goes, a later `--view` answers 404, and the count drops.
+    Do not treat a non-zero count as proof the delete failed, and do not filter
+    the empty rows out: the caller needs to see that something was there. The
+    three list handlers pass `deleted` through, because empty content on its
+    own does not say whether someone deleted the comment or left it blank.
+    All three paths were run end to end on 2026-08-07 against a throwaway
+    repository and snippet, both since deleted.
 
 ## Auth
 
@@ -193,6 +198,9 @@ Do not try to "fix" these. They return 410 Gone:
 - `/2.0/workspaces` (`bbx workspace list`)
 - `/2.0/user/permissions/{workspaces,repositories}`
 - `/2.0/repositories?role=…` without a workspace
+- `/2.0/snippets` (`bbx snippet list`), CHANGE-2770, seen 2026-08-07. Listing
+  only. Every other snippet path still works, including create, view, comments
+  and delete, so you need the snippet ID from somewhere else.
 
 Usernames are no longer valid user selectors either; use an account UUID or
 account ID. Bitbucket Issues shut down **2026-08-20** and the `issue` group goes

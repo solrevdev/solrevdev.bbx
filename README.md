@@ -415,6 +415,7 @@ bbx snippet files|watch|comments <id> -w myws
 bbx snippet commits <id> -w myws
 bbx snippet diff|patch <id> <revision> -w myws
 bbx snippet comments <id> --update <comment-id> --content "..." -w myws
+bbx snippet comments <id> --view <comment-id> -w myws
 
 bbx user view                       # the authenticated account
 bbx user emails [--email me@x.com]

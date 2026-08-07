@@ -200,6 +200,7 @@ public static class SnippetCommand
         var deleteOption = new Option<int?>("--delete", "-d") { Description = "Delete comment by ID" };
         var updateOption = new Option<int?>("--update", "-u") { Description = "Edit comment by ID. Needs --content." };
         var contentOption = new Option<string?>("--content") { Description = "Replacement text for --update" };
+        var viewOption = new Option<int?>("--view") { Description = "View a single comment by ID" };
 
         command.Arguments.Add(snippetIdArg);
         command.Options.Add(workspaceOption);
@@ -207,12 +208,13 @@ public static class SnippetCommand
         command.Options.Add(deleteOption);
         command.Options.Add(updateOption);
         command.Options.Add(contentOption);
+        command.Options.Add(viewOption);
 
-        command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId, int? updateId, string? content) =>
+        command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId, int? updateId, string? content, int? viewId) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<SnippetCommentsHandler>()
-                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId, updateId, content), CommandBinding.CancellationToken)),
-            snippetIdArg, workspaceOption, addOption, deleteOption, updateOption, contentOption);
+                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId, updateId, content, viewId), CommandBinding.CancellationToken)),
+            snippetIdArg, workspaceOption, addOption, deleteOption, updateOption, contentOption, viewOption);
         return command;
     }
 

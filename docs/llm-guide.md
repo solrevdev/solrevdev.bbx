@@ -179,7 +179,7 @@ offered; use `remove`.
 | `merge <id>` | `POST .../merge` — `--strategy merge_commit\|squash\|fast_forward`, `--message`, `--close-source-branch` |
 | `approve <id>` / `unapprove <id>` | `POST/DELETE .../approve` |
 | `decline <id>` | `POST .../decline` |
-| `comments <id>` / `comment <id>` | `GET/POST .../comments` — `--body` for `comment` |
+| `comments <id>` / `comment <id>` | `GET/POST .../comments` — `--body` for `comment`. Each row carries `deleted`; a tombstone reads `deleted: true` with empty `content` |
 | `diff <id>` / `patch <id>` | `GET .../diff` or `.../patch` (raw text out) |
 | `activity <id>` | `GET .../activity` |
 | `statuses <id>` | `GET .../statuses` |
@@ -238,7 +238,7 @@ bbx pr update 42 -r myrepo --title "New title" --close-source-branch
 | `list` | `GET repositories/{ws}/{repo}/commits[/{branch}]` — `--include`/`--exclude` walk a range and switch the call to `POST`, which is the only verb Bitbucket takes them on |
 | `view <hash>` | `GET .../commit/{hash}` |
 | `diff <hash>` / `patch <hash>` | `GET .../diff/{hash}` or `.../patch/{hash}` (raw) |
-| `comments <hash>` | `GET .../commit/{hash}/comments` |
+| `comments <hash>` | `GET .../commit/{hash}/comments` — each row carries `deleted`, as on pull requests |
 | `statuses <hash>` | `GET .../commit/{hash}/statuses` |
 | `status {create,update} <hash>` | `POST/PUT .../commit/{hash}/statuses/build[/{key}]` — `--key`, `--state INPROGRESS\|SUCCESSFUL\|FAILED\|STOPPED`, `--url`, `--name`, `--description` |
 | `filehistory <hash> <path>` | `GET .../filehistory/{hash}/{path}` |
@@ -311,7 +311,11 @@ endpoints under `snippets/{workspace}[/{id}]`.
 - `files <snippet-id> [<file-name>] [--raw] [--revision <rev>]` — list all
   files or stream a single file's contents.
 - `watch <snippet-id> [--list|--unwatch]` — watch by default.
-- `comments <snippet-id> [--add <body>|--delete <id>|--update <id> --content <body>]`.
+- `comments <snippet-id> [--add <body>|--view <id>|--delete <id>|--update <id> --content <body>]`.
+  With no flag it lists. The flags are tested in the order add, update, delete,
+  view, so passing two picks the first of those. Unlike pull request and commit
+  comments, `--delete` removes the row outright: no tombstone, and a later
+  `--view` answers 404.
 - `commits <snippet-id> [--revision <rev>]` — the log, or one commit.
 - `diff <snippet-id> <revision>` / `patch <snippet-id> <revision>` — raw text.
 - `view`, `update` and `delete` take `--revision`, which pins the call to that

@@ -23,6 +23,7 @@ public sealed class ListPullRequestCommentsHandler(BitbucketClient client, Crede
                 content = comment.TryGetObject("content", out var c) && c.TryGetProperty("raw", out var raw) ? raw.GetString() : null,
                 created_on = comment.TryGetProperty("created_on", out var co) ? co.GetString() : null,
                 inline = comment.TryGetProperty("inline", out _),
+                deleted = comment.TryGetProperty("deleted", out var del) && del.ValueKind == JsonValueKind.True,
             });
         }
 
