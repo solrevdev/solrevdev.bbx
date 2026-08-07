@@ -166,6 +166,12 @@ rules below are; it is still the right place to start.
     the only way to read one. `GET /1.0/users/{workspace}/invitations` answers
     too, and lists invitations that have been sent but not accepted. Both are
     probes, not features: do not build on them.
+26. **Deleting a comment leaves a tombstone.** `DELETE .../comments/{id}`
+    answers 204 and clears the text, but the row stays. A later `pr comments`
+    still counts it and returns `"content": ""`. Confirmed on 2026-08-07
+    against a comment deleted the day before. Do not treat a non-zero count as
+    proof the delete failed, and do not filter the empty rows out: the caller
+    needs to see that something was there.
 
 ## Auth
 

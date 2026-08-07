@@ -193,7 +193,7 @@ offered; use `remove`.
 | `activity [<id>]` | `GET .../pullrequests/activity` with no ID, `.../pullrequests/{id}/activity` with one — `--limit` |
 | `comment-view <id>` | `GET .../comments/{comment-id}` — `--comment-id` |
 | `comment-update <id>` | `PUT .../comments/{comment-id}` — `--comment-id`, `--body` |
-| `comment-delete <id>` | `DELETE .../comments/{comment-id}` — `--comment-id`, `--yes` |
+| `comment-delete <id>` | `DELETE .../comments/{comment-id}` — `--comment-id`, `--yes`. Leaves a tombstone: `comments` still counts the row and shows `"content": ""` |
 | `comment-resolve <id>` / `comment-unresolve <id>` | `POST/DELETE .../comments/{comment-id}/resolve` — `--comment-id` |
 | `tasks view <id>` | `GET .../tasks/{task-id}` — `--task-id` |
 
