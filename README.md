@@ -252,8 +252,9 @@ bbx pr tasks list|view|add|update|complete|delete 42 -w myws -r myrepo
 Merge strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`,
 `rebase_fast_forward` and `rebase_merge`. `merge`, `fast-forward` and `ff` are
 accepted as aliases. Leave `--strategy` off and `bbx` uses the destination
-branch's own default; ask for one that branch forbids and it says so, with the
-allowed list, before calling Bitbucket.
+branch's own default, set on the repository's Merge strategies page. Name one
+and that wins, at the cost of nothing: an explicit strategy is sent straight
+through.
 
 `pr update` changes only the fields you name and works on open pull requests
 only. `--body ""` clears the description. `--close-source-branch` and

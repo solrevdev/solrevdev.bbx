@@ -11,11 +11,8 @@ public class MergePullRequestHandlerTests
 {
     private const string PullRequest = """{"id":1,"destination":{"branch":{"name":"master"}}}""";
 
-    private static string Branch(params string[] allowed) =>
-        $$"""
-          {"name":"master","default_merge_strategy":"{{allowed[0]}}",
-           "merge_strategies":[{{string.Join(",", allowed.Select(a => $"\"{a}\""))}}]}
-          """;
+    private static string Branch(string defaultStrategy) =>
+        $$"""{"name":"master","default_merge_strategy":"{{defaultStrategy}}"}""";
 
     private static CredentialManager Creds() =>
         new(new InMemoryCredentialStore(new BbxConfig
@@ -53,19 +50,21 @@ public class MergePullRequestHandlerTests
         MergePullRequestHandler.NormalizeStrategy(input).Should().BeNull();
     }
 
+    // An explicit strategy is the caller's business, so it costs no lookups.
     [Fact]
-    public async Task Merge_sends_the_normalized_strategy()
+    public async Task Merge_sends_the_normalized_strategy_and_looks_nothing_up()
     {
-        var http = Http(Branch("merge_commit", "squash"));
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.OK, """{"id":1,"state":"MERGED"}""");
         var handler = new MergePullRequestHandler(Client(http), Creds());
 
         await handler.HandleAsync(
             new MergePullRequestRequest("ws", "repo", 1, "merge", null, false),
             TestContext.Current.CancellationToken);
 
-        http.Calls[2].RequestUri!.AbsolutePath
+        http.Calls.Single().RequestUri!.AbsolutePath
             .Should().Be("/2.0/repositories/ws/repo/pullrequests/1/merge");
-        http.CallBodies[2]!.Should().Contain("\"merge_strategy\": \"merge_commit\"");
+        http.CallBodies.Single()!.Should().Contain("\"merge_strategy\": \"merge_commit\"");
     }
 
     // Regression: --strategy defaulted to merge_commit whatever the repository
@@ -74,7 +73,7 @@ public class MergePullRequestHandlerTests
     [Fact]
     public async Task Merge_without_a_strategy_takes_the_destination_branch_default()
     {
-        var http = Http(Branch("squash", "merge_commit"));
+        var http = Http(Branch("squash"));
         var handler = new MergePullRequestHandler(Client(http), Creds());
 
         await handler.HandleAsync(
@@ -86,27 +85,10 @@ public class MergePullRequestHandlerTests
         http.CallBodies[2]!.Should().Contain("\"merge_strategy\": \"squash\"");
     }
 
-    // Bitbucket answers "merge_strategy: Select a valid choice" without saying
-    // what the choices are. The branch knows, so say it here and do not merge.
+    // A branch that reports no default is not a reason to refuse: fall back to
+    // the one Bitbucket itself defaults to.
     [Fact]
-    public async Task Merge_refuses_a_strategy_the_destination_branch_forbids()
-    {
-        var http = Http(Branch("squash", "fast_forward"));
-        var handler = new MergePullRequestHandler(Client(http), Creds());
-
-        var act = () => handler.HandleAsync(
-            new MergePullRequestRequest("ws", "repo", 1, "merge_commit", null, false),
-            TestContext.Current.CancellationToken);
-
-        (await act.Should().ThrowAsync<BbxUserException>())
-            .WithMessage("*does not allow the 'merge_commit' merge strategy*Allowed: squash, fast_forward*");
-        http.Calls.Should().HaveCount(2, "the merge must not be attempted");
-    }
-
-    // A branch that reports no strategies at all is not a reason to refuse: send
-    // what was asked for and let Bitbucket judge it.
-    [Fact]
-    public async Task Merge_falls_back_when_the_branch_reports_no_strategies()
+    public async Task Merge_falls_back_when_the_branch_reports_no_default()
     {
         var http = Http("""{"name":"master"}""");
         var handler = new MergePullRequestHandler(Client(http), Creds());
@@ -132,12 +114,12 @@ public class MergePullRequestHandlerTests
         var handler = new MergePullRequestHandler(Client(http), Creds());
 
         await handler.HandleAsync(
-            new MergePullRequestRequest("ws", "repo", 1, "squash", null, false),
+            new MergePullRequestRequest("ws", "repo", 1, null, null, false),
             TestContext.Current.CancellationToken);
 
         http.Calls[1].RequestUri!.AbsolutePath
             .Should().Be("/2.0/repositories/ws/repo/pullrequests/1/merge");
-        http.CallBodies[1]!.Should().Contain("\"merge_strategy\": \"squash\"");
+        http.CallBodies[1]!.Should().Contain("\"merge_strategy\": \"merge_commit\"");
     }
 
     [Fact]

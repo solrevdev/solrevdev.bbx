@@ -176,7 +176,7 @@ offered; use `remove`.
 | `view <id>` | `GET repositories/{ws}/{repo}/pullrequests/{id}` |
 | `create` | `POST repositories/{ws}/{repo}/pullrequests` — `--title`, `--source`, `--dest`, `--body`, `--close-source-branch`, `--reviewers <account-id>` |
 | `update <id>` | `PUT repositories/{ws}/{repo}/pullrequests/{id}` — `--title`, `--body`, `--dest`, `--reviewers <account-id>...`, `--close-source-branch`, `--no-close-source-branch`. Open pull requests only. |
-| `merge <id>` | `POST .../merge` — `--strategy`, `--message`, `--close-source-branch`, `--yes`. Six strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`, `rebase_fast_forward`, `rebase_merge`. Left off, the destination branch's `default_merge_strategy` is used; one that branch forbids is refused locally with the allowed list. May answer 202 with a task ID instead of merging on the spot; read it with `merge-status` |
+| `merge <id>` | `POST .../merge` — `--strategy`, `--message`, `--close-source-branch`, `--yes`. Six strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`, `rebase_fast_forward`, `rebase_merge`. Left off, `bbx` reads the destination branch's `default_merge_strategy` (two extra GETs); named explicitly, it is sent straight through with no lookups. May answer 202 with a task ID instead of merging on the spot; read it with `merge-status` |
 | `approve <id>` / `unapprove <id>` | `POST/DELETE .../approve` |
 | `decline <id>` | `POST .../decline`. Takes no body, so there is no `--close-source-branch` here: the source branch stays until `bbx branch delete` removes it |
 | `comments <id>` / `comment <id>` | `GET/POST .../comments` — `--body` for `comment`. Each row carries `deleted`; a tombstone reads `deleted: true` with empty `content` |

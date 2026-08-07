@@ -237,15 +237,25 @@ rules below are; it is still the right place to start.
     claim: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`,
     `rebase_fast_forward`, `rebase_merge`. The pull request does **not** carry
     them whatever the spec says: `destination.branch` comes back as
-    `{"name": "master"}` alone, checked on both `create` and `view`. A strategy
-    the branch forbids is answered "merge_strategy: Select a valid choice",
-    which does not name the choices, so `MergePullRequestHandler` reads the
-    branch and refuses first. There is no 2.0 endpoint that *sets* the allowed
-    strategies; that is web UI only, and a `restrict_merges` branch restriction
-    does not change the list either, so the refusal path cannot be tested live
-    and rests on unit tests. Both lookups are wrapped in a fallback for that
-    reason: if either call fails, the merge goes ahead with what was asked for,
-    because the merge is the job and these two reads are advice.
+    `{"name": "master"}` alone, checked on both `create` and `view`. So
+    `MergePullRequestHandler` reads the branch when `--strategy` is left off,
+    and sends an explicit one straight through without looking anything up. The
+    read is wrapped: if it fails the merge still goes ahead, because the merge
+    is the job and the lookup is advice.
+
+    **`merge_strategies` is not a per-repository list and cannot be narrowed.**
+    The repository's Merge strategies page offers an inherit toggle and a single
+    default; there are no per-strategy controls anywhere in it, and a
+    `restrict_merges` branch restriction leaves the list untouched. It always
+    names all six. An earlier version of this handler refused a strategy missing
+    from the list, which could never fire and could only ever block a merge that
+    would have worked; it was taken back out. Do not add it again without a
+    repository that actually reports a shorter list.
+
+    Both halves were proven on one repository on 2026-08-07, with the default
+    set to Squash by hand: `bbx pr merge` with no flag produced a one-parent
+    commit, and `--strategy merge_commit` on the same repository produced a
+    two-parent one.
 32. **A schedule's branch cannot be changed.** `PUT
     pipelines_config/schedules/{uuid}` accepts a whole new `target`, answers
     200, echoes the **old** `ref_name` back and moves nothing; a read afterwards

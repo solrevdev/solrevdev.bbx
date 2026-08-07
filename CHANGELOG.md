@@ -7,6 +7,23 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.3.1]
+
+### Changed
+
+- `pr merge` no longer refuses a strategy that the destination branch does not
+  list. Nothing can shorten that list: the repository's Merge strategies page
+  offers a default and no per-strategy control, and a `restrict_merges` branch
+  restriction leaves it alone, so it always names all six. The check could never
+  fire, and the only thing it could do was block a merge that would have worked.
+- An explicit `--strategy` now costs no extra calls. It is the caller's
+  business, so it goes straight through; the two lookups happen only when the
+  flag is left off and the destination branch has to be asked.
+
+  Both paths were checked against a repository with its default set to Squash by
+  hand, the one thing the API cannot do: no flag produced a one-parent commit,
+  and `--strategy merge_commit` produced a two-parent one.
+
 ## [1.3.0]
 
 Everything below was run against a throwaway repository with Pipelines enabled

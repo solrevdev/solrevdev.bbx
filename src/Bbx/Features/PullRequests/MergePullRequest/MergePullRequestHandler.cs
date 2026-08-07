@@ -30,16 +30,23 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
     /// rather than assuming.
     /// </summary>
     /// <remarks>
-    /// A repository can change its default strategy and can forbid strategies
-    /// outright, and `--strategy` used to default to merge_commit whatever the
-    /// repository said. The allowed set lives on the branch:
-    /// <c>GET refs/branches/{name}</c> returns <c>default_merge_strategy</c> and
-    /// <c>merge_strategies</c>. The pull request does not carry them, whatever
-    /// the spec says: <c>destination.branch</c> comes back as
-    /// <c>{"name": "master"}</c> and nothing else, checked live on 2026-08-07.
-    /// A strategy Bitbucket does not allow is answered with
-    /// "merge_strategy: Select a valid choice", which does not say what the
-    /// choices are, so the check happens here where the list is known.
+    /// <para>
+    /// A repository can change its default strategy, and <c>--strategy</c> used
+    /// to default to merge_commit whatever it said. The value lives on the
+    /// branch: <c>GET refs/branches/{name}</c> returns
+    /// <c>default_merge_strategy</c>. The pull request does not carry it,
+    /// whatever the spec says; <c>destination.branch</c> comes back as
+    /// <c>{"name": "master"}</c> and nothing else.
+    /// </para>
+    /// <para>
+    /// The same call returns <c>merge_strategies</c>, and this used to refuse a
+    /// strategy missing from that list. It no longer does. Nothing can shrink
+    /// the list: the repository's Merge strategies page offers a default and no
+    /// per-strategy control, and a <c>restrict_merges</c> branch restriction
+    /// leaves it alone, so it always names all six. A check that cannot fire can
+    /// only ever be wrong, and the one thing it could do is block a merge that
+    /// would have worked.
+    /// </para>
     /// </remarks>
     private async Task<string> ResolveStrategyAsync(
         string ws, string repo, MergePullRequestRequest request, CancellationToken ct)
@@ -50,37 +57,24 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
         // failure to read the branch must not stop it: fall back to what the
         // caller wanted and let Bitbucket have the last word, which is what
         // happened before these two calls existed.
-        JsonElement branch;
-        string destination;
+        // An explicit strategy is the caller's business, so do not spend two
+        // calls confirming it.
+        if (asked is not null) return asked;
+
         try
         {
-            var name = await DestinationBranchAsync(ws, repo, request.Id, ct);
-            if (name is null)
-                return asked ?? DefaultStrategy;
+            var destination = await DestinationBranchAsync(ws, repo, request.Id, ct);
+            if (destination is null) return DefaultStrategy;
 
-            destination = name;
-            branch = await client.GetAsync<JsonElement>(
+            var branch = await client.GetAsync<JsonElement>(
                 $"repositories/{ws}/{repo}/refs/branches/{Uri.EscapeDataString(destination)}", ct);
-        }
-        catch (Exception e) when (e is not (BbxUserException or OperationCanceledException))
-        {
-            return asked ?? DefaultStrategy;
-        }
 
-        var allowed = branch.TryGetProperty("merge_strategies", out var strategies)
-                      && strategies.ValueKind == JsonValueKind.Array
-            ? strategies.EnumerateArray().Select(s => s.GetString()).Where(s => s is not null).ToArray()
-            : [];
-
-        if (asked is null)
             return branch.GetStringOrNull("default_merge_strategy") ?? DefaultStrategy;
-
-        if (allowed.Length > 0 && !allowed.Contains(asked))
-            throw new BbxUserException(
-                $"Error: {destination} does not allow the '{asked}' merge strategy. "
-                + $"Allowed: {string.Join(", ", allowed)}.");
-
-        return asked;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return DefaultStrategy;
+        }
     }
 
     private async Task<string?> DestinationBranchAsync(string ws, string repo, int id, CancellationToken ct)
