@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using AwesomeAssertions;
 using Bbx.Api;
 using Bbx.Auth;
@@ -56,6 +57,41 @@ public class BranchRestrictionAndScheduleTests
         body.Should().Contain("\"ref_name\": \"master\"");
         body.Should().Contain("\"type\": \"branches\"");
         body.Should().Contain("\"pattern\": \"default\"");
+    }
+
+    // Regression: --branch defaulted to "main", and a schedule repeats, so a
+    // wrong branch repeats on a cron until somebody notices.
+    [Fact]
+    public async Task Schedule_without_a_branch_asks_the_repository_for_its_main_branch()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.OK, """{"mainbranch":{"name":"master"}}""");
+        http.Enqueue(HttpStatusCode.Created, """{"uuid":"{s1}"}""");
+        var handler = new CreatePipelineScheduleHandler(Client(http), Creds());
+
+        var result = await handler.HandleAsync(
+            new CreatePipelineScheduleRequest("ws", "repo", "0 0 1 * * ? *", null, null, true),
+            TestContext.Current.CancellationToken);
+
+        http.Calls[0].RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/repo");
+        http.CallBodies[1]!.Should().Contain("\"ref_name\": \"master\"");
+        // The reply echoes the branch, so it has to echo the resolved one.
+        JsonSerializer.Serialize(result).Should().Contain("master");
+    }
+
+    [Fact]
+    public async Task Schedule_with_no_main_branch_to_fall_back_on_says_so()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.Enqueue(HttpStatusCode.OK, """{"mainbranch":null}""");
+        var handler = new CreatePipelineScheduleHandler(Client(http), Creds());
+
+        var act = () => handler.HandleAsync(
+            new CreatePipelineScheduleRequest("ws", "repo", "0 0 1 * * ? *", null, null, true),
+            TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<BbxUserException>()).WithMessage("*no main branch*");
+        http.Calls.Should().ContainSingle();
     }
 
     [Fact]

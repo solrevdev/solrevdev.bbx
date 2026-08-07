@@ -357,10 +357,18 @@ public static class PipelineCommand
         var command = new Command("trigger", "Trigger a new pipeline run");
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
-        var branchOption = new Option<string>("--branch") { Description = "Branch to run pipeline on (also used as the PR source branch when --pull-request is set)", DefaultValueFactory = _ => "main" };
+        var branchOption = new Option<string?>("--branch")
+        {
+            Description = "Branch to run the pipeline on. Defaults to the repository's main branch, "
+                          + "or to the pull request's source branch when --pull-request is set.",
+        };
         var commitOption = new Option<string?>("--commit") { Description = "Specific commit hash to run on (branch trigger only)" };
         var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern (selector) to run" };
-        var pullRequestOption = new Option<string?>("--pull-request") { Description = "Trigger the pull-request pipeline for this PR id (uses --branch as the PR's source branch)" };
+        var pullRequestOption = new Option<string?>("--pull-request")
+        {
+            Description = "Trigger the pull-request pipeline for this PR id. Runs on the pull request's "
+                          + "own source branch unless --branch says otherwise.",
+        };
         var variablesOption = new Option<string[]>("--variable") { Description = "Pipeline variables in key=value format", AllowMultipleArgumentsPerToken = true };
 
         command.Options.Add(workspaceOption);
@@ -371,7 +379,7 @@ public static class PipelineCommand
         command.Options.Add(pullRequestOption);
         command.Options.Add(variablesOption);
 
-        command.SetHandler((string? workspace, string? repo, string branch, string? commit, string? pattern, string? pullRequest, string[] variables) =>
+        command.SetHandler((string? workspace, string? repo, string? branch, string? commit, string? pattern, string? pullRequest, string[] variables) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<TriggerPipelineHandler>()
                     .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, pullRequest, variables), CommandBinding.CancellationToken)),
@@ -554,7 +562,8 @@ return command;
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
         var cronOption = new Option<string>("--cron") { Description = "Cron expression (e.g., '0 0 * * *')", Required = true };
-        var branchOption = new Option<string>("--branch") { Description = "Target branch", DefaultValueFactory = _ => "main" };
+        var branchOption = new Option<string?>("--branch")
+        { Description = "Target branch. Defaults to the repository's main branch." };
         var patternOption = new Option<string?>("--pattern") { Description = "Custom pipeline pattern" };
         var enabledOption = new Option<bool>("--enabled") { Description = "Enable the schedule", DefaultValueFactory = _ => true };
 
@@ -565,7 +574,7 @@ return command;
         command.Options.Add(patternOption);
         command.Options.Add(enabledOption);
 
-        command.SetHandler((string? workspace, string? repo, string cron, string branch, string? pattern, bool enabled) =>
+        command.SetHandler((string? workspace, string? repo, string cron, string? branch, string? pattern, bool enabled) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<CreatePipelineScheduleHandler>()
                     .HandleAsync(new CreatePipelineScheduleRequest(workspace, repo, cron, branch, pattern, enabled), CommandBinding.CancellationToken)),

@@ -177,6 +177,71 @@ rules below are; it is still the right place to start.
     own does not say whether someone deleted the comment or left it blank.
     All three paths were run end to end on 2026-08-07 against a throwaway
     repository and snippet, both since deleted.
+27. **`bbx` is remote-only, and that is a decision, not an oversight.** It never
+    runs `git`, never reads a remote, and cannot tell which clone it was
+    launched from. `--close-source-branch` is a field on Bitbucket's merge
+    endpoint, executed on Bitbucket; it cannot touch a working copy.
+    `gh` calls the nearest thing `-d, --delete-branch` and that one deletes the
+    local branch too, so people arrive expecting it. The gap was considered on
+    2026-08-07 and left alone: `gh` only deletes locally because it works the
+    other way round, resolving the repository *from* the clone's remotes, and it
+    switches local deletion off entirely when `--repo` is passed
+    (`CanDeleteLocalBranch = !cmd.Flags().Changed("repo")`). Every `bbx` command
+    takes `-r`, so under that rule nothing would ever be deleted anyway. Adding
+    it would mean shelling out to `git`, parsing `origin`, and proving the clone
+    is the repository that was just merged. The help text and README say so
+    instead. If this is revisited, do not add a `-d` that only closes the remote
+    branch: a flag matching `gh`'s name that does half the job invites the same
+    mistake it was meant to fix.
+28. **Do not default a branch option to "main".** `pipeline trigger` and
+    `pipeline schedules create` both did, and new repositories in
+    `foremost-group` are created with `mainbranch.name` of **master**, so the
+    default was wrong on every one of them. Worse than a 404:
+    `POST pipelines_config/schedules` accepts a `ref_name` for a branch that
+    does not exist and answers 201, so the old default quietly created
+    schedules firing on a cron against nothing. Verified live on 2026-08-07
+    against a throwaway repository, since deleted.
+    `Features/Common/DefaultBranch` asks the API instead: `mainbranch.name` off
+    the repository, or `source.branch.name` off the pull request for a
+    pull-request run, since a PR pipeline runs on the PR's own branch. `src ls`
+    already relied on the API knowing its own default.
+29. **There is no pull-request pipeline target.** `pipeline trigger
+    --pull-request` sent `"type": "pipeline_pullrequest_target"` and had never
+    worked in any released version: Bitbucket answers 400 "The request body
+    contains invalid properties", and the type appears nowhere in
+    `docs/spec/swagger.json`, which has `pipeline_ref_target` and
+    `pipeline_commit_target` only. Four bodies were tried live on 2026-08-07,
+    with the id as a string and as a number, with and without `source`. All 400.
+    A pull-request run is a **`pipeline_ref_target` on the source branch with a
+    `pull-requests` selector**, whose pattern matches the source branch in the
+    `pull-requests:` section of `bitbucket-pipelines.yml` (`**` is the
+    catch-all). Proven by running both on one commit: the selector build ran the
+    `pull-requests:` step, a plain branch trigger ran the `default:` one. The PR
+    id never reaches the wire; it is only how `bbx` looks the source branch up.
+30. **Bitbucket does not check that a commit is on the branch you name.** A
+    `pipeline_ref_target` with `ref_name: master` and a commit that exists only
+    on a feature branch is answered 201 and runs, labelled `master`. So a
+    guessed branch beside an explicit commit is silently wrong rather than
+    rejected, which is why `--commit` requires `--branch`.
+31. **Merge strategies live on the branch, not the pull request.**
+    `GET refs/branches/{name}` returns `default_merge_strategy` and
+    `merge_strategies`; a live branch listed six, not the three the help used to
+    claim: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`,
+    `rebase_fast_forward`, `rebase_merge`. The pull request does **not** carry
+    them whatever the spec says: `destination.branch` comes back as
+    `{"name": "master"}` alone, checked on both `create` and `view`. A strategy
+    the branch forbids is answered "merge_strategy: Select a valid choice",
+    which does not name the choices, so `MergePullRequestHandler` reads the
+    branch and refuses first. There is no 2.0 endpoint that *sets* the allowed
+    strategies; that is web UI only.
+32. **A schedule's branch cannot be changed.** `PUT
+    pipelines_config/schedules/{uuid}` accepts a whole new `target`, answers
+    200, echoes the **old** `ref_name` back and moves nothing; a read afterwards
+    confirms it. Tried with the target alone and beside `type` and
+    `cron_pattern`. Do not add a `--branch` to `schedules update`: delete the
+    schedule and create another. `POST` is worse than lax about it and accepts a
+    `ref_name` for a branch that does not exist, answering 201, so a wrong
+    branch there fires on a cron against nothing.
 
 ## Auth
 

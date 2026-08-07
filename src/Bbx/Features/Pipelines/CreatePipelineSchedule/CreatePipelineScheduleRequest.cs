@@ -4,6 +4,6 @@ public sealed record CreatePipelineScheduleRequest(
     string? Workspace,
     string? Repository,
     string Cron,
-    string Branch,
+    string? Branch,
     string? Pattern,
     bool Enabled);

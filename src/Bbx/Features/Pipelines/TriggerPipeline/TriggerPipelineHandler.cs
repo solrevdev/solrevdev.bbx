@@ -7,34 +7,51 @@ namespace Bbx.Features.Pipelines.TriggerPipeline;
 
 public sealed class TriggerPipelineHandler(BitbucketClient client, CredentialManager credentials)
 {
+    public const string CommitNeedsBranch =
+        "Error: --commit needs --branch. Bitbucket does not check that the commit is on the branch, "
+        + "so it would run against whichever branch was guessed.";
+
+
     public async Task<object> HandleAsync(TriggerPipelineRequest request, CancellationToken ct)
     {
         var (ws, repository) = Resolve.WorkspaceAndRepoFlexible(credentials, request.Workspace, request.Repository,
             "Workspace and repository are required.");
 
-        Dictionary<string, object> target;
+        // Bitbucket accepts a commit that is not on the branch you name and runs
+        // it anyway, labelled with that branch, so a guessed branch beside an
+        // explicit commit is silently wrong rather than rejected.
+        if (!string.IsNullOrEmpty(request.Commit) && string.IsNullOrWhiteSpace(request.Branch))
+            throw new BbxUserException(CommitNeedsBranch);
+
+        // --branch is optional. Without it a pull-request run takes the pull
+        // request's own source branch and a branch run takes the repository's
+        // main branch, both read from the API rather than assumed to be "main".
+        var branch = !string.IsNullOrEmpty(request.PullRequestId)
+            ? await DefaultBranch.ResolveFromPullRequestAsync(
+                client, ws, repository, request.Branch, request.PullRequestId, ct)
+            : await DefaultBranch.ResolveAsync(client, ws, repository, request.Branch, ct);
+
+        var target = new Dictionary<string, object>
+        {
+            ["type"] = "pipeline_ref_target",
+            ["ref_type"] = "branch",
+            ["ref_name"] = branch,
+        };
+
         if (!string.IsNullOrEmpty(request.PullRequestId))
         {
-            // pipeline_pullrequest_target — runs the pull-request pipeline for
-            // the named PR. `source` is the source branch of the PR; Bitbucket
-            // fills in destination/destination_commit from the PR itself.
-            target = new Dictionary<string, object>
-            {
-                ["type"] = "pipeline_pullrequest_target",
-                ["source"] = request.Branch,
-                ["pullrequest"] = new { id = request.PullRequestId },
-            };
-            if (!string.IsNullOrEmpty(request.Pattern))
-                target["selector"] = new { type = "pull-requests", pattern = request.Pattern };
+            // A pull-request run is a ref target on the source branch carrying a
+            // pull-requests selector. There is no pull-request target type:
+            // `pipeline_pullrequest_target` appears nowhere in Bitbucket's spec
+            // and every spelling of it is answered with 400 "The request body
+            // contains invalid properties" (four bodies tried live on
+            // 2026-08-07). The selector pattern matches the source branch in the
+            // `pull-requests:` section of bitbucket-pipelines.yml, so "**" is the
+            // catch-all that section is normally keyed by.
+            target["selector"] = new { type = "pull-requests", pattern = request.Pattern ?? "**" };
         }
         else
         {
-            target = new Dictionary<string, object>
-            {
-                ["type"] = "pipeline_ref_target",
-                ["ref_type"] = "branch",
-                ["ref_name"] = request.Branch,
-            };
             if (!string.IsNullOrEmpty(request.Commit))
                 target["commit"] = new { hash = request.Commit };
             if (!string.IsNullOrEmpty(request.Pattern))

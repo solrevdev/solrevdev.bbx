@@ -249,13 +249,33 @@ bbx pr request-changes|unrequest-changes 42 -w myws -r myrepo
 bbx pr tasks list|view|add|update|complete|delete 42 -w myws -r myrepo
 ```
 
-Merge strategies: `merge_commit` (default), `squash`, `fast_forward`.
-`merge`, `fast-forward` and `ff` are accepted as aliases.
+Merge strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`,
+`rebase_fast_forward` and `rebase_merge`. `merge`, `fast-forward` and `ff` are
+accepted as aliases. Leave `--strategy` off and `bbx` uses the destination
+branch's own default; ask for one that branch forbids and it says so, with the
+allowed list, before calling Bitbucket.
 
 `pr update` changes only the fields you name and works on open pull requests
 only. `--body ""` clears the description. `--close-source-branch` and
 `--no-close-source-branch` need another real change in the same call, because
 Bitbucket silently drops the setting otherwise.
+
+`--close-source-branch` closes the branch on Bitbucket and nothing else. `bbx`
+talks to the API and never runs `git`, so your local branch survives the merge.
+`gh` calls its equivalent `-d, --delete-branch` and that one does delete
+locally, which is the assumption to watch for. Tidy up by hand:
+
+```bash
+git fetch origin --prune
+git branch -d feature/x
+```
+
+Fetch first: `git branch -d` checks the branch against local `HEAD`, so
+immediately after a merge it refuses a branch that really is merged. After a
+`squash` merge it refuses regardless. Neither is a reason to use `-D`.
+
+`pr decline` leaves the source branch in place. Remove it with
+`bbx branch delete`.
 </details>
 
 <details>
@@ -326,7 +346,10 @@ bbx pipeline list -w myws -r myrepo --limit 10
 bbx pipeline view '{uuid}' -w myws -r myrepo
 bbx pipeline steps '{uuid}' -w myws -r myrepo
 bbx pipeline logs '{pipeline-uuid}' '{step-uuid}' -w myws -r myrepo
-bbx pipeline trigger --branch main -w myws -r myrepo
+bbx pipeline trigger -w myws -r myrepo    # the repository's main branch
+bbx pipeline trigger --branch feat/x -w myws -r myrepo
+bbx pipeline trigger --pull-request 42 -w myws -r myrepo   # the PR's own branch
+bbx pipeline trigger --branch feat/x --commit abc1234 -w myws -r myrepo
 bbx pipeline stop '{uuid}' --yes -w myws -r myrepo
 
 bbx pipeline step '{pipeline-uuid}' '{step-uuid}' -w myws -r myrepo

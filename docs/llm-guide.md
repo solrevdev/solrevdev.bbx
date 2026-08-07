@@ -176,9 +176,9 @@ offered; use `remove`.
 | `view <id>` | `GET repositories/{ws}/{repo}/pullrequests/{id}` |
 | `create` | `POST repositories/{ws}/{repo}/pullrequests` — `--title`, `--source`, `--dest`, `--body`, `--close-source-branch`, `--reviewers <account-id>` |
 | `update <id>` | `PUT repositories/{ws}/{repo}/pullrequests/{id}` — `--title`, `--body`, `--dest`, `--reviewers <account-id>...`, `--close-source-branch`, `--no-close-source-branch`. Open pull requests only. |
-| `merge <id>` | `POST .../merge` — `--strategy merge_commit\|squash\|fast_forward`, `--message`, `--close-source-branch` |
+| `merge <id>` | `POST .../merge` — `--strategy`, `--message`, `--close-source-branch`, `--yes`. Six strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`, `rebase_fast_forward`, `rebase_merge`. Left off, the destination branch's `default_merge_strategy` is used; one that branch forbids is refused locally with the allowed list. May answer 202 with a task ID instead of merging on the spot; read it with `merge-status` |
 | `approve <id>` / `unapprove <id>` | `POST/DELETE .../approve` |
-| `decline <id>` | `POST .../decline` |
+| `decline <id>` | `POST .../decline`. Takes no body, so there is no `--close-source-branch` here: the source branch stays until `bbx branch delete` removes it |
 | `comments <id>` / `comment <id>` | `GET/POST .../comments` — `--body` for `comment`. Each row carries `deleted`; a tombstone reads `deleted: true` with empty `content` |
 | `diff <id>` / `patch <id>` | `GET .../diff` or `.../patch` (raw text out) |
 | `activity <id>` | `GET .../activity` |
@@ -200,6 +200,25 @@ offered; use `remove`.
 `pr update` sends only the flags you pass. Anything you leave out keeps its
 current value, so you can retitle a pull request without touching its
 description. An empty `--body ""` clears the description.
+
+`--close-source-branch` is a field on Bitbucket's API, applied by Bitbucket. It
+closes the branch on the server and nothing else. `bbx` never runs `git` and
+does not know a clone exists, so the local branch and its remote-tracking ref
+both survive a merge. `gh` spells the nearest thing `-d, --delete-branch` and
+that one does delete locally, which is the assumption to watch for. Clean up by
+hand:
+
+```bash
+bbx pr merge 42 -r myrepo --close-source-branch --yes
+git fetch origin --prune
+git branch -d feature/x
+```
+
+Run the fetch first. `git branch -d` measures the branch against local `HEAD`,
+so straight after a merge it refuses a branch that is genuinely merged, because
+local `master` is behind. After a `squash` merge it refuses whatever you do, as
+the source commits are not ancestors of anything on the destination. Neither
+case is a reason to reach for `-D`.
 
 Two things to know before scripting it:
 
@@ -281,14 +300,14 @@ Each command prints a deprecation warning on stderr.
 |---|---|
 | `list` | `GET .../pipelines/` |
 | `view <pipeline-uuid>` | `GET .../pipelines/{uuid}` |
-| `trigger` | `POST .../pipelines/` — `--branch` (default `main`), `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable) |
+| `trigger` | `POST .../pipelines/` — `--branch`, `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable). Without `--branch` it reads `mainbranch.name` off the repository, or the pull request's source branch when `--pull-request` is set. `--commit` needs `--branch`: Bitbucket runs a commit that is not on the named branch and labels it with that branch anyway. A pull-request run is a `pipeline_ref_target` with a `pull-requests` selector, **not** a `pipeline_pullrequest_target`, which does not exist |
 | `stop <pipeline-uuid>` | `POST .../pipelines/{uuid}/stopPipeline` — `--yes` |
 | `logs <pipeline-uuid> <step-uuid>` | `GET .../pipelines/{uuid}/steps/{step-uuid}/log`, or `.../logs/{log-uuid}` with `--log-uuid` for one numbered attempt |
 | `steps <pipeline-uuid>` | `GET .../pipelines/{uuid}/steps/` |
 | `step <pipeline-uuid> <step-uuid>` | `GET .../pipelines/{uuid}/steps/{step-uuid}` |
 | `config {view,update,build-number}` | `GET/PUT .../pipelines_config`, `PUT .../pipelines_config/build_number` — `--enabled`/`--disabled`, `--next`. 404s until Pipelines has been enabled on the repository once. |
 | `variables {list,view,add,update,delete}` | `.../pipelines_config/variables[/{uuid}]` — `--key`, `--value`, `--secured`/`--unsecured` |
-| `schedules {list,view,create,update,delete,executions}` | `.../pipelines_config/schedules[/{uuid}[/executions]]` — `--cron`, `--branch`, `--pattern`, `--enabled`/`--disabled` |
+| `schedules {list,view,create,update,delete,executions}` | `.../pipelines_config/schedules[/{uuid}[/executions]]` — `--cron`, `--branch` (defaults to the repository's `mainbranch.name`), `--pattern`, `--enabled`/`--disabled`. `create` accepts a branch that does not exist and answers 201. `update` takes only `--cron` and `--enabled`/`--disabled`: a schedule's branch cannot be changed, so delete and recreate |
 | `ssh key-pair {view,set,delete}` | `.../pipelines_config/ssh/key_pair` — `--private-key`, `--public-key`. The private half is write-only. |
 | `ssh known-hosts {list,view,add,update,delete}` | `.../pipelines_config/ssh/known_hosts[/{uuid}]` — `--hostname`, `--key-type`, `--key`. `bitbucket.org` is rejected: Bitbucket configures it already. |
 | `caches {list,clear,content-uri}` | `.../pipelines-config/caches[/{uuid}[/content-uri]]`. `clear <uuid>` clears one; `clear --name node` clears every cache with that name through `DELETE .../caches?name=`. |

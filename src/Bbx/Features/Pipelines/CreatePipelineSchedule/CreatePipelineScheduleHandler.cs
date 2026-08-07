@@ -12,6 +12,10 @@ public sealed class CreatePipelineScheduleHandler(BitbucketClient client, Creden
         var (ws, repository) = Resolve.WorkspaceAndRepoFlexible(credentials, request.Workspace, request.Repository,
             "Workspace and repository are required.");
 
+        // A schedule repeats, so a wrong branch repeats with it. Ask the
+        // repository which branch is its main one rather than assume "main".
+        var branch = await DefaultBranch.ResolveAsync(client, ws, repository, request.Branch, ct);
+
         // "type" and "selector" are both required. Without the discriminator
         // Bitbucket answers "An invalid field was found in the JSON payload"
         // (it cannot resolve the target subtype), and without a selector it
@@ -20,7 +24,7 @@ public sealed class CreatePipelineScheduleHandler(BitbucketClient client, Creden
         {
             ["type"] = "pipeline_ref_target",
             ["ref_type"] = "branch",
-            ["ref_name"] = request.Branch,
+            ["ref_name"] = branch,
             ["selector"] = string.IsNullOrEmpty(request.Pattern)
                 ? new { type = "branches", pattern = "default" }
                 : new { type = "custom", pattern = request.Pattern },
@@ -45,7 +49,7 @@ public sealed class CreatePipelineScheduleHandler(BitbucketClient client, Creden
                 uuid = PipelineFormat.GetString(schedule, "uuid"),
                 cron_pattern = request.Cron,
                 enabled = request.Enabled,
-                branch = request.Branch,
+                branch,
             },
         };
     }

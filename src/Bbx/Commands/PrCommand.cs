@@ -73,7 +73,11 @@ public static class PrCommand
         var destOption = new Option<string>("--dest") { Description = "Destination branch", Required = true };
         var bodyOption = new Option<string?>("--body") { Description = "Pull request description" };
         var reviewersOption = new Option<string[]?>("--reviewers") { Description = "Reviewer account IDs (UUID format)" };
-        var closeSourceOption = new Option<bool>("--close-source-branch") { Description = "Close source branch after merge" };
+        var closeSourceOption = new Option<bool>("--close-source-branch")
+        {
+            Description = "Ask Bitbucket to close the source branch when this pull request merges. "
+                          + "Server-side only: no local clone is touched.",
+        };
         createCommand.Options.Add(titleOption);
         createCommand.Options.Add(sourceOption);
         createCommand.Options.Add(destOption);
@@ -93,8 +97,13 @@ public static class PrCommand
         var updateBodyOption = new Option<string?>("--body") { Description = "New description. Pass an empty string to clear it." };
         var updateDestOption = new Option<string?>("--dest") { Description = "Retarget the pull request at this destination branch" };
         var updateReviewersOption = new Option<string[]?>("--reviewers") { Description = "Replace reviewers with these account IDs" };
-        var updateCloseSourceOption = new Option<bool>("--close-source-branch") { Description = "Close the source branch after merge" };
-        var updateKeepSourceOption = new Option<bool>("--no-close-source-branch") { Description = "Keep the source branch after merge" };
+        var updateCloseSourceOption = new Option<bool>("--close-source-branch")
+        {
+            Description = "Close the source branch on Bitbucket when this pull request merges. "
+                          + "Needs another real change in the same call to stick. No local clone is touched.",
+        };
+        var updateKeepSourceOption = new Option<bool>("--no-close-source-branch")
+        { Description = "Keep the source branch on Bitbucket after the merge" };
         updateCommand.Arguments.Add(updateIdArg);
         updateCommand.Options.Add(updateTitleOption);
         updateCommand.Options.Add(updateBodyOption);
@@ -117,13 +126,25 @@ public static class PrCommand
 
         var mergeCommand = new Command("merge", "Merge a pull request");
         var mergeIdArg = new Argument<int>("id") { Description = "Pull request ID" };
-        var strategyOption = new Option<string>("--strategy")
+        // No default: the destination branch has one, and it is allowed to
+        // differ from Bitbucket's. Left off, bbx uses whatever that branch says.
+        var strategyOption = new Option<string?>("--strategy")
         {
-            Description = "Merge strategy (merge_commit, squash, fast_forward). 'merge' is accepted for merge_commit.",
-            DefaultValueFactory = _ => "merge_commit",
+            Description = "Merge strategy: merge_commit, squash, fast_forward, squash_fast_forward, "
+                          + "rebase_fast_forward or rebase_merge. 'merge' is accepted for merge_commit. "
+                          + "Defaults to the destination branch's own default strategy.",
         };
         var messageOption = new Option<string?>("--message") { Description = "Merge commit message" };
-        var closeSourceMergeOption = new Option<bool>("--close-source-branch") { Description = "Close source branch after merge" };
+        // gh spells the nearest thing `-d, --delete-branch` and it deletes the
+        // local branch too. This one cannot: it is a field on Bitbucket's merge
+        // endpoint, executed on Bitbucket. Say so here, because the help text is
+        // where that assumption gets made.
+        var closeSourceMergeOption = new Option<bool>("--close-source-branch")
+        {
+            Description = "Close the source branch on Bitbucket after the merge. Server-side only: "
+                          + "your local branch and its remote-tracking ref survive. Clear them with "
+                          + "`git fetch origin --prune` then `git branch -d <branch>`.",
+        };
         // Merging writes to the destination branch and cannot be undone from
         // here, so it confirms like the other destructive verbs.
         var mergeYesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
@@ -132,9 +153,12 @@ public static class PrCommand
         mergeCommand.Options.Add(messageOption);
         mergeCommand.Options.Add(closeSourceMergeOption);
         mergeCommand.Options.Add(mergeYesOption);
-        mergeCommand.SetHandler(async (string? workspace, string? repo, int id, string strategy, string? message, bool closeSource, bool yes) =>
+        mergeCommand.SetHandler(async (string? workspace, string? repo, int id, string? strategy, string? message, bool closeSource, bool yes) =>
         {
-            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Merge PR #{id} using '{strategy}'? [y/N]: "))
+            var using_ = string.IsNullOrEmpty(strategy)
+                ? "the destination branch's default strategy"
+                : $"'{strategy}'";
+            if (!yes && !CommandRunner.ConfirmOrCancelStderr($"Merge PR #{id} using {using_}? [y/N]: "))
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<MergePullRequestHandler>()
@@ -162,7 +186,8 @@ public static class PrCommand
             workspaceOption, repoOption, unapproveIdArg);
         command.Subcommands.Add(unapproveCommand);
 
-        var declineCommand = new Command("decline", "Decline a pull request");
+        var declineCommand = new Command("decline",
+            "Decline a pull request. The source branch is left open; delete it with `bbx branch delete`.");
         var declineIdArg = new Argument<int>("id") { Description = "Pull request ID" };
         var declineReasonOption = new Option<string?>("--reason") { Description = "Reason for declining" };
         declineCommand.Arguments.Add(declineIdArg);

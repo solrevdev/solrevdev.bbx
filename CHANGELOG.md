@@ -7,7 +7,88 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [1.3.0]
+
+Everything below was run against a throwaway repository with Pipelines enabled
+and a pull request open on it, not read off the spec. The spec was wrong about
+two of them.
+
+### Fixed
+
+- `pipeline trigger --pull-request` never worked, in any released version. It
+  sent `"type": "pipeline_pullrequest_target"`, which Bitbucket answers with 400
+  "The request body contains invalid properties" and which appears nowhere in
+  its own API spec. Four bodies were tried live, including the id as a number
+  and as a string. A pull-request run is really a `pipeline_ref_target` on the
+  source branch carrying a `pull-requests` selector, and that shape ran the step
+  from the `pull-requests:` section while a plain branch trigger on the same
+  commit ran the `default:` one.
+- `pipeline trigger --branch` and `pipeline schedules create --branch` defaulted
+  to `main`. New repositories in the test workspace are created with a
+  `mainbranch` of `master`, so the default was wrong on all of them, and
+  `POST pipelines_config/schedules` accepts a branch that does not exist and
+  answers 201, so it did not even fail loudly: it created a schedule firing on a
+  cron against nothing. Both options now read `mainbranch.name` off the
+  repository, or the pull request's own source branch when `--pull-request` is
+  set.
+- `pipeline trigger --commit` no longer runs without `--branch`. Bitbucket
+  accepts a commit that is not on the branch it was given, answers 201 and
+  labels the run with that branch, so pairing a real commit with a guessed
+  branch was silently wrong rather than rejected.
+- `pr merge --strategy` defaulted to `merge_commit` whatever the repository
+  said. It now takes the destination branch's own `default_merge_strategy`, and
+  a strategy that branch forbids is refused before the call with the allowed
+  list quoted. Bitbucket's own answer, "merge_strategy: Select a valid choice",
+  does not say what the choices are. The strategies live on
+  `GET refs/branches/{name}`; the pull request does not carry them, whatever the
+  spec says, and `destination.branch` comes back as `{"name": "master"}` alone.
+- `pr merge --strategy` accepts all six strategies Bitbucket allows. The help
+  listed three; a live branch reported `merge_commit`, `squash`, `fast_forward`,
+  `squash_fast_forward`, `rebase_fast_forward` and `rebase_merge`.
+- `pipeline schedules update` says that a schedule's branch cannot be changed.
+  `PUT .../schedules/{uuid}` takes a new `target`, answers 200, echoes the old
+  `ref_name` back and moves nothing.
+
+### Documentation
+
+- `--close-source-branch` now says in `--help`, the README and the agent guide
+  that it is a server-side field. It closes the branch on Bitbucket and leaves
+  the local branch and its remote-tracking ref alone. `gh` spells the nearest
+  thing `-d, --delete-branch` and that one does delete locally, so the manual
+  cleanup is written out, including why `git branch -d` refuses straight after a
+  merge and after a squash merge.
+- `pr decline` says that it leaves the source branch open, because the decline
+  endpoint takes no body and has no `--close-source-branch` to offer.
+
+## [1.2.0]
+
+### Changed
+
+- `snippet comments --delete` confirms before deleting. It was the only
+  destructive verb that fired on sight, and the only comment delete with no
+  tombstone to read back afterwards. Scripts calling it must pass `--yes`.
+
+### Added
+
+- `snippet comment-view`, and a `deleted` flag on the three comment listings.
+
+## [1.1.0]
+
+### Changed
+
+- `bbx access` no longer offers `none` as a permission. Bitbucket answers "none
+  is not a valid permission"; use the delete verb to clear a grant.
+- `bbx repo deploy-keys update` is gone. It cannot succeed: without the key
+  Bitbucket calls the key invalid, and with it refuses to change a key's
+  contents. Delete and re-add.
+- `bbx pipeline oidc` is gone. Only the workspace form of that path exists.
+
+### Fixed
+
+- `pipeline environments changes` posts a `{"change": {...}}` envelope, which is
+  what the endpoint takes and what the spec omits entirely.
+
+## [1.0.2]
 
 ### Fixed
 

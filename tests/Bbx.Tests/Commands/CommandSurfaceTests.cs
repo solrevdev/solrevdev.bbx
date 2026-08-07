@@ -193,13 +193,30 @@ public class CommandSurfaceTests
         result.GetValue<string[]>("--file").Should().Equal("a=b", "c=d");
     }
 
+    // --strategy used to default to merge_commit here, which overrode whatever
+    // the destination branch said its default was. Absent now reaches the
+    // handler as absent, and the branch decides.
     [Fact]
-    public void Merge_strategy_defaults_to_a_value_bitbucket_accepts()
+    public void Merge_strategy_carries_no_default()
     {
         var result = Parse(PrCommand.Create(Services()), "merge", "1");
 
         result.Errors.Should().BeEmpty();
-        result.GetValue<string>("--strategy").Should().Be("merge_commit");
+        result.GetValue<string>("--strategy").Should().BeNull();
+    }
+
+    // Both branch options used to default to "main", which is a guess about
+    // somebody else's repository. Absent now means absent, and the handler asks
+    // the API which branch it is.
+    [Theory]
+    [InlineData("trigger")]
+    [InlineData("schedules", "create", "--cron", "0 0 1 * * ? *")]
+    public void Pipeline_branch_options_carry_no_default(params string[] args)
+    {
+        var result = Parse(PipelineCommand.Create(Services()), [.. args, "-r", "widgets"]);
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--branch").Should().BeNull();
     }
 
     [Fact]
