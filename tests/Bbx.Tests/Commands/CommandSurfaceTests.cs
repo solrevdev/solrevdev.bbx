@@ -65,6 +65,31 @@ public class CommandSurfaceTests
         BoolValue(result, "--yes").Should().BeFalse();
     }
 
+    // A snippet comment delete is the one comment delete with no tombstone, so
+    // it prompts like the rest rather than firing on sight.
+    [Fact]
+    public void Snippet_comment_delete_takes_a_confirmation_flag()
+    {
+        var command = SnippetCommand.Create(Services());
+
+        var bare = Parse(command, "comments", "abc", "--delete", "42");
+        bare.Errors.Should().BeEmpty();
+        BoolValue(bare, "--yes").Should().BeFalse();
+
+        var skipped = Parse(command, "comments", "abc", "--delete", "42", "-y");
+        skipped.Errors.Should().BeEmpty();
+        BoolValue(skipped, "--yes").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Snippet_comment_view_parses()
+    {
+        var result = Parse(SnippetCommand.Create(Services()), "comments", "abc", "--view", "42");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<int?>("--view").Should().Be(42);
+    }
+
     // Every repo-scoped group takes the short forms; pipeline was the one group
     // that only accepted the long ones.
     [Theory]

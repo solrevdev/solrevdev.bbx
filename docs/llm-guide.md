@@ -315,7 +315,7 @@ endpoints under `snippets/{workspace}[/{id}]`.
   With no flag it lists. The flags are tested in the order add, update, delete,
   view, so passing two picks the first of those. Unlike pull request and commit
   comments, `--delete` removes the row outright: no tombstone, and a later
-  `--view` answers 404.
+  `--view` answers 404. It therefore confirms first; pass `--yes` in a script.
 - `commits <snippet-id> [--revision <rev>]` — the log, or one commit.
 - `diff <snippet-id> <revision>` / `patch <snippet-id> <revision>` — raw text.
 - `view`, `update` and `delete` take `--revision`, which pins the call to that

@@ -201,6 +201,7 @@ public static class SnippetCommand
         var updateOption = new Option<int?>("--update", "-u") { Description = "Edit comment by ID. Needs --content." };
         var contentOption = new Option<string?>("--content") { Description = "Replacement text for --update" };
         var viewOption = new Option<int?>("--view") { Description = "View a single comment by ID" };
+        var yesOption = new Option<bool>("--yes", "-y") { Description = "Skip confirmation prompt" };
 
         command.Arguments.Add(snippetIdArg);
         command.Options.Add(workspaceOption);
@@ -209,12 +210,19 @@ public static class SnippetCommand
         command.Options.Add(updateOption);
         command.Options.Add(contentOption);
         command.Options.Add(viewOption);
+        command.Options.Add(yesOption);
 
-        command.SetHandler((string snippetId, string? workspace, string? addContent, int? deleteId, int? updateId, string? content, int? viewId) =>
-            CommandRunner.RunJsonAsync(() =>
+        command.SetHandler(async (string snippetId, string? workspace, string? addContent, int? deleteId, int? updateId, string? content, int? viewId, bool yes) =>
+        {
+            // Unlike a pull request or commit comment, this one does not leave a
+            // tombstone. The row goes and there is nothing to read back.
+            if (deleteId.HasValue && addContent is null && !updateId.HasValue && !yes &&
+                !CommandRunner.ConfirmOrCancelStderr($"Delete comment #{deleteId} on snippet '{snippetId}'? This cannot be undone. [y/N]: "))
+                return;
+            await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<SnippetCommentsHandler>()
-                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId, updateId, content, viewId), CommandBinding.CancellationToken)),
-            snippetIdArg, workspaceOption, addOption, deleteOption, updateOption, contentOption, viewOption);
+                    .HandleAsync(new SnippetCommentsRequest(snippetId, workspace, addContent, deleteId, updateId, content, viewId), CommandBinding.CancellationToken));
+        }, snippetIdArg, workspaceOption, addOption, deleteOption, updateOption, contentOption, viewOption, yesOption);
         return command;
     }
 

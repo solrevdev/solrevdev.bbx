@@ -416,6 +416,7 @@ bbx snippet commits <id> -w myws
 bbx snippet diff|patch <id> <revision> -w myws
 bbx snippet comments <id> --update <comment-id> --content "..." -w myws
 bbx snippet comments <id> --view <comment-id> -w myws
+bbx snippet comments <id> --delete <comment-id> --yes -w myws   # no tombstone
 
 bbx user view                       # the authenticated account
 bbx user emails [--email me@x.com]
