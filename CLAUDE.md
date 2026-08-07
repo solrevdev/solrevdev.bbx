@@ -205,19 +205,27 @@ rules below are; it is still the right place to start.
     the repository, or `source.branch.name` off the pull request for a
     pull-request run, since a PR pipeline runs on the PR's own branch. `src ls`
     already relied on the API knowing its own default.
-29. **There is no pull-request pipeline target.** `pipeline trigger
-    --pull-request` sent `"type": "pipeline_pullrequest_target"` and had never
-    worked in any released version: Bitbucket answers 400 "The request body
-    contains invalid properties", and the type appears nowhere in
-    `docs/spec/swagger.json`, which has `pipeline_ref_target` and
-    `pipeline_commit_target` only. Four bodies were tried live on 2026-08-07,
-    with the id as a string and as a number, with and without `source`. All 400.
-    A pull-request run is a **`pipeline_ref_target` on the source branch with a
-    `pull-requests` selector**, whose pattern matches the source branch in the
-    `pull-requests:` section of `bitbucket-pipelines.yml` (`**` is the
-    catch-all). Proven by running both on one commit: the selector build ran the
-    `pull-requests:` step, a plain branch trigger ran the `default:` one. The PR
-    id never reaches the wire; it is only how `bbx` looks the source branch up.
+29. **A pull-request pipeline target needs both branches and both commits.**
+    `pipeline_pullrequest_target` is real, though it appears nowhere in
+    `docs/spec/swagger.json`, and `pipeline trigger --pull-request` had never
+    worked in any released version because it sent only `source` and
+    `pullrequest`. The required fields are `type`, `source`, `destination`,
+    `commit`, `destination_commit` and `pullrequest`; `selector` is the only
+    optional one. Dropping any of the others is answered 400 "The request body
+    contains invalid properties", except `commit`, which is answered 500. The
+    id may be a string or a number, and the nested `"type": "pullrequest"` that
+    Bitbucket echoes back is not required on the way in. All of it is on the
+    pull request, so one `GET pullrequests/{id}` builds the body.
+
+    **Do not settle for a `pipeline_ref_target` with a `pull-requests`
+    selector.** It is accepted, and it runs the steps under `pull-requests:`,
+    which is exactly why it looks like the answer. The run is not a pull-request
+    run: `BITBUCKET_PR_ID` and `BITBUCKET_PR_DESTINATION_BRANCH` are missing
+    from its environment altogether, so a script reading either gets an empty
+    string. Read out of two live build logs on 2026-08-07, empty for the ref
+    target and `1` and `master` for the real one. The way to find a shape like
+    this is to let Bitbucket make one: push to a branch with a pull request open
+    and read the `target` off the run it starts.
 30. **Bitbucket does not check that a commit is on the branch you name.** A
     `pipeline_ref_target` with `ref_name: master` and a commit that exists only
     on a feature branch is answered 201 and runs, labelled `master`. So a
@@ -233,7 +241,11 @@ rules below are; it is still the right place to start.
     the branch forbids is answered "merge_strategy: Select a valid choice",
     which does not name the choices, so `MergePullRequestHandler` reads the
     branch and refuses first. There is no 2.0 endpoint that *sets* the allowed
-    strategies; that is web UI only.
+    strategies; that is web UI only, and a `restrict_merges` branch restriction
+    does not change the list either, so the refusal path cannot be tested live
+    and rests on unit tests. Both lookups are wrapped in a fallback for that
+    reason: if either call fails, the merge goes ahead with what was asked for,
+    because the merge is the job and these two reads are advice.
 32. **A schedule's branch cannot be changed.** `PUT
     pipelines_config/schedules/{uuid}` accepts a whole new `target`, answers
     200, echoes the **old** `ref_name` back and moves nothing; a read afterwards

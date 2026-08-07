@@ -51,25 +51,6 @@ public class TriggerPipelineHandlerTests
         body.RootElement.GetProperty("target").GetProperty("ref_name").GetString().Should().Be("master");
     }
 
-    // A pull-request pipeline runs on the pull request's source branch, so the
-    // repository's main branch would be the wrong answer here.
-    [Fact]
-    public async Task HandleAsync_without_a_branch_takes_the_source_branch_off_the_pull_request()
-    {
-        var handler = BuildHandler(out var http,
-            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
-        http.Enqueue(HttpStatusCode.OK, """{"id":123,"source":{"branch":{"name":"feature/x"}}}""");
-        http.Enqueue(HttpStatusCode.Created, """{"uuid":"{p1}"}""");
-
-        await handler.HandleAsync(
-            new TriggerPipelineRequest("ws", "myrepo", null, null, null, "123", []),
-            TestContext.Current.CancellationToken);
-
-        http.Calls[0].RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/myrepo/pullrequests/123");
-        var body = JsonDocument.Parse(http.CallBodies[1]!);
-        body.RootElement.GetProperty("target").GetProperty("ref_name").GetString().Should().Be("feature/x");
-    }
-
     // Bitbucket sends an explicit null for a repository with no main branch, so
     // this reads through TryGetObject rather than TryGetProperty.
     [Fact]
@@ -88,31 +69,40 @@ public class TriggerPipelineHandlerTests
         http.Calls.Should().ContainSingle();
     }
 
-    // Regression: this sent "type": "pipeline_pullrequest_target", which
-    // Bitbucket answers with 400 "The request body contains invalid properties"
-    // in every spelling tried, and which appears nowhere in its own spec. A
-    // pull-request run is a ref target on the source branch carrying a
-    // pull-requests selector; that shape ran the `pull-requests:` step live.
+    private const string PullRequest =
+        """
+        {"id":123,
+         "source":{"branch":{"name":"feature/x"},"commit":{"hash":"aaa111"}},
+         "destination":{"branch":{"name":"master"},"commit":{"hash":"bbb222"}}}
+        """;
+
+    // Regression: this sent a bare "pipeline_pullrequest_target" with a source
+    // and an id, which Bitbucket answers with 400 in every spelling. The real
+    // target needs both branches and both commits. A ref target with a
+    // pull-requests selector runs the same steps and looked right, but the run
+    // is not a pull-request run: BITBUCKET_PR_ID came out empty in a live build.
     [Fact]
-    public async Task HandleAsync_pull_request_trigger_uses_a_ref_target_with_a_pull_requests_selector()
+    public async Task HandleAsync_pull_request_trigger_carries_both_branches_and_both_commits()
     {
         var handler = BuildHandler(out var http,
             seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+        http.Enqueue(HttpStatusCode.OK, PullRequest);
         http.Enqueue(HttpStatusCode.Created, """{"uuid":"{p1}","build_number":2,"state":{"name":"PENDING"}}""");
 
         await handler.HandleAsync(
-            new TriggerPipelineRequest("ws", "myrepo", "feature-x", null, null, "123", []),
+            new TriggerPipelineRequest("ws", "myrepo", null, null, null, "123", []),
             TestContext.Current.CancellationToken);
 
-        var body = JsonDocument.Parse(http.CallBodies.Single()!);
-        var target = body.RootElement.GetProperty("target");
-        target.GetProperty("type").GetString().Should().Be("pipeline_ref_target");
-        target.GetProperty("ref_type").GetString().Should().Be("branch");
-        target.GetProperty("ref_name").GetString().Should().Be("feature-x");
-        target.GetProperty("selector").GetProperty("type").GetString().Should().Be("pull-requests");
-        // "**" is what the pull-requests section is normally keyed by.
-        target.GetProperty("selector").GetProperty("pattern").GetString().Should().Be("**");
-        target.TryGetProperty("pullrequest", out _).Should().BeFalse();
+        http.Calls[0].RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/myrepo/pullrequests/123");
+        var target = JsonDocument.Parse(http.CallBodies[1]!).RootElement.GetProperty("target");
+        target.GetProperty("type").GetString().Should().Be("pipeline_pullrequest_target");
+        target.GetProperty("source").GetString().Should().Be("feature/x");
+        target.GetProperty("destination").GetString().Should().Be("master");
+        target.GetProperty("commit").GetProperty("hash").GetString().Should().Be("aaa111");
+        target.GetProperty("destination_commit").GetProperty("hash").GetString().Should().Be("bbb222");
+        target.GetProperty("pullrequest").GetProperty("id").GetString().Should().Be("123");
+        // selector is the only optional field, so it stays off unless asked for.
+        target.TryGetProperty("selector", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -120,16 +110,50 @@ public class TriggerPipelineHandlerTests
     {
         var handler = BuildHandler(out var http,
             seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+        http.Enqueue(HttpStatusCode.OK, PullRequest);
         http.Enqueue(HttpStatusCode.Created, """{"uuid":"{p1}"}""");
 
         await handler.HandleAsync(
-            new TriggerPipelineRequest("ws", "myrepo", "feature-x", null, "custom-step", "123", []),
+            new TriggerPipelineRequest("ws", "myrepo", null, null, "custom-step", "123", []),
             TestContext.Current.CancellationToken);
 
-        var body = JsonDocument.Parse(http.CallBodies.Single()!);
-        var selector = body.RootElement.GetProperty("target").GetProperty("selector");
+        var selector = JsonDocument.Parse(http.CallBodies[1]!)
+            .RootElement.GetProperty("target").GetProperty("selector");
         selector.GetProperty("type").GetString().Should().Be("pull-requests");
         selector.GetProperty("pattern").GetString().Should().Be("custom-step");
+    }
+
+    // The branches come from the pull request, so a --branch beside it is a
+    // contradiction rather than an override.
+    [Fact]
+    public async Task HandleAsync_refuses_a_branch_beside_a_pull_request()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+
+        var act = () => handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", "feature/x", null, null, "123", []),
+            TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<BbxUserException>())
+            .WithMessage(TriggerPipelineHandler.BranchAndPullRequest);
+        http.Calls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_a_pull_request_missing_a_branch_or_a_commit()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+        http.Enqueue(HttpStatusCode.OK, """{"id":123,"source":{"branch":{"name":"feature/x"}}}""");
+
+        var act = () => handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", null, null, null, "123", []),
+            TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<BbxUserException>())
+            .WithMessage("*does not report both of its branches*");
+        http.Calls.Should().ContainSingle();
     }
 
     // Bitbucket accepts a commit that is not on the branch it was given and runs

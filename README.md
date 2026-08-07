@@ -348,7 +348,7 @@ bbx pipeline steps '{uuid}' -w myws -r myrepo
 bbx pipeline logs '{pipeline-uuid}' '{step-uuid}' -w myws -r myrepo
 bbx pipeline trigger -w myws -r myrepo    # the repository's main branch
 bbx pipeline trigger --branch feat/x -w myws -r myrepo
-bbx pipeline trigger --pull-request 42 -w myws -r myrepo   # the PR's own branch
+bbx pipeline trigger --pull-request 42 -w myws -r myrepo   # a real PR run
 bbx pipeline trigger --branch feat/x --commit abc1234 -w myws -r myrepo
 bbx pipeline stop '{uuid}' --yes -w myws -r myrepo
 

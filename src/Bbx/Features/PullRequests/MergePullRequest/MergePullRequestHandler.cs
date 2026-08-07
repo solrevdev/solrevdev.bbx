@@ -46,12 +46,26 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
     {
         var asked = NormalizeStrategy(request.Strategy);
 
-        var destination = await DestinationBranchAsync(ws, repo, request.Id, ct);
-        if (destination is null)
-            return asked ?? DefaultStrategy;
+        // Both lookups are advisory. The merge is what was asked for, so a
+        // failure to read the branch must not stop it: fall back to what the
+        // caller wanted and let Bitbucket have the last word, which is what
+        // happened before these two calls existed.
+        JsonElement branch;
+        string destination;
+        try
+        {
+            var name = await DestinationBranchAsync(ws, repo, request.Id, ct);
+            if (name is null)
+                return asked ?? DefaultStrategy;
 
-        var branch = await client.GetAsync<JsonElement>(
-            $"repositories/{ws}/{repo}/refs/branches/{Uri.EscapeDataString(destination)}", ct);
+            destination = name;
+            branch = await client.GetAsync<JsonElement>(
+                $"repositories/{ws}/{repo}/refs/branches/{Uri.EscapeDataString(destination)}", ct);
+        }
+        catch (Exception e) when (e is not (BbxUserException or OperationCanceledException))
+        {
+            return asked ?? DefaultStrategy;
+        }
 
         var allowed = branch.TryGetProperty("merge_strategies", out var strategies)
                       && strategies.ValueKind == JsonValueKind.Array

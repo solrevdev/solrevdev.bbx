@@ -43,31 +43,4 @@ internal static class DefaultBranch
         return name;
     }
 
-    /// <summary>
-    /// A pull-request pipeline runs on the pull request's source branch, so the
-    /// repository's default branch is the wrong answer here. Read the source
-    /// branch off the pull request instead.
-    /// </summary>
-    public static async Task<string> ResolveFromPullRequestAsync(
-        BitbucketClient client,
-        string workspace,
-        string repository,
-        string? branch,
-        string pullRequestId,
-        CancellationToken ct)
-    {
-        if (!string.IsNullOrWhiteSpace(branch)) return branch;
-
-        var pr = await client.GetAsync<JsonElement>(
-            $"repositories/{workspace}/{repository}/pullrequests/{pullRequestId}", ct);
-        var name = pr.TryGetObject("source", out var source) && source.TryGetObject("branch", out var sourceBranch)
-            ? sourceBranch.GetStringOrNull("name")
-            : null;
-
-        if (string.IsNullOrEmpty(name))
-            throw new BbxUserException(
-                $"Error: --branch is required. Pull request {pullRequestId} reports no source branch.");
-
-        return name;
-    }
 }

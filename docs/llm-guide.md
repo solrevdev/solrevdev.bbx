@@ -300,7 +300,7 @@ Each command prints a deprecation warning on stderr.
 |---|---|
 | `list` | `GET .../pipelines/` |
 | `view <pipeline-uuid>` | `GET .../pipelines/{uuid}` |
-| `trigger` | `POST .../pipelines/` — `--branch`, `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable). Without `--branch` it reads `mainbranch.name` off the repository, or the pull request's source branch when `--pull-request` is set. `--commit` needs `--branch`: Bitbucket runs a commit that is not on the named branch and labels it with that branch anyway. A pull-request run is a `pipeline_ref_target` with a `pull-requests` selector, **not** a `pipeline_pullrequest_target`, which does not exist |
+| `trigger` | `POST .../pipelines/` — `--branch`, `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable). Without `--branch` it reads `mainbranch.name` off the repository, or the pull request's source branch when `--pull-request` is set. `--commit` needs `--branch`: Bitbucket runs a commit that is not on the named branch and labels it with that branch anyway. `--pull-request` reads both branches and both commits off the pull request and posts a `pipeline_pullrequest_target`, which is what sets `BITBUCKET_PR_ID`; it cannot be combined with `--branch` |
 | `stop <pipeline-uuid>` | `POST .../pipelines/{uuid}/stopPipeline` — `--yes` |
 | `logs <pipeline-uuid> <step-uuid>` | `GET .../pipelines/{uuid}/steps/{step-uuid}/log`, or `.../logs/{log-uuid}` with `--log-uuid` for one numbered attempt |
 | `steps <pipeline-uuid>` | `GET .../pipelines/{uuid}/steps/` |

@@ -16,13 +16,17 @@ two of them.
 ### Fixed
 
 - `pipeline trigger --pull-request` never worked, in any released version. It
-  sent `"type": "pipeline_pullrequest_target"`, which Bitbucket answers with 400
-  "The request body contains invalid properties" and which appears nowhere in
-  its own API spec. Four bodies were tried live, including the id as a number
-  and as a string. A pull-request run is really a `pipeline_ref_target` on the
-  source branch carrying a `pull-requests` selector, and that shape ran the step
-  from the `pull-requests:` section while a plain branch trigger on the same
-  commit ran the `default:` one.
+  sent a `pipeline_pullrequest_target` carrying only a source branch and an id,
+  and Bitbucket answers that with 400 "The request body contains invalid
+  properties". The target also needs the destination branch and both commits;
+  only its selector is optional. All four are read off the pull request now, so
+  the run is a real pull-request run with `BITBUCKET_PR_ID` and
+  `BITBUCKET_PR_DESTINATION_BRANCH` set. A `pipeline_ref_target` with a
+  `pull-requests` selector is not good enough: it runs the same steps, which is
+  why it looks right, but the run has neither variable.
+- `pipeline trigger --branch` is refused beside `--pull-request`. Both branches
+  come from the pull request, so a run against any other branch is not a
+  pull-request run.
 - `pipeline trigger --branch` and `pipeline schedules create --branch` defaulted
   to `main`. New repositories in the test workspace are created with a
   `mainbranch` of `master`, so the default was wrong on all of them, and
@@ -45,6 +49,10 @@ two of them.
 - `pr merge --strategy` accepts all six strategies Bitbucket allows. The help
   listed three; a live branch reported `merge_commit`, `squash`, `fast_forward`,
   `squash_fast_forward`, `rebase_fast_forward` and `rebase_merge`.
+- `pr merge` no longer fails when it cannot read the pull request or the
+  destination branch. Those two reads are new, and they are advice: if either
+  one fails the merge goes ahead with the strategy that was asked for, as it did
+  before they existed.
 - `pipeline schedules update` says that a schedule's branch cannot be changed.
   `PUT .../schedules/{uuid}` takes a new `target`, answers 200, echoes the old
   `ref_name` back and moves nothing.
