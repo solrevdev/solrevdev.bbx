@@ -118,6 +118,12 @@ Where bbx **shapes** the Bitbucket response (most cases), property
 names are snake_case. A handful of pass-through endpoints (snippets,
 some pipelines payloads) keep the upstream shape verbatim.
 
+Shaping drops fields and flattens nested objects, so a shaped body is
+not the API body with different casing. Do not write a script against
+the shape in `docs/spec/swagger.json`: run the command once and read
+what it prints. A pipeline's `target.commit`, for one, is the hash as a
+string where the API sends an object.
+
 ---
 
 ## 4. Group reference
@@ -321,6 +327,57 @@ Each command prints a deprecation warning on stderr.
 | `test-case-reasons <pipeline> <step> <test-case>` | `.../test_reports/test_cases/{uuid}/test_case_reasons` |
 | `test-reports <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports` |
 | `test-cases <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports/test_cases` |
+
+#### Output shape of `list`, `view` and `steps`
+
+These three reshape the Bitbucket body rather than pass it through, so
+do not code against the API's own shape. **`target.commit` is the hash
+as a string, not an object with a `hash` field.** Reading it as one
+raises `'str' object has no attribute 'get'`.
+
+`list` returns the usual list envelope:
+
+```json
+{
+  "workspace": "myworkspace",
+  "repository": "myrepo",
+  "count": 1,
+  "pipelines": [
+    {
+      "uuid": "{8d73cb5b-…}",
+      "build_number": 38,
+      "state": { "name": "COMPLETED", "result": "SUCCESSFUL" },
+      "target": {
+        "ref_type": "branch",
+        "ref_name": "master",
+        "commit": "ed6216b91ced2da25ddbbe99876d6c026aa4c901"
+      },
+      "trigger": "PUSH",
+      "created_on": "2026-08-08T17:09:42.371897635Z",
+      "completed_on": "2026-08-08T17:11:43.301081748Z",
+      "duration_in_seconds": 105
+    }
+  ]
+}
+```
+
+`view` returns `{"pipeline": {…}, "steps": […]}` in one call: the same
+pipeline object plus `creator`, `repository`, `links` (the html href, or
+null when Bitbucket sends none) and the steps, so there is no need to
+call `steps` after it.
+
+`steps` returns `{"pipeline_uuid": …, "count": …, "steps": […]}`, each
+step carrying `uuid`, `name`, `state`, `started_on`, `completed_on`,
+`duration_in_seconds`, `run_number` and `max_time`.
+
+Every field above is nullable except `build_number`. `state` and
+`target` are null on a run that has neither.
+
+```bash
+# the branch and short hash of the last five runs
+bbx pipeline list -r myrepo --limit 5 \
+  | jq -r '.pipelines[] | "\(.build_number) \(.target.ref_name) \(.target.commit[0:8])"'
+```
 
 ### 4.10 `bbx snippet`
 
