@@ -7,6 +7,37 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.4.0]
+
+### Added
+
+- `pipeline trigger --yaml <file>` runs an *on-demand* pipeline: the file's
+  YAML (or stdin with `-`) is sent as the request body and applies to that run
+  only, overriding `bitbucket-pipelines.yml`. The target and variables the
+  other flags build move into query parameters keyed by JSON path
+  (`target.ref_name`, `variables[0].key`, …), which is the shape the endpoint
+  documents for YAML bodies. Two new flags cover the query parameters Bitbucket
+  added for this mode: `--merge-defaults` merges repository-level defaults
+  (image, options, clone, export, labels, definitions) into the supplied YAML,
+  and `--target-branch-to-create <name>` creates that branch from the requested
+  target before the run starts. Both refuse to run without `--yaml`. All of it
+  was proven live on 2026-08-27 against a throwaway repository, since deleted,
+  including one trap: `--merge-defaults` on a repository with no
+  `bitbucket-pipelines.yml` is accepted and the run then fails with "No
+  matching pipeline definition", so the flag's help says so. One caveat the
+  endpoint's shape forces: in this mode `--variable` values travel in the
+  request URL rather than the body, secured or not, so anything that logs URLs
+  sees them; the help for `--yaml` says that too.
+
+### Removed
+
+- The `bbx issue` group. Atlassian shut the Bitbucket Issues API down on
+  2026-08-20, a week before this release, so every call the group could make
+  answered an error. It had printed a deprecation warning since 1.0. The 21
+  Issues endpoints are gone from the published spec, along with the withdrawn
+  `/user/permissions/{repositories,workspaces}`; the pinned spec copy is
+  refreshed to match (331 → 296 operations).
+
 ## [1.3.3]
 
 ### Fixed
