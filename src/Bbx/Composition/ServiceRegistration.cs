@@ -171,14 +171,6 @@ public static class ServiceRegistration
         services.AddTransient<Features.Commits.Comments.UpdateCommitComment.UpdateCommitCommentHandler>();
         services.AddTransient<Features.Commits.Comments.DeleteCommitComment.DeleteCommitCommentHandler>();
 
-        services.AddTransient<Features.Issues.ListIssues.ListIssuesHandler>();
-        services.AddTransient<Features.Issues.ViewIssue.ViewIssueHandler>();
-        services.AddTransient<Features.Issues.CreateIssue.CreateIssueHandler>();
-        services.AddTransient<Features.Issues.UpdateIssue.UpdateIssueHandler>();
-        services.AddTransient<Features.Issues.DeleteIssue.DeleteIssueHandler>();
-        services.AddTransient<Features.Issues.ListIssueComments.ListIssueCommentsHandler>();
-        services.AddTransient<Features.Issues.AddIssueComment.AddIssueCommentHandler>();
-
         services.AddTransient<Features.Pipelines.ListPipelines.ListPipelinesHandler>();
         services.AddTransient<Features.Pipelines.ViewPipeline.ViewPipelineHandler>();
         services.AddTransient<Features.Pipelines.TriggerPipeline.TriggerPipelineHandler>();

@@ -48,7 +48,6 @@ public class Program
         rootCommand.Subcommands.Add(CommitCommand.Create(Services));
         rootCommand.Subcommands.Add(SrcCommand.Create(Services));
         rootCommand.Subcommands.Add(DownloadCommand.Create(Services));
-        rootCommand.Subcommands.Add(IssueCommand.Create(Services));
         rootCommand.Subcommands.Add(PipelineCommand.Create(Services));
         rootCommand.Subcommands.Add(SnippetCommand.Create(Services));
         rootCommand.Subcommands.Add(WorkspaceCommand.Create(Services));

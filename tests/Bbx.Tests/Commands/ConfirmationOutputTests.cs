@@ -11,7 +11,7 @@ public class ConfirmationOutputTests
     [Theory]
     [InlineData("repo")]
     [InlineData("branch")]
-    [InlineData("issue")]
+    [InlineData("snippet")]
     public async Task Destructive_prompts_do_not_write_to_stdout(string group)
     {
         var services = new ServiceCollection().BuildServiceProvider();
@@ -19,13 +19,13 @@ public class ConfirmationOutputTests
         {
             "repo" => RepoCommand.Create(services),
             "branch" => BranchCommand.Create(services),
-            _ => IssueCommand.Create(services),
+            _ => SnippetCommand.Create(services),
         };
         var args = group switch
         {
             "repo" => new[] { "delete", "ws/repo" },
             "branch" => new[] { "delete", "feature" },
-            _ => new[] { "delete", "1" },
+            _ => new[] { "delete", "abc123" },
         };
         var originalInput = Console.In;
         Console.SetIn(new StringReader("n\n"));
