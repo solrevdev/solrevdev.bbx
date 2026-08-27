@@ -54,41 +54,38 @@ public class BitbucketClient : IDisposable
         await response.Content.CopyToAsync(destination, ct);
     }
 
-    public async Task<T?> PostAsync<T>(string endpoint, object? body = null, CancellationToken ct = default)
-    {
-        var content = body != null
-            ? new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json")
-            : null;
-        using var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
-        await EnsureSuccessAsync(response);
-        var json = await response.Content.ReadAsStringAsync(ct);
-        return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
-    }
+    public Task<T?> PostAsync<T>(string endpoint, object? body = null, CancellationToken ct = default)
+        => SendForJsonAsync<T>(HttpMethod.Post, endpoint, JsonContent(body), ct);
 
-    public async Task<T?> PostMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
-    {
-        using var response = await SendAsync(HttpMethod.Post, endpoint, content, ct);
-        await EnsureSuccessAsync(response);
-        var json = await response.Content.ReadAsStringAsync(ct);
-        return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
-    }
+    /// <summary>
+    /// POST a body that is not JSON. The on-demand pipeline trigger takes the
+    /// pipeline YAML itself as the body (<c>application/yaml</c>) with the
+    /// target supplied as query parameters, so serializing through
+    /// <see cref="PostAsync{T}"/> would wrap it in quotes and break it.
+    /// </summary>
+    public Task<T?> PostRawAsync<T>(string endpoint, string body, string mediaType, CancellationToken ct = default)
+        => SendForJsonAsync<T>(HttpMethod.Post, endpoint, new StringContent(body, Encoding.UTF8, mediaType), ct);
 
-    public async Task<T?> PutAsync<T>(string endpoint, object body, CancellationToken ct = default)
-    {
-        var content = new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
-        using var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
-        await EnsureSuccessAsync(response);
-        var json = await response.Content.ReadAsStringAsync(ct);
-        // A PUT that succeeds with 204 has no body. Deserializing "" throws, which
-        // is how `bbx snippet watch` failed against its 204.
-        return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
-    }
+    public Task<T?> PostMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
+        => SendForJsonAsync<T>(HttpMethod.Post, endpoint, content, ct);
 
-    public async Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
+    public Task<T?> PutAsync<T>(string endpoint, object body, CancellationToken ct = default)
+        => SendForJsonAsync<T>(HttpMethod.Put, endpoint, JsonContent(body), ct);
+
+    public Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
+        => SendForJsonAsync<T>(HttpMethod.Put, endpoint, content, ct);
+
+    private static StringContent? JsonContent(object? body) => body is null
+        ? null
+        : new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
+
+    private async Task<T?> SendForJsonAsync<T>(HttpMethod method, string endpoint, HttpContent? content, CancellationToken ct)
     {
-        using var response = await SendAsync(HttpMethod.Put, endpoint, content, ct);
+        using var response = await SendAsync(method, endpoint, content, ct);
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync(ct);
+        // A write that succeeds with 204 has no body. Deserializing "" throws,
+        // which is how `bbx snippet watch` failed against its 204.
         return string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 

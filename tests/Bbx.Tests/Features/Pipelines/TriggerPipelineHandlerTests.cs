@@ -8,8 +8,16 @@ using Bbx.Tests.TestKit;
 
 namespace Bbx.Tests.Features.Pipelines;
 
-public class TriggerPipelineHandlerTests
+public sealed class TriggerPipelineHandlerTests : IDisposable
 {
+    private readonly List<string> _tempFiles = [];
+
+    public void Dispose()
+    {
+        foreach (var file in _tempFiles)
+            File.Delete(file);
+    }
+
     [Fact]
     public async Task HandleAsync_branch_trigger_uses_pipeline_ref_target()
     {
@@ -188,6 +196,147 @@ public class TriggerPipelineHandlerTests
         target.GetProperty("ref_name").GetString().Should().Be("feature-x");
         target.GetProperty("commit").GetProperty("hash").GetString().Should().Be("abc123");
     }
+
+    // On-demand runs put the YAML in the body, so the target moves into query
+    // parameters keyed by the JSON path of the field it replaces.
+    [Fact]
+    public async Task HandleAsync_on_demand_sends_yaml_body_and_target_as_query_parameters()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+        http.Enqueue(HttpStatusCode.Created, """{"uuid":"{p1}","build_number":3,"state":{"name":"PENDING"}}""");
+        var yamlPath = WriteYaml("pipelines:\n  default:\n    - step:\n        script:\n          - echo on-demand\n");
+
+        await handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", "main", null, null, null, [], yamlPath),
+            TestContext.Current.CancellationToken);
+
+        var call = http.Calls.Single();
+        call.RequestUri!.AbsolutePath.Should().Be("/2.0/repositories/ws/myrepo/pipelines/");
+        call.Content!.Headers.ContentType!.MediaType.Should().Be("application/yaml");
+        http.CallBodies.Single().Should().Contain("echo on-demand");
+
+        var query = ParseQuery(call.RequestUri!);
+        query["target.type"].Should().Be("pipeline_ref_target");
+        query["target.ref_type"].Should().Be("branch");
+        query["target.ref_name"].Should().Be("main");
+    }
+
+    [Fact]
+    public async Task HandleAsync_on_demand_carries_variables_and_optional_query_parameters()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+        http.Enqueue(HttpStatusCode.Created, """{"uuid":"{p1}"}""");
+        var yamlPath = WriteYaml("pipelines:\n  custom:\n    scan:\n      - step:\n          script: [echo hi]\n");
+
+        await handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", "main", null, "Deploy to production", null,
+                ["KEY=value", "MY_SECRET=hush"], yamlPath, MergeDefaults: true, TargetBranchToCreate: "od-run"),
+            TestContext.Current.CancellationToken);
+
+        var query = ParseQuery(http.Calls.Single().RequestUri!);
+        query["target.selector.type"].Should().Be("custom");
+        query["target.selector.pattern"].Should().Be("Deploy to production");
+        query["variables[0].key"].Should().Be("KEY");
+        query["variables[0].value"].Should().Be("value");
+        query["variables[0].secured"].Should().Be("false");
+        query["variables[1].key"].Should().Be("MY_SECRET");
+        query["variables[1].secured"].Should().Be("true");
+        query["merge_defaults"].Should().Be("true");
+        query["target_branch_to_create"].Should().Be("od-run");
+    }
+
+    // The pull-request target keeps its full shape in query form too: both
+    // branches, both commits, and the id.
+    [Fact]
+    public async Task HandleAsync_on_demand_pull_request_target_flattens_to_query_parameters()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+        http.Enqueue(HttpStatusCode.OK, PullRequest);
+        http.Enqueue(HttpStatusCode.Created, """{"uuid":"{p1}"}""");
+        var yamlPath = WriteYaml("pipelines:\n  pull-requests:\n    '**':\n      - step:\n          script: [echo pr]\n");
+
+        await handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", null, null, null, "123", [], yamlPath),
+            TestContext.Current.CancellationToken);
+
+        var query = ParseQuery(http.Calls[1].RequestUri!);
+        query["target.type"].Should().Be("pipeline_pullrequest_target");
+        query["target.source"].Should().Be("feature/x");
+        query["target.destination"].Should().Be("master");
+        query["target.commit.hash"].Should().Be("aaa111");
+        query["target.destination_commit.hash"].Should().Be("bbb222");
+        query["target.pullrequest.id"].Should().Be("123");
+    }
+
+    [Fact]
+    public async Task HandleAsync_refuses_on_demand_flags_without_yaml()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+
+        var act = () => handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", "main", null, null, null, [], null, MergeDefaults: true),
+            TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<BbxUserException>())
+            .WithMessage(TriggerPipelineHandler.OnDemandFlagsNeedYaml);
+        http.Calls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_a_missing_yaml_file_before_any_network_call()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+
+        // No --branch, so the normal path would look the repository up first: a
+        // typo'd path must fail on its own error, not after a round trip.
+        var act = () => handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", null, null, null, null, [],
+                Path.Combine(Path.GetTempPath(), "bbx-no-such-file.yml")),
+            TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<BbxUserException>())
+            .WithMessage("*YAML file not found*");
+        http.Calls.Should().BeEmpty();
+    }
+
+    // An empty --yaml is a broken invocation (an unset shell variable, say).
+    // Routing it to the config-file path would trigger a real run the caller
+    // never asked for.
+    [Fact]
+    public async Task HandleAsync_refuses_an_empty_yaml_path()
+    {
+        var handler = BuildHandler(out var http,
+            seed: new BbxConfig { Username = "u", ApiToken = "t", DefaultWorkspace = "ws" });
+
+        var act = () => handler.HandleAsync(
+            new TriggerPipelineRequest("ws", "myrepo", "main", null, null, null, [], ""),
+            TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<BbxUserException>())
+            .WithMessage(TriggerPipelineHandler.EmptyYamlPath);
+        http.Calls.Should().BeEmpty();
+    }
+
+    private string WriteYaml(string content)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"bbx-test-{Guid.NewGuid():N}.yml");
+        File.WriteAllText(path, content);
+        _tempFiles.Add(path);
+        return path;
+    }
+
+    private static Dictionary<string, string> ParseQuery(Uri uri) => uri.Query
+        .TrimStart('?')
+        .Split('&', StringSplitOptions.RemoveEmptyEntries)
+        .Select(pair => pair.Split('=', 2))
+        .ToDictionary(
+            parts => Uri.UnescapeDataString(parts[0]),
+            parts => parts.Length == 2 ? Uri.UnescapeDataString(parts[1]) : string.Empty);
 
     private static TriggerPipelineHandler BuildHandler(out FakeHttpMessageHandler http, BbxConfig? seed)
     {

@@ -219,6 +219,22 @@ public class CommandSurfaceTests
         result.GetValue<string>("--branch").Should().BeNull();
     }
 
+    // A broken command definition still compiles (rule 11), so the on-demand
+    // options are pinned at parse level: all three parse, and '-' survives as
+    // an option value rather than reading as a stray token.
+    [Fact]
+    public void Pipeline_trigger_takes_the_on_demand_options()
+    {
+        var result = Parse(PipelineCommand.Create(Services()),
+            "trigger", "--yaml", "-", "--merge-defaults",
+            "--target-branch-to-create", "od-run", "-r", "widgets");
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue<string>("--yaml").Should().Be("-");
+        BoolValue(result, "--merge-defaults").Should().BeTrue();
+        result.GetValue<string>("--target-branch-to-create").Should().Be("od-run");
+    }
+
     [Fact]
     public void Pr_update_takes_every_mutable_field()
     {

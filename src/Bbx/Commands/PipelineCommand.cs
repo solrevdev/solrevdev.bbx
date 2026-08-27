@@ -370,6 +370,25 @@ public static class PipelineCommand
                           + "commits come from the pull request, so this sets BITBUCKET_PR_ID in the run.",
         };
         var variablesOption = new Option<string[]>("--variable") { Description = "Pipeline variables in key=value format", AllowMultipleArgumentsPerToken = true };
+        var yamlOption = new Option<string?>("--yaml")
+        {
+            Description = "Run an on-demand pipeline: path to a YAML file, or '-' for stdin. "
+                          + "That YAML applies to this run only, overriding bitbucket-pipelines.yml. "
+                          + "In this mode --variable values travel in the request URL (the YAML is "
+                          + "the body), so anything that logs URLs sees them.",
+        };
+        var mergeDefaultsOption = new Option<bool>("--merge-defaults")
+        {
+            Description = "On-demand only: merge repository-level defaults (image, options, clone, "
+                          + "export, labels, definitions) into the supplied YAML. Needs a "
+                          + "bitbucket-pipelines.yml in the repository: without one the trigger is "
+                          + "accepted and the run then fails with 'No matching pipeline definition'.",
+        };
+        var targetBranchToCreateOption = new Option<string?>("--target-branch-to-create")
+        {
+            Description = "On-demand only: create this branch from the requested branch or commit "
+                          + "before the run starts, and run on it.",
+        };
 
         command.Options.Add(workspaceOption);
         command.Options.Add(repoOption);
@@ -378,12 +397,15 @@ public static class PipelineCommand
         command.Options.Add(patternOption);
         command.Options.Add(pullRequestOption);
         command.Options.Add(variablesOption);
+        command.Options.Add(yamlOption);
+        command.Options.Add(mergeDefaultsOption);
+        command.Options.Add(targetBranchToCreateOption);
 
-        command.SetHandler((string? workspace, string? repo, string? branch, string? commit, string? pattern, string? pullRequest, string[] variables) =>
+        command.SetHandler((string? workspace, string? repo, string? branch, string? commit, string? pattern, string? pullRequest, string[] variables, string? yaml, bool mergeDefaults, string? targetBranchToCreate) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<TriggerPipelineHandler>()
-                    .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, pullRequest, variables), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption, branchOption, commitOption, patternOption, pullRequestOption, variablesOption);
+                    .HandleAsync(new TriggerPipelineRequest(workspace, repo, branch, commit, pattern, pullRequest, variables, yaml, mergeDefaults, targetBranchToCreate), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, branchOption, commitOption, patternOption, pullRequestOption, variablesOption, yamlOption, mergeDefaultsOption, targetBranchToCreateOption);
         return command;
     }
 

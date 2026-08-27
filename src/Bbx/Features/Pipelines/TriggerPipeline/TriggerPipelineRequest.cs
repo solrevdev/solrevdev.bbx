@@ -7,4 +7,7 @@ public sealed record TriggerPipelineRequest(
     string? Commit,
     string? Pattern,
     string? PullRequestId,
-    string[] Variables);
+    string[] Variables,
+    string? YamlPath = null,
+    bool MergeDefaults = false,
+    string? TargetBranchToCreate = null);
