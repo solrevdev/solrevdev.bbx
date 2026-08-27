@@ -21,6 +21,17 @@ Refresh it with `scripts/fetch-spec.sh`.
 
 The `bbx` command named against a `cover` row is the one that now calls the endpoint.
 
+## Spec refreshes since the triage
+
+The counts above describe the 2026-08-05 spec the triage ran against. Later refreshes:
+
+**2026-08-27**: 296 operations (was 331). Every removal was expected: the 21 Issues
+paths went with the Issues shutdown on 2026-08-20 (the `bbx issue` group was removed in
+1.4.0), and `/user/permissions/{repositories,workspaces}` were already withdrawn 410s.
+Nothing was added except two optional query parameters on `POST .../pipelines/` for
+on-demand runs, `merge_defaults` and `target_branch_to_create`, both covered by
+`bbx pipeline trigger --yaml` (1.4.0). No other operation, body or response changed.
+
 ## Why things are skipped
 
 Four reasons account for every skip.

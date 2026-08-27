@@ -351,6 +351,8 @@ bbx pipeline trigger -w myws -r myrepo    # the repository's main branch
 bbx pipeline trigger --branch feat/x -w myws -r myrepo
 bbx pipeline trigger --pull-request 42 -w myws -r myrepo   # a real PR run
 bbx pipeline trigger --branch feat/x --commit abc1234 -w myws -r myrepo
+bbx pipeline trigger --yaml run.yml -w myws -r myrepo      # on-demand: this YAML, this run only
+bbx pipeline trigger --yaml - --merge-defaults -w myws -r myrepo   # YAML from stdin
 bbx pipeline stop '{uuid}' --yes -w myws -r myrepo
 
 bbx pipeline step '{pipeline-uuid}' '{step-uuid}' -w myws -r myrepo
@@ -430,7 +432,7 @@ bbx workspace project access users list|view|set|remove --project-key KEY -w myw
 </details>
 
 <details>
-<summary><strong>snippet</strong>, <strong>user</strong>, <strong>issue</strong></summary>
+<summary><strong>snippet</strong>, <strong>user</strong></summary>
 
 ```bash
 bbx snippet list|view|create|update|delete -w myws
@@ -448,16 +450,13 @@ bbx user workspaces                 # replaces the withdrawn workspace list
 bbx user permissions workspace|workspace-repositories -w myws
 bbx user gpg-keys list|view
 bbx user ssh-keys list|view|add|delete
-
-bbx issue list|view|create|update|delete -w myws -r myrepo
-bbx issue comment|comments <id> -w myws -r myrepo
 ```
-
-> [!WARNING]
-> **Bitbucket Issues are being retired by Atlassian.** The API is removed on
-> **2026-08-20** and these commands go with it. See
-> [docs/bitbucket-issues-wikis-sunset.md](docs/bitbucket-issues-wikis-sunset.md).
 </details>
+
+> [!NOTE]
+> **`bbx issue` was removed in 1.4.0.** Atlassian shut the Bitbucket Issues API
+> down on **2026-08-20**, so every call the group could make now fails. See
+> [docs/bitbucket-issues-wikis-sunset.md](docs/bitbucket-issues-wikis-sunset.md).
 
 ### Commands Bitbucket has withdrawn
 
@@ -541,7 +540,6 @@ BBX_NO_INTERACTIVE=1 bbx repo list     # never prompt; fail with a clear error
 | `Not authenticated. Run: bbx auth login` | No stored credential. Log in, or write the config file directly in CI. |
 | `Missing token scopes: …` | The token lacks a scope. Re-issue it at the API tokens page with that scope. |
 | `HTTP 410 Gone` on `workspace list` | Atlassian withdrew the endpoint (CHANGE-2770). Name the workspace instead. |
-| `Bitbucket Cloud Issues are being sunset` | A warning, not a failure. The Issues API goes away 2026-08-20. |
 | `Workspace and repository are required` | Pass `-w` and `-r`, or set a default with `bbx auth set-workspace`. |
 | A UUID argument "does nothing" | Quote it. `{...}` is brace expansion in bash and zsh. |
 

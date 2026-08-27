@@ -1,5 +1,8 @@
 # Bitbucket Cloud Issues and Wikis Sunset
 
+> **Status (2026-08-27):** the shutdown happened as announced. The endpoints are gone
+> from the published spec and the `bbx issue` group was removed in 1.4.0.
+
 > **Source:** Email from Atlassian to john@solrevdev.com, dated 25 March 2026
 > **Subject:** Bitbucket Cloud Issues and Wikis are being removed
 > **Affected workspace:** `foremost-group`
@@ -45,10 +48,11 @@ All other bbx commands are unaffected: `repo`, `pr`, `branch`, `commit`, `pipeli
 
 ### For bbx development
 
-1. Deprecation warnings have been added to all `bbx issue *` subcommands (as of March 2026)
-2. The `IssueCommand` should be removed or replaced after August 20, 2026
-3. The group is frozen: no new `bbx issue *` endpoints. Effort goes to the
-   parts of the API that survive the sunset.
+1. Deprecation warnings were added to all `bbx issue *` subcommands in March 2026
+2. The `IssueCommand` and the whole `Features/Issues` tree were removed in 1.4.0
+   (2026-08-27), a week after the endpoints went away
+3. Nothing issue-shaped remains to freeze. Effort goes to the parts of the API
+   that survived the sunset.
 
 ## Official Atlassian Resources
 

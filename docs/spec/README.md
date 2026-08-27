@@ -7,10 +7,10 @@ Bitbucket Cloud API v2. It is the document every endpoint decision in
 | | |
 | --- | --- |
 | Source | <https://api.bitbucket.org/swagger.json> |
-| Fetched | 2026-08-05 |
-| SHA-256 | ced73199f584139a75b2f002f707e983b87f6160d5ec64898218cb587f19c1fd |
-| Paths | 193 |
-| Operations | 331 |
+| Fetched | 2026-08-27 |
+| SHA-256 | fb629f2205a2440c523d11bbc2ad71af972335ef4d314ed6188e7f458539137f |
+| Paths | 172 |
+| Operations | 296 |
 
 ## Why it is here
 

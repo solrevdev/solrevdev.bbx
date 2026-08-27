@@ -83,12 +83,12 @@ an agent infer correct command lines without re-checking `--help`.
 ### 3.1 Workspace / repo selection
 
 These three options appear (as global options) on `repo`, `pr`,
-`branch`, `commit`, and `issue`:
+`branch`, and `commit`:
 
 | Option | Short | Required if no default set |
 |---|---|---|
 | `--workspace` | `-w` | Yes (or set with `bbx auth set-workspace`) |
-| `--repo` | `-r` | Yes for `pr`/`branch`/`commit`/`issue` |
+| `--repo` | `-r` | Yes for `pr`/`branch`/`commit` |
 | `--json-compact` | — | Optional; toggles single-line JSON; env: `BBX_JSON_COMPACT=1` |
 
 ### 3.2 Common verb-name patterns
@@ -131,7 +131,7 @@ string where the API sends an object.
 Every group below corresponds to one `Commands/*.cs` file. Each row
 gives the verb, the Bitbucket endpoint it hits, and any important
 flags. Workspace / repo options are omitted from the table — assume
-they're available on `repo` / `pr` / `branch` / `commit` / `issue`.
+they're available on `repo` / `pr` / `branch` / `commit`.
 
 ### 4.1 `bbx auth`
 
@@ -294,19 +294,13 @@ bbx pr update 42 -r myrepo --title "New title" --close-source-branch
 | `get <filename>` | `GET .../downloads/{filename}` — `--output <path>` (else streams to stdout) |
 | `delete <filename>` | `DELETE .../downloads/{filename}` — `--yes` |
 
-### 4.8 `bbx issue` (DEPRECATED — Bitbucket issues API shuts down 2026-08-20)
-
-`list / view / create / update / delete / comments / comment` —
-endpoints under `repositories/{ws}/{repo}/issues[/{id}][/comments]`.
-Each command prints a deprecation warning on stderr.
-
-### 4.9 `bbx pipeline`
+### 4.8 `bbx pipeline`
 
 | Verb | Endpoint |
 |---|---|
 | `list` | `GET .../pipelines/` |
 | `view <pipeline-uuid>` | `GET .../pipelines/{uuid}` |
-| `trigger` | `POST .../pipelines/` — `--branch`, `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable). Without `--branch` it reads `mainbranch.name` off the repository, or the pull request's source branch when `--pull-request` is set. `--commit` needs `--branch`: Bitbucket runs a commit that is not on the named branch and labels it with that branch anyway. `--pull-request` reads both branches and both commits off the pull request and posts a `pipeline_pullrequest_target`, which is what sets `BITBUCKET_PR_ID`; it cannot be combined with `--branch` |
+| `trigger` | `POST .../pipelines/` — `--branch`, `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable). Without `--branch` it reads `mainbranch.name` off the repository, or the pull request's source branch when `--pull-request` is set. `--commit` needs `--branch`: Bitbucket runs a commit that is not on the named branch and labels it with that branch anyway. `--pull-request` reads both branches and both commits off the pull request and posts a `pipeline_pullrequest_target`, which is what sets `BITBUCKET_PR_ID`; it cannot be combined with `--branch`. `--yaml <file>` (or `-` for stdin) runs an *on-demand* pipeline: the file's YAML is the body (`application/yaml`), applies to that run only, and the target and variables move into query parameters keyed by JSON path (`target.ref_name`, `variables[0].key`, …). On-demand only: `--merge-defaults` merges repository-level defaults (image, options, clone, export, labels, definitions) into the supplied YAML (the repository must have a `bitbucket-pipelines.yml`; without one the trigger is accepted (201) and the run then fails `selector-not-found`), and `--target-branch-to-create <name>` creates that branch from the requested target before the run starts, and it stays behind afterwards. In this mode `--variable` values travel in the request URL, secured or not, so URL-logging proxies see them |
 | `stop <pipeline-uuid>` | `POST .../pipelines/{uuid}/stopPipeline` — `--yes` |
 | `logs <pipeline-uuid> <step-uuid>` | `GET .../pipelines/{uuid}/steps/{step-uuid}/log`, or `.../logs/{log-uuid}` with `--log-uuid` for one numbered attempt |
 | `steps <pipeline-uuid>` | `GET .../pipelines/{uuid}/steps/` |
@@ -379,7 +373,7 @@ bbx pipeline list -r myrepo --limit 5 \
   | jq -r '.pipelines[] | "\(.build_number) \(.target.ref_name) \(.target.commit[0:8])"'
 ```
 
-### 4.10 `bbx snippet`
+### 4.9 `bbx snippet`
 
 `list / view / create / update / delete / files / watch / comments` —
 endpoints under `snippets/{workspace}[/{id}]`.
@@ -398,7 +392,7 @@ endpoints under `snippets/{workspace}[/{id}]`.
   node. Bitbucket uses it for optimistic concurrency: a write against a stale
   revision is refused rather than clobbering the newer one.
 
-### 4.11 `bbx workspace`
+### 4.10 `bbx workspace`
 
 | Verb | Endpoint |
 |---|---|
@@ -426,7 +420,7 @@ endpoints under `snippets/{workspace}[/{id}]`.
 | `project access groups {list,view,set,remove}` | `.../projects/{key}/permissions-config/groups[/{slug}]` — `--permission read\|write\|create-repo\|admin` |
 | `project access users {list,view,set,remove}` | `.../projects/{key}/permissions-config/users[/{account-id}]` — same permissions |
 
-### 4.12 `bbx user`
+### 4.11 `bbx user`
 
 | Verb | Endpoint |
 |---|---|
@@ -531,7 +525,7 @@ bbx src write -w myworkspace -r myrepo \
 - **`Error: Workspace required. …`** — no `-w` and no default. Fix
   permanently with `bbx auth set-workspace <slug>`.
 - **`Error: Workspace and repository required.`** — `pr`/`branch`/
-  `commit`/`issue` need `-r` (and `-w` if not defaulted).
+  `commit` need `-r` (and `-w` if not defaulted).
 - **`Error: <Bitbucket API error message>`** — a 4xx/5xx from
   Bitbucket. The body is bubbled through verbatim after `"Error: "`.
 - **`Error: … This resource does not support authentication using the
@@ -560,9 +554,10 @@ fix is to re-run `bbx auth login`.
 - The **command surface** (group/verb/flag names) follows the same
   rule. Aliases like `workspace projects` (alias of `workspace
   project`) MAY be removed in a future major.
-- Within v2.x, `bbx issue *` is the only command group that will
-  disappear (alongside Bitbucket's Issues API on 2026-08-20). The
-  deprecation warning gives advance notice.
+- `bbx issue *` was removed in 1.4.0, a week after Bitbucket's Issues
+  API shut down on 2026-08-20. The group had printed a deprecation
+  warning since 1.0, and by removal time every call it could make
+  answered an error, so nothing that worked was taken away.
 
 For the full list of changes by version, see
 [`CHANGELOG.md`](../CHANGELOG.md).

@@ -265,6 +265,17 @@ rules below are; it is still the right place to start.
     `ref_name` for a branch that does not exist, answering 201, so a wrong
     branch there fires on a cron against nothing.
 
+33. **An on-demand trigger is accepted before it is checked.** `POST
+    pipelines/` with a YAML body answers 201 and the run fails afterwards, so
+    a bad on-demand request looks successful at the command line.
+    `merge_defaults=true` on a repository with no `bitbucket-pipelines.yml` is
+    the case found live (2026-08-27, throwaway repository, since deleted): the
+    run completes FAILED with `result-service.pipeline.selector-not-found`,
+    as if the supplied YAML's `pipelines:` section had been ignored. The same
+    request without `merge_defaults`, or with a config file present, succeeds.
+    `target_branch_to_create` really does create the branch, from the
+    requested target, before the run starts; it stays behind afterwards.
+
 ## Auth
 
 API tokens only. OAuth was removed: Bitbucket requires every user to create their
@@ -290,8 +301,8 @@ Do not try to "fix" these. They return 410 Gone:
   and delete, so you need the snippet ID from somewhere else.
 
 Usernames are no longer valid user selectors either; use an account UUID or
-account ID. Bitbucket Issues shut down **2026-08-20** and the `issue` group goes
-with them.
+account ID. Bitbucket Issues shut down **2026-08-20**; the `issue` group and the
+21 Issues endpoints were removed in 1.4.0.
 
 ## Adding a command
 
