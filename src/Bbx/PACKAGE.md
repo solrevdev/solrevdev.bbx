@@ -29,11 +29,12 @@ bbx pr list -r myrepo --state OPEN
 bbx pr view 42 -r myrepo
 bbx pr diff 42 -r myrepo
 bbx pipeline logs '{pipeline-uuid}' '{step-uuid}' -r myrepo
+bbx pipeline trigger --yaml run.yml -r myrepo    # on-demand: this YAML, this run only
 bbx src cat --ref main README.md -r myrepo
 ```
 
 Command groups: `auth`, `repo`, `pr`, `branch`, `commit`, `src`, `download`,
-`issue`, `pipeline`, `snippet`, `workspace`, `user`.
+`pipeline`, `snippet`, `workspace`, `user`.
 
 Run `bbx <group> --help` for the full surface.
 
@@ -68,7 +69,8 @@ https://id.atlassian.com/manage-profile/security/api-tokens
 - Atlassian withdrew the cross-workspace discovery endpoints (CHANGE-2770), so
   `bbx workspace list` and `bbx user permissions ...` return HTTP 410. Name the
   workspace, or set a default with `bbx auth set-workspace`.
-- Bitbucket Issues shut down on 2026-08-20; the `issue` group goes with them.
+- Bitbucket Issues shut down on 2026-08-20; the `issue` group was removed in
+  1.4.0 because every call it could make now fails.
 
 Full documentation, recipes and troubleshooting:
 <https://github.com/solrevdev/solrevdev.bbx>
