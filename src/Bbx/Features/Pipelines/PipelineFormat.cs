@@ -50,14 +50,28 @@ internal static class PipelineFormat
         },
     };
 
-    public static string BuildQuery(string? status, string? branch)
+    /// <summary>
+    /// Query parameters for <c>pipeline list</c>. Not a <c>q=</c> filter: the pipelines
+    /// endpoint ignores <c>q</c> and answers the whole list, so <c>--status</c> and
+    /// <c>--branch</c> used to filter nothing. It honours <c>status</c> and
+    /// <c>target.branch</c> as plain parameters. Proven live on two repositories on 2026-09-12.
+    /// </summary>
+    public static string BuildFilters(string? status, string? branch)
     {
-        var conditions = new List<string>();
+        var parameters = new List<string>();
         if (!string.IsNullOrEmpty(status))
-            conditions.Add($"state.name=\"{status.ToUpperInvariant()}\"");
+            parameters.Add($"status={Uri.EscapeDataString(StatusFilter(status))}");
         if (!string.IsNullOrEmpty(branch))
-            conditions.Add($"target.ref_name=\"{branch}\"");
-        return string.Join(" AND ", conditions);
+            parameters.Add($"target.branch={Uri.EscapeDataString(branch)}");
+        return string.Join("&", parameters);
+    }
+
+    // The filter does not use the vocabulary the pipeline prints. A run whose result is
+    // SUCCESSFUL is found by status=PASSED, and status=SUCCESSFUL matches nothing.
+    private static string StatusFilter(string status)
+    {
+        var upper = status.ToUpperInvariant();
+        return upper == "SUCCESSFUL" ? "PASSED" : upper;
     }
 
     public static PipelineSummary Pipeline(JsonElement pipeline)

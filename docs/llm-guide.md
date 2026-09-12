@@ -298,7 +298,7 @@ bbx pr update 42 -r myrepo --title "New title" --close-source-branch
 
 | Verb | Endpoint |
 |---|---|
-| `list` | `GET .../pipelines/` |
+| `list` | `GET .../pipelines/` — `--status` and `--branch` are sent as the `status` and `target.branch` parameters, because the endpoint ignores `q`. `--status` takes `PASSED` (or `SUCCESSFUL`, translated) and `FAILED`; other values go through unchecked |
 | `view <pipeline-uuid>` | `GET .../pipelines/{uuid}` |
 | `trigger` | `POST .../pipelines/` — `--branch`, `--commit`, `--pattern`, `--pull-request <id>`, `--variable KEY=value` (repeatable). Without `--branch` it reads `mainbranch.name` off the repository, or the pull request's source branch when `--pull-request` is set. `--commit` needs `--branch`: Bitbucket runs a commit that is not on the named branch and labels it with that branch anyway. `--pull-request` reads both branches and both commits off the pull request and posts a `pipeline_pullrequest_target`, which is what sets `BITBUCKET_PR_ID`; it cannot be combined with `--branch`. `--yaml <file>` (or `-` for stdin) runs an *on-demand* pipeline: the file's YAML is the body (`application/yaml`), applies to that run only, and the target and variables move into query parameters keyed by JSON path (`target.ref_name`, `variables[0].key`, …). On-demand only: `--merge-defaults` merges repository-level defaults (image, options, clone, export, labels, definitions) into the supplied YAML (the repository must have a `bitbucket-pipelines.yml`; without one the trigger is accepted (201) and the run then fails `selector-not-found`), and `--target-branch-to-create <name>` creates that branch from the requested target before the run starts, and it stays behind afterwards. In this mode `--variable` values travel in the request URL, secured or not, so URL-logging proxies see them |
 | `stop <pipeline-uuid>` | `POST .../pipelines/{uuid}/stopPipeline` — `--yes` |
@@ -320,7 +320,7 @@ bbx pr update 42 -r myrepo --title "New title" --close-source-branch
 | `reports annotation-{view,update,delete} <hash> <report-id> <ann-id>` | `.../reports/{id}/annotations/{ann-id}` — `--summary`, `--details`, `--type`, `--severity`, `--path`, `--line` |
 | `test-case-reasons <pipeline> <step> <test-case>` | `.../test_reports/test_cases/{uuid}/test_case_reasons` |
 | `test-reports <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports` |
-| `test-cases <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports/test_cases` |
+| `test-cases <pipeline-uuid> <step-uuid>` | `.../pipelines/{uuid}/steps/{uuid}/test_reports/test_cases` — **failed cases only**: Bitbucket never returns passed or skipped ones, so an all-green step answers an empty list with a `note`. Each case carries `uuid` (for `test-case-reasons`), `name`, `classname`, `fully_qualified_name`, `status`, `duration_ms` and `message` |
 
 #### Output shape of `list`, `view` and `steps`
 

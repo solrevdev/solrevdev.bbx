@@ -380,6 +380,11 @@ bbx pipeline test-case-reasons '{pipeline}' '{step}' '{test-case}' -w myws -r my
 
 UUIDs include the braces. Quote them so your shell doesn't expand them.
 
+`test-cases` lists failed test cases only. Bitbucket never returns passed or
+skipped ones, so a step whose tests all passed lists none, and there is no way
+to read per-test timings for a passing run. `test-reports` has the counts.
+`pipeline list --status` takes `PASSED` (or `SUCCESSFUL`) and `FAILED`.
+
 `deployments` manages the environments; `deploys` reads the records of what was
 released to them. `deployments changes` takes `--name`, `--admin-only` and
 `--no-admin-only`, and nothing else: Bitbucket refuses to change an

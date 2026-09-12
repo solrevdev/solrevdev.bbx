@@ -275,6 +275,27 @@ rules below are; it is still the right place to start.
     request without `merge_defaults`, or with a config file present, succeeds.
     `target_branch_to_create` really does create the branch, from the
     requested target, before the run starts; it stays behind afterwards.
+34. **`test_reports/test_cases` lists failed cases only.** Passed and skipped
+    cases are never returned, whatever the query: `status`, `q`, `sort`,
+    `fields` and `pagelen` were all tried on 2026-09-12 and a step of 1,354
+    passing tests answered `{"page": 1, "values": [], "size": 0}` every time,
+    while `test_reports` on the same step counted all 1,354. A report of 586
+    with 1 failure (and 116 skips) listed the one failure. So there is no
+    public route to per-test timings for a passing run; do not go looking for a
+    parameter. The spec documents no schema. The live field names are
+    `class_name` (not `classname`), `duration` as an ISO 8601 string
+    (`PT0.9589264S`, not `duration_in_ms`), `uuid`, `fully_qualified_name`,
+    `suite_name`, `reason.message` and a `test_summary` with flakiness metrics.
+    Errored cases are unverified: neither report had one.
+35. **The pipelines list ignores `q`.** `GET pipelines/?q=state.name="FAILED"`
+    and `?q=target.ref_name="…"` both answer the full unfiltered list with a
+    200, so a filter built that way fails silently. The endpoint honours plain
+    parameters instead: `status`, `target.branch` and `target.ref_name`, and
+    they combine. `status` has its own vocabulary: `PASSED` and `FAILED` work,
+    while `SUCCESSFUL` (the printed result), `COMPLETED`, `STOPPED` and the
+    in-progress names all answer 0, though no stopped or running pipeline
+    existed in either repository to test against. Verified on 2026-09-12
+    against `crm.promosys` and `velocity.foremost-print.com`.
 
 ## Auth
 

@@ -289,7 +289,7 @@ public static class PipelineCommand
     private static Command CreateTestCasesCommand(IServiceProvider services)
     {
         var command = new Command("test-cases",
-            "List test cases for a pipeline step's test report");
+            "List the failed test cases in a pipeline step's test report. Bitbucket never returns passed or skipped cases, so a step whose tests all passed lists none; test-reports has the counts");
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
         var pipelineUuidArg = new Argument<string>("pipeline-uuid") { Description = "Pipeline UUID" };
@@ -313,7 +313,7 @@ public static class PipelineCommand
         var command = new Command("list", "List pipelines for a repository");
         var workspaceOption = new Option<string?>("--workspace", "-w") { Description = "Workspace slug" };
         var repoOption = new Option<string?>("--repo", "-r") { Description = "Repository slug" };
-        var statusOption = new Option<string?>("--status") { Description = "Filter by status (PENDING, BUILDING, COMPLETED, HALTED, FAILED, SUCCESSFUL, STOPPED)" };
+        var statusOption = new Option<string?>("--status") { Description = "Filter by result: PASSED (or SUCCESSFUL) or FAILED. Other values go to Bitbucket unchecked" };
         var sortOption = new Option<string>("--sort") { Description = "Sort field (prefix with - for descending)", DefaultValueFactory = _ => "-created_on" };
         var limitOption = new Option<int>("--limit") { Description = "Maximum number of pipelines to return", DefaultValueFactory = _ => 25 };
         var targetBranchOption = new Option<string?>("--branch") { Description = "Filter by target branch" };

@@ -12,10 +12,10 @@ public sealed class ListPipelinesHandler(BitbucketClient client, CredentialManag
         var (ws, repository) = Resolve.WorkspaceAndRepoFlexible(credentials, request.Workspace, request.Repository,
             "Workspace and repository are required. Use --workspace and --repo or set defaults.");
 
-        var query = PipelineFormat.BuildQuery(request.Status, request.Branch);
+        var filters = PipelineFormat.BuildFilters(request.Status, request.Branch);
         var url = $"repositories/{ws}/{repository}/pipelines/?sort={request.Sort}";
-        if (!string.IsNullOrEmpty(query))
-            url += $"&q={Uri.EscapeDataString(query)}";
+        if (!string.IsNullOrEmpty(filters))
+            url += $"&{filters}";
 
         var pipelines = new List<JsonElement>();
         await foreach (var pipeline in client.GetPaginatedAsync<JsonElement>(url, ct))

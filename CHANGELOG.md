@@ -7,6 +7,32 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.4.3]
+
+### Fixed
+
+- `pipeline test-cases` printed `classname` and `duration` as null on every
+  case and left out the case's `uuid`, which `test-case-reasons` needs. It read
+  field names Bitbucket does not send. It now reads `class_name`, turns
+  Bitbucket's ISO 8601 `duration` (`PT0.9589264S`) into `duration_ms`, and adds
+  `uuid`, `fully_qualified_name` and the failure `message`. `duration` is
+  renamed to `duration_ms`; it had never held a value.
+- `pipeline test-cases` now says why a page is empty. Bitbucket lists **only
+  failed** cases on this endpoint and never returns passed or skipped ones, so
+  a step whose 1,354 tests all passed answers an empty list, which reads as "no
+  tests ran". The output carries a `note` when that happens, and the help says
+  so. Proven live on 2026-09-12: a report of 586 cases with 1 failure listed
+  exactly that one, and a report of 1,608 with 1 failure did the same. Per-test
+  timings for passing tests are therefore not available from the public API.
+- `pipeline list --status` and `--branch` filtered nothing. Both were sent as
+  a `q=` filter, which the pipelines endpoint ignores, so every run came back
+  whatever the flags said. They are now sent as the `status` and
+  `target.branch` parameters the endpoint honours. The status vocabulary is
+  Bitbucket's own and is not the one a pipeline prints: a run whose result is
+  `SUCCESSFUL` is found by `status=PASSED`, and `status=SUCCESSFUL` matches
+  nothing, so `--status SUCCESSFUL` is translated to `PASSED`. `PASSED` and
+  `FAILED` are proven; other values are passed through unchecked.
+
 ## [1.4.0]
 
 ### Added
