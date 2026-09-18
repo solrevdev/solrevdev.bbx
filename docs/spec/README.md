@@ -54,7 +54,7 @@ jq '.definitions["bitbucket.apps.permissions.serializers.RepoPermissionUpdateSch
 jq -r '.paths | keys[] | select(test("permissions-config"))' docs/spec/swagger.json
 ```
 
-Two things the spec gets wrong are listed in `CLAUDE.md`, rules 14 to 21. It
+Two things the spec gets wrong are listed in `AGENTS.md`, rules 14 to 21. It
 documents no body for calls that need one, and marks fields optional that
 Bitbucket requires. Treat it as the starting point, not the answer.
 

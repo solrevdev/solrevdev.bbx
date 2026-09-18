@@ -350,7 +350,7 @@ public static class RepoCommand
         dkCommand.Subcommands.Add(addCommand);
 
         // No update command. PUT deploy-keys/{key_id} cannot succeed: it demands
-        // key and then refuses it, whatever you send. See CLAUDE.md rule 19.
+        // key and then refuses it, whatever you send. See AGENTS.md rule 19.
 
         var deleteCommand = new Command("delete", "Delete a deploy key");
         var deleteIdArg = new Argument<int>("key-id") { Description = "Deploy key ID" };
