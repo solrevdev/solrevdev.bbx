@@ -4,7 +4,7 @@
 #
 # Requirements:
 #   - `bbx` on PATH (either `dotnet tool install -g solrevdev.bbx` or
-#     `dotnet run --project src/Bbx/Bbx.csproj -f net10.0 --` aliased).
+#     `dotnet run --project src/Bbx/Bbx.csproj -f net11.0 --` aliased).
 #   - Stored API-token credentials (`bbx auth status` must succeed). This
 #     script will not prompt; run `bbx auth login` first.
 #   - `jq` for quick output sanity checks.

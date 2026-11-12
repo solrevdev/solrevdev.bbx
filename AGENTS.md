@@ -16,11 +16,21 @@ Bitbucket. Output is JSON so scripts and agents can consume it.
 ## Commands
 
 ```bash
-dotnet build src/Bbx/Bbx.csproj                    # net10.0; SDK pinned by global.json
-dotnet test tests/Bbx.Tests/Bbx.Tests.csproj       # xunit v3, no network
-dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- <args>
+dotnet build src/Bbx/Bbx.csproj                    # net10.0, plus net11.0 when SDK 11+ is present
+dotnet test tests/Bbx.Tests/Bbx.Tests.csproj       # xunit v3, no network; every built target
+dotnet test tests/Bbx.Tests/Bbx.Tests.csproj -f net10.0   # one target only
+dotnet run --project src/Bbx/Bbx.csproj -f net11.0 -- <args>
 dotnet pack src/Bbx/Bbx.csproj -c Release
 ```
+
+.NET 10 is the LTS baseline. `global.json` asks for SDK `10.0.100` with
+`rollForward: latestMajor` and no prereleases, so the newest installed SDK
+builds. The target list depends on that SDK: 11 or later builds `net10.0` and
+`net11.0`, SDK 10 alone builds `net10.0` only. The published package must carry
+both, so CI installs SDKs 10.0.x and 11.0.x explicitly and checks the package
+for both `tools/` folders. Do not switch the workflow back to
+`global-json-file`: setup-dotnet installs nothing from a `latestMajor`
+global.json.
 
 Tests must pass before you commit. They use a fake HTTP handler and never touch
 the network. Do not add a test that needs credentials. New behaviour ships with

@@ -5,7 +5,7 @@
   <p>
     <a href="https://www.nuget.org/packages/solrevdev.bbx"><img src="https://img.shields.io/nuget/v/solrevdev.bbx.svg?logo=nuget" alt="NuGet"></a>
     <a href="https://www.nuget.org/packages/solrevdev.bbx"><img src="https://img.shields.io/nuget/dt/solrevdev.bbx.svg" alt="NuGet downloads"></a>
-    <img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white" alt=".NET 10">
+    <img src="https://img.shields.io/badge/.NET-10%20%7C%2011-512BD4?logo=dotnet&logoColor=white" alt=".NET 10 and 11">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
   </p>
 </div>
@@ -50,7 +50,7 @@ dotnet tool update -g solrevdev.bbx
 dotnet tool uninstall -g solrevdev.bbx
 ```
 
-Requires the [.NET 10 runtime or SDK](https://dotnet.microsoft.com/download). If `bbx` isn't found afterwards, add the tools directory to your `PATH`:
+Requires the [.NET 10 or .NET 11 runtime or SDK](https://dotnet.microsoft.com/download). The package carries a build for each. If `bbx` isn't found afterwards, add the tools directory to your `PATH`:
 
 ```bash
 export PATH="$PATH:$HOME/.dotnet/tools"
@@ -560,11 +560,14 @@ bbx <group> <command> --help
 ```bash
 git clone <this repo> && cd solrevdev.bbx
 
+# SDK 10 or later. global.json starts at 10.0.100 and rolls forward to the
+# newest installed SDK. SDK 11 builds net10.0 and net11.0; SDK 10 alone builds
+# net10.0 only. Testing net10.0 under SDK 11 needs the .NET 10 runtime too.
 dotnet build src/Bbx/Bbx.csproj
 dotnet test tests/Bbx.Tests/Bbx.Tests.csproj
 
-# run without installing
-dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- repo list -w myws
+# run without installing; pick a target with -f
+dotnet run --project src/Bbx/Bbx.csproj -f net11.0 -- repo list -w myws
 
 # install your build globally
 dotnet pack src/Bbx/Bbx.csproj -c Release
