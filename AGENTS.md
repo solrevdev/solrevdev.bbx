@@ -16,9 +16,10 @@ Bitbucket. Output is JSON so scripts and agents can consume it.
 ## Commands
 
 ```bash
-dotnet build src/Bbx/Bbx.csproj                    # net10.0; SDK pinned by global.json
-dotnet test tests/Bbx.Tests/Bbx.Tests.csproj       # xunit v3, no network
-dotnet run --project src/Bbx/Bbx.csproj -f net10.0 -- <args>
+dotnet build src/Bbx/Bbx.csproj                    # net10.0 + net11.0; SDK 11 pinned by global.json
+dotnet test tests/Bbx.Tests/Bbx.Tests.csproj       # xunit v3, no network; runs both targets
+dotnet test tests/Bbx.Tests/Bbx.Tests.csproj -f net10.0   # one target only
+dotnet run --project src/Bbx/Bbx.csproj -f net11.0 -- <args>
 dotnet pack src/Bbx/Bbx.csproj -c Release
 ```
 

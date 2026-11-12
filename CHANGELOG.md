@@ -7,6 +7,17 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.5.0]
+
+### Changed
+
+- The package now targets both `net10.0` and `net11.0`. `RollForward` stays
+  `Major`, so a machine with only a newer runtime still runs it. bbx already ran
+  on .NET 11 through roll-forward, so this is for consistency, not a fix.
+- `global.json` now pins SDK `11.0.100` with `rollForward: latestFeature`, so
+  any 11.0 feature band builds it. Building from source needs the .NET 11 SDK,
+  and the `net10.0` tests also need the .NET 10 runtime. CI installs both.
+
 ## [1.4.3]
 
 ### Fixed
