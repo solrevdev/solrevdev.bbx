@@ -14,9 +14,11 @@ Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATC
 - The package now targets both `net10.0` and `net11.0`. `RollForward` stays
   `Major`, so a machine with only a newer runtime still runs it. bbx already ran
   on .NET 11 through roll-forward, so this is for consistency, not a fix.
-- `global.json` now pins SDK `11.0.100` with `rollForward: latestFeature`, so
-  any 11.0 feature band builds it. Building from source needs the .NET 11 SDK,
-  and the `net10.0` tests also need the .NET 10 runtime. CI installs both.
+- .NET 10 is the LTS baseline for building. `global.json` asks for SDK
+  `10.0.100` with `rollForward: latestMajor` and `allowPrerelease: false`, so
+  the newest installed release SDK builds. SDK 11 or later builds both targets;
+  SDK 10 alone builds `net10.0` only. CI installs SDKs 10.0.x and 11.0.x and
+  fails if the package is missing either target.
 
 ## [1.4.3]
 

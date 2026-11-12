@@ -50,10 +50,13 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          # global.json brings SDK 11, which builds both targets. The net10.0
-          # tests still need the .NET 10 runtime, which SDK 11 does not carry.
-          dotnet-version: 10.0.x
-          global-json-file: global.json
+          # Both SDKs are listed, not read from global.json: under latestMajor
+          # setup-dotnet v5 drops the global.json version and installs
+          # nothing from it. global.json then rolls forward to SDK 11, which
+          # builds both targets, and runtime 10 runs the net10.0 tests.
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Restore
         run: |
@@ -68,6 +71,18 @@ jobs:
 
       - name: Pack
         run: dotnet pack "$PROJECT_DIR" --configuration Release --no-build
+
+      - name: Check package targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The targets depend on the SDK that built them; fail rather than
+          # ship a package missing one.
+          LISTING=$(unzip -l "$NUPKG_DIR"/solrevdev.bbx.*.nupkg)
+          for tfm in net10.0 net11.0; do
+            grep -q "tools/$tfm/any/bbx.dll" <<<"$LISTING" \
+              || { echo "Package is missing tools/$tfm" >&2; exit 1; }
+          done
 
   publish:
     if: github.event_name != 'pull_request'
@@ -85,10 +100,13 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          # global.json brings SDK 11, which builds both targets. The net10.0
-          # tests still need the .NET 10 runtime, which SDK 11 does not carry.
-          dotnet-version: 10.0.x
-          global-json-file: global.json
+          # Both SDKs are listed, not read from global.json: under latestMajor
+          # setup-dotnet v5 drops the global.json version and installs
+          # nothing from it. global.json then rolls forward to SDK 11, which
+          # builds both targets, and runtime 10 runs the net10.0 tests.
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Determine and bump version
         id: bump
@@ -183,6 +201,18 @@ jobs:
 
       - name: Pack
         run: dotnet pack "$PROJECT_DIR" --configuration Release --no-build
+
+      - name: Check package targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The targets depend on the SDK that built them; fail rather than
+          # ship a package missing one.
+          LISTING=$(unzip -l "$NUPKG_DIR"/solrevdev.bbx.*.nupkg)
+          for tfm in net10.0 net11.0; do
+            grep -q "tools/$tfm/any/bbx.dll" <<<"$LISTING" \
+              || { echo "Package is missing tools/$tfm" >&2; exit 1; }
+          done
 
       - name: Verify package
         id: package

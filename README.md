@@ -560,7 +560,9 @@ bbx <group> <command> --help
 ```bash
 git clone <this repo> && cd solrevdev.bbx
 
-# needs the .NET 11 SDK (global.json) and the .NET 10 runtime for the net10.0 tests
+# SDK 10 or later. global.json starts at 10.0.100 and rolls forward to the
+# newest installed SDK. SDK 11 builds net10.0 and net11.0; SDK 10 alone builds
+# net10.0 only. Testing net10.0 under SDK 11 needs the .NET 10 runtime too.
 dotnet build src/Bbx/Bbx.csproj
 dotnet test tests/Bbx.Tests/Bbx.Tests.csproj
 
