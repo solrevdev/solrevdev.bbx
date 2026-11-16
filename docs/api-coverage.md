@@ -39,7 +39,7 @@ Three operations in the spec can answer 202 Accepted. Checked on 2026-11-16 afte
 
 | Method | Path | What 202 means | What `bbx` does |
 | --- | --- | --- | --- |
-| `POST` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/merge` | Merge queued; the task-status URL is in the `Location` header | Before 1.6.0 it printed `""` and exited 0. Now it reads the task ID from `Location` (or `links.self.href`), polls task-status for up to `--timeout` seconds (default 120), and exits 75 with `"status": "queued"` and the task ID if the merge has not finished. `--no-wait` returns the task at once with exit 0 |
+| `POST` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/merge` | Merge queued; the task-status URL is in the `Location` header | Before 1.6.0 it printed `""` and exited 0. Now it sends `async=true` so the 202 comes at once instead of after a wait that can outlast the client timeout, reads the task ID from `Location` (or `links.self.href`), polls task-status for up to `--timeout` seconds (default 120), and exits 75 with `"status": "queued"` and the task ID if the merge has not finished. `--no-wait` returns the task at once with exit 0 |
 | `POST` | `/repositories/{workspace}/{repo_slug}/environments/{environment_uuid}/changes` | Change queued; empty body | `bbx pipeline deployments changes` now says "Queued change" rather than "Updated". There is no task to poll |
 | `GET` | `/repositories/{workspace}/{repo_slug}/commit/{commit}/pullrequests` | Pull request links still being indexed; the page may be partial | Left as is. `bbx commit pullrequests` prints what came back |
 

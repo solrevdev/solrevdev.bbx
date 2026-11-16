@@ -27,7 +27,9 @@ public static class ServiceRegistration
             var client = new HttpClient(sp.GetRequiredService<HttpMessageHandler>(), disposeHandler: false)
             {
                 BaseAddress = new Uri(BaseUrl),
-                Timeout = TimeSpan.FromSeconds(30),
+                // BitbucketClient applies the timeout per request, so one call
+                // (the merge) can wait longer than the rest.
+                Timeout = Timeout.InfiniteTimeSpan,
             };
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             client.DefaultRequestHeaders.UserAgent.ParseAdd("bbx-cli/1.0");

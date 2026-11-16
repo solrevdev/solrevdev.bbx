@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Common;
 using Bbx.Features.PullRequests.PullRequestMergeStatus;
@@ -22,13 +23,32 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
         };
         if (!string.IsNullOrEmpty(request.Message)) body["message"] = request.Message;
 
-        var response = await client.PostForResponseAsync(
-            $"/repositories/{ws}/{repo}/pullrequests/{request.Id}/merge", body, ct);
+        // async=true makes Bitbucket queue the merge and answer 202 at once.
+        // Without it Bitbucket holds the request open while it merges, and on
+        // 16 Nov 2026 that ran past the client's 30s timeout: bbx exited 1
+        // with no idea whether the merge had been queued. Polling is ours to
+        // bound with --timeout; a hung POST is not.
+        ApiResponse response;
+        try
+        {
+            response = await client.PostForResponseAsync(
+                $"/repositories/{ws}/{repo}/pullrequests/{request.Id}/merge?async=true", body, ct,
+                MergeRequestTimeout);
+        }
+        catch (OperationCanceledException e) when (e.InnerException is TimeoutException)
+        {
+            // The request may have reached Bitbucket, so "try again" could
+            // merge twice or race a queued merge. Say what is unknown.
+            throw new BbxUserException(
+                $"Error: Bitbucket did not answer the merge of PR #{request.Id} in time. The merge may "
+                + $"still have been queued. Check `bbx pr view {request.Id} -w {ws} -r {repo}` before "
+                + "merging again.");
+        }
 
-        // 200 carries the merged pull request. 202 means Bitbucket queued the
-        // merge and named the task only in the Location header; this used to
+        // 200 carries the merged pull request, in case Bitbucket ignores
+        // async. 202 names the task only in the Location header; this used to
         // print the empty body as "" and exit 0, leaving the PR open and the
-        // task ID nowhere (16 Nov 2026, during a Bitbucket slowdown).
+        // task ID nowhere.
         if (response.Status != 202) return new CommandOutcome(response.Body);
 
         var statusUrl = MergeTask.StatusUrl(response);
@@ -111,6 +131,14 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
     }
 
     private const string DefaultStrategy = "merge_commit";
+
+    /// <summary>
+    /// Even with async=true, Bitbucket took over 30s just to accept a merge
+    /// during the 16 Nov 2026 slowdown (two live runs on throwaway
+    /// repositories). A timed-out merge is the worst outcome, because nobody
+    /// knows whether it was queued, so this call gets longer than the rest.
+    /// </summary>
+    internal static readonly TimeSpan MergeRequestTimeout = TimeSpan.FromSeconds(120);
 
     /// <summary>
     /// Bitbucket accepts merge_commit, squash, fast_forward, squash_fast_forward,

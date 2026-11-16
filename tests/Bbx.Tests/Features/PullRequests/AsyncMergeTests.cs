@@ -43,6 +43,20 @@ public sealed class AsyncMergeTests : IDisposable
         http.Calls.Should().HaveCount(1);
     }
 
+    // Without async=true Bitbucket holds the POST open while it merges, and on
+    // 16 Nov 2026 that outlasted the 30s client timeout, leaving the outcome
+    // unknown.
+    [Fact]
+    public async Task The_merge_is_requested_asynchronously_so_a_slow_bitbucket_cannot_time_it_out()
+    {
+        var http = new FakeHttpMessageHandler();
+        EnqueueAccepted(http);
+
+        await Merge(http, wait: false);
+
+        http.Calls.Single().RequestUri!.Query.Should().Be("?async=true");
+    }
+
     [Fact]
     public async Task A_queued_merge_is_polled_until_it_succeeds_and_returns_the_merged_pull_request()
     {
@@ -89,6 +103,54 @@ public sealed class AsyncMergeTests : IDisposable
         (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("*Merge failed*");
     }
 
+    // Live on 16 Nov 2026: after two minutes of PENDING one poll hung past the
+    // 30s request timeout and the whole wait aborted with exit 1.
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task A_poll_that_fails_transiently_does_not_end_the_wait(HttpStatusCode failure)
+    {
+        var http = new FakeHttpMessageHandler();
+        EnqueueAccepted(http);
+        http.Enqueue(HttpStatusCode.OK, """{"task_status":"PENDING"}""");
+        http.Enqueue(failure, """{"error":{"message":"slow"}}""");
+        http.Enqueue(HttpStatusCode.OK, $$"""{"task_status":"SUCCESS","merge_result":{{Merged}}}""");
+
+        var outcome = await Merge(http, wait: true, timeoutSeconds: 60);
+
+        outcome.ExitCode.Should().Be(0);
+        Json(outcome.Output).GetProperty("state").GetString().Should().Be("MERGED");
+    }
+
+    [Fact]
+    public async Task A_poll_that_hangs_does_not_end_the_wait()
+    {
+        var http = new FakeHttpMessageHandler();
+        EnqueueAccepted(http);
+        http.EnqueueResponder(_ => throw new TaskCanceledException("hung", new TimeoutException()));
+        http.Enqueue(HttpStatusCode.OK, $$"""{"task_status":"SUCCESS","merge_result":{{Merged}}}""");
+
+        var outcome = await Merge(http, wait: true, timeoutSeconds: 60);
+
+        outcome.ExitCode.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_poll_that_keeps_failing_still_ends_with_the_task_and_exit_75()
+    {
+        var http = new FakeHttpMessageHandler();
+        EnqueueAccepted(http);
+        http.Enqueue(HttpStatusCode.ServiceUnavailable, """{"error":{"message":"down"}}""");
+
+        var outcome = await Merge(http, wait: true, timeoutSeconds: 0);
+
+        outcome.ExitCode.Should().Be(ExitCodes.Pending);
+        var json = Json(outcome.Output);
+        json.GetProperty("task_id").GetString().Should().Be("task-abc");
+        json.GetProperty("last_poll_error").GetString().Should().Contain("down");
+    }
+
     [Fact]
     public async Task A_task_status_that_is_neither_pending_nor_success_exits_one()
     {
@@ -125,6 +187,18 @@ public sealed class AsyncMergeTests : IDisposable
 
         outcome.ExitCode.Should().Be(ExitCodes.Pending);
         Json(outcome.Output).GetProperty("status").GetString().Should().Be("queued");
+    }
+
+    [Fact]
+    public async Task A_merge_post_that_times_out_says_the_merge_may_still_be_queued()
+    {
+        var http = new FakeHttpMessageHandler();
+        http.EnqueueResponder(_ => throw new TaskCanceledException(
+            "timed out", new TimeoutException()));
+
+        var act = () => Merge(http, wait: true);
+
+        (await act.Should().ThrowAsync<BbxUserException>()).WithMessage("*may still have been queued*");
     }
 
     [Fact]

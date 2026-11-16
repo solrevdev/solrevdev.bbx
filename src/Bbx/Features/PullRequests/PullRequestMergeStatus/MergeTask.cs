@@ -52,7 +52,7 @@ public static class MergeTask
     /// <c>status</c> nobody can mistake for a finished merge.
     /// </summary>
     public static object Queued(string ws, string repo, int id, string? taskId, string? statusUrl,
-        string? taskStatus, int? waitedSeconds) => new
+        string? taskStatus, int? waitedSeconds, string? lastPollError = null) => new
     {
         status = "queued",
         pull_request = id,
@@ -60,6 +60,7 @@ public static class MergeTask
         task_status_url = statusUrl,
         task_status = taskStatus,
         waited_seconds = waitedSeconds,
+        last_poll_error = lastPollError,
         next = taskId is null
             ? $"bbx pr view {id} -w {ws} -r {repo}"
             : $"bbx pr merge-status {id} --task-id {taskId} -w {ws} -r {repo} --wait",
@@ -82,10 +83,30 @@ public static class MergeTask
     {
         var clock = Stopwatch.StartNew();
         var timeout = TimeSpan.FromSeconds(Math.Max(0, timeoutSeconds));
+        string? state = null;
+        string? lastPollError = null;
         while (true)
         {
-            var status = await client.GetAsync<JsonElement>(Endpoint(ws, repo, id, taskId), ct);
-            var state = status.GetStringOrNull("task_status");
+            JsonElement status;
+            try
+            {
+                status = await client.GetAsync<JsonElement>(Endpoint(ws, repo, id, taskId), ct);
+                lastPollError = null;
+            }
+            catch (Exception e) when (IsTransient(e, ct))
+            {
+                // Live on 16 Nov 2026 one poll hung past 30s after two minutes
+                // of PENDING, and aborting there lost the task ID all over
+                // again. A poll that fails to answer says nothing about the
+                // merge, so keep going until the caller's timeout.
+                lastPollError = e.Message;
+                if (TimedOut(clock, timeout, interval))
+                    return StillQueued(ws, repo, id, taskId, statusUrl, state, clock, lastPollError);
+                await Task.Delay(interval, ct);
+                continue;
+            }
+
+            state = status.GetStringOrNull("task_status");
 
             if (string.Equals(state, "SUCCESS", StringComparison.OrdinalIgnoreCase))
             {
@@ -105,17 +126,39 @@ public static class MergeTask
                     + (message is null ? $" (task_status: {state ?? "missing"})." : $": {message}"));
             }
 
-            if (clock.Elapsed + interval > timeout)
-            {
-                var waited = (int)Math.Round(clock.Elapsed.TotalSeconds);
-                return new CommandOutcome(
-                    Queued(ws, repo, id, taskId, statusUrl, state, waited),
-                    ExitCodes.Pending,
-                    $"PR #{id} merge is still queued after {waited}s (task {taskId}). "
-                    + "It may still land. Check again with `bbx pr merge-status`.");
-            }
+            if (TimedOut(clock, timeout, interval))
+                return StillQueued(ws, repo, id, taskId, statusUrl, state, clock, null);
 
             await Task.Delay(interval, ct);
         }
     }
+
+    private static bool TimedOut(Stopwatch clock, TimeSpan timeout, TimeSpan interval) =>
+        clock.Elapsed + interval > timeout;
+
+    private static CommandOutcome StillQueued(string ws, string repo, int id, string taskId, string? statusUrl,
+        string? state, Stopwatch clock, string? lastPollError)
+    {
+        var waited = (int)Math.Round(clock.Elapsed.TotalSeconds);
+        return new CommandOutcome(
+            Queued(ws, repo, id, taskId, statusUrl, state, waited, lastPollError),
+            ExitCodes.Pending,
+            $"PR #{id} merge is still queued after {waited}s (task {taskId}). "
+            + "It may still land. Check again with `bbx pr merge-status`.");
+    }
+
+    /// <summary>
+    /// A poll failure that says nothing about the merge: a timeout, a network
+    /// error, 429 or a 5xx. A 4xx is Bitbucket's answer (400 is how a failed
+    /// task is reported) and must end the wait.
+    /// </summary>
+    private static bool IsTransient(Exception e, CancellationToken ct) => e switch
+    {
+        OperationCanceledException { InnerException: TimeoutException } => true,
+        OperationCanceledException => false,
+        HttpRequestException { StatusCode: null } => true,
+        HttpRequestException { StatusCode: var code } =>
+            (int)code! >= 500 || (int)code == 429,
+        _ => false,
+    } && !ct.IsCancellationRequested;
 }

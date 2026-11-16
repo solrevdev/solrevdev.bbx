@@ -332,12 +332,17 @@ rules below are; it is still the right place to start.
     answers 202 with an empty body. `PostAsync` drops headers, so 1.5.0 printed
     `""`, exited 0 and lost the task ID (16 Nov 2026; two queued merges were then
     dropped without a word, and a third landed 40 minutes later while `pr view`
-    still said OPEN). `MergePullRequestHandler` uses `PostForResponseAsync` and
-    polls `merge/task-status/{id}` through `MergeTask`. A merge still pending at
-    the timeout exits 75 (EX_TEMPFAIL) with the task in its JSON; a handler sets
-    a non-zero exit while still printing by returning a `CommandOutcome`. Never
-    test this by merging a real pull request: the 202 path is covered with
-    faked responses in `AsyncMergeTests`.
+    still said OPEN). Without `?async=true` the same POST can also block past the
+    30s client timeout, which happened on the same day, so the handler always
+    sends it and polls instead. `MergePullRequestHandler` uses
+    `PostForResponseAsync` and polls `merge/task-status/{id}` through
+    `MergeTask`, which retries a poll that times out or answers 5xx or 429:
+    live, one poll hung 30s after two minutes of PENDING and aborted the wait.
+    A merge still pending at the timeout exits 75 (EX_TEMPFAIL)
+    with the task in its JSON; a handler sets a non-zero exit while still
+    printing by returning a `CommandOutcome`. Never test this on a live
+    repository: `AsyncMergeTests` fakes the 202 path, and a live check belongs
+    on a throwaway repository.
 
 ## Live testing
 

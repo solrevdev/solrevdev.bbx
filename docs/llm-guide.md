@@ -208,16 +208,25 @@ offered; use `remove`.
 
 #### Queued merges (202)
 
-Bitbucket sometimes queues a merge instead of running it inline, most often when
-it is slow. It answers 202 and names a task. `pr merge` then polls that task
-every 3 seconds:
+`pr merge` sends `?async=true`, so Bitbucket queues the merge, answers 202 at
+once and names a task. Without it Bitbucket holds the request open while it
+merges, and on 16 Nov 2026 that ran past the 30-second client timeout and left
+the outcome unknown. Even with `async=true` Bitbucket took over 30 seconds to
+accept a merge that day, so the merge request alone waits up to 120 seconds.
+`pr merge` then polls the task every 3 seconds:
 
 | What happens | stdout | Exit |
 | --- | --- | --- |
 | Merged inline (200), or the queued task finishes | the merged pull request, as before | `0` |
-| Still `PENDING` at `--timeout` | `{"status": "queued", "task_id": …, "task_status_url": …, "task_status": "PENDING", "waited_seconds": …, "next": "bbx pr merge-status …"}` | `75` |
+| Still `PENDING` at `--timeout` | `{"status": "queued", "task_id": …, "task_status_url": …, "task_status": "PENDING", "waited_seconds": …, "last_poll_error": …, "next": "bbx pr merge-status …"}` | `75` |
 | The task fails | the error, on stderr | `1` |
+| The merge request itself times out | a "may still have been queued" error, on stderr | `1` |
 | `--no-wait` | the same `"status": "queued"` record, at once | `0` |
+
+A poll that times out or answers 5xx or 429 does not end the wait: it says
+nothing about the merge, so polling carries on until `--timeout`, and the last
+such error appears as `last_poll_error`. A 4xx ends it, because 400 is how
+Bitbucket reports a failed task.
 
 A queued merge can still land after the timeout, or be dropped: during the
 Bitbucket slowdown of 16 Nov 2026 two of three queued merges vanished and the

@@ -19,12 +19,22 @@ Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATC
 
 ### Added
 
+- `pr merge` sends `async=true`. Without it Bitbucket holds the request open
+  while it merges, and during the slowdown that ran past the 30-second client
+  timeout and exited 1 with the outcome unknown. Even with `async=true`,
+  Bitbucket took over 30 seconds to accept a merge during the slowdown, so the
+  merge request alone now waits up to 120 seconds; every other call keeps 30.
+  If it still times out, the error says the merge may have been queued.
 - `pr merge` waits for a queued merge by polling its task status, then prints
   the merged pull request just as a direct merge does. If the merge is still
   pending after `--timeout` seconds (default 120) it prints
   `"status": "queued"` with `task_id`, `task_status_url` and the follow-up
   command, and exits **75**. A failed task exits 1. `--no-wait` prints the
   queued record at once and exits 0.
+- While waiting, a task-status poll that times out or answers 5xx or 429 is
+  retried rather than ending the wait, which is what happened live: after two
+  minutes of PENDING one poll hung for 30 seconds. The queued record carries
+  the last such error as `last_poll_error`.
 - `pr merge-status` takes `--wait` and `--timeout`, and `--task-id` now
   accepts the `task_status_url` as well as the bare ID.
 
