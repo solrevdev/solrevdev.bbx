@@ -148,12 +148,28 @@ public static class PrCommand
         // Merging writes to the destination branch and cannot be undone from
         // here, so it confirms like the other destructive verbs.
         var mergeYesOption = new Option<bool>("--yes") { Description = "Skip confirmation prompt" };
+        // Bitbucket answers 202 when it queues a merge instead of running it
+        // inline. Waiting is the default so a queued merge that then fails is
+        // reported, not lost.
+        var mergeNoWaitOption = new Option<bool>("--no-wait")
+        {
+            Description = "If Bitbucket queues the merge, print the task ID and return at once (exit 0) "
+                          + "instead of waiting for it.",
+        };
+        var mergeTimeoutOption = new Option<int>("--timeout")
+        {
+            Description = "Seconds to wait for a queued merge before giving up with exit code 75. "
+                          + "The merge may still land; follow it with `bbx pr merge-status`.",
+            DefaultValueFactory = _ => MergeTask.DefaultTimeoutSeconds,
+        };
         mergeCommand.Arguments.Add(mergeIdArg);
         mergeCommand.Options.Add(strategyOption);
         mergeCommand.Options.Add(messageOption);
         mergeCommand.Options.Add(closeSourceMergeOption);
         mergeCommand.Options.Add(mergeYesOption);
-        mergeCommand.SetHandler(async (string? workspace, string? repo, int id, string? strategy, string? message, bool closeSource, bool yes) =>
+        mergeCommand.Options.Add(mergeNoWaitOption);
+        mergeCommand.Options.Add(mergeTimeoutOption);
+        mergeCommand.SetHandler(async (string? workspace, string? repo, int id, string? strategy, string? message, bool closeSource, bool yes, bool noWait, int timeout) =>
         {
             var using_ = string.IsNullOrEmpty(strategy)
                 ? "the destination branch's default strategy"
@@ -162,8 +178,8 @@ public static class PrCommand
                 return;
             await CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<MergePullRequestHandler>()
-                    .HandleAsync(new MergePullRequestRequest(workspace, repo, id, strategy, message, closeSource), CommandBinding.CancellationToken));
-        }, workspaceOption, repoOption, mergeIdArg, strategyOption, messageOption, closeSourceMergeOption, mergeYesOption);
+                    .HandleAsync(new MergePullRequestRequest(workspace, repo, id, strategy, message, closeSource, !noWait, timeout), CommandBinding.CancellationToken));
+        }, workspaceOption, repoOption, mergeIdArg, strategyOption, messageOption, closeSourceMergeOption, mergeYesOption, mergeNoWaitOption, mergeTimeoutOption);
         command.Subcommands.Add(mergeCommand);
 
         var approveCommand = new Command("approve", "Approve a pull request");
@@ -280,14 +296,26 @@ public static class PrCommand
             "Report on a merge that was accepted asynchronously and returned a task ID");
         var mergeStatusIdArg = new Argument<int>("id") { Description = "Pull request ID" };
         var mergeStatusTaskOption = new Option<string>("--task-id")
-        { Description = "Merge task ID, as returned by an asynchronous merge", Required = true };
+        {
+            Description = "Merge task ID, or the whole task_status_url, as printed by `bbx pr merge`",
+            Required = true,
+        };
+        var mergeStatusWaitOption = new Option<bool>("--wait")
+        { Description = "Poll until the merge finishes; exit 75 if it is still queued at --timeout" };
+        var mergeStatusTimeoutOption = new Option<int>("--timeout")
+        {
+            Description = "Seconds to wait with --wait",
+            DefaultValueFactory = _ => MergeTask.DefaultTimeoutSeconds,
+        };
         mergeStatusCommand.Arguments.Add(mergeStatusIdArg);
         mergeStatusCommand.Options.Add(mergeStatusTaskOption);
-        mergeStatusCommand.SetHandler((string? workspace, string? repo, int id, string taskId) =>
+        mergeStatusCommand.Options.Add(mergeStatusWaitOption);
+        mergeStatusCommand.Options.Add(mergeStatusTimeoutOption);
+        mergeStatusCommand.SetHandler((string? workspace, string? repo, int id, string taskId, bool wait, int timeout) =>
             CommandRunner.RunJsonAsync(() =>
                 services.GetRequiredService<PullRequestMergeStatusHandler>()
-                    .HandleAsync(new PullRequestMergeStatusRequest(workspace, repo, id, taskId), CommandBinding.CancellationToken)),
-            workspaceOption, repoOption, mergeStatusIdArg, mergeStatusTaskOption);
+                    .HandleAsync(new PullRequestMergeStatusRequest(workspace, repo, id, taskId, wait, timeout), CommandBinding.CancellationToken)),
+            workspaceOption, repoOption, mergeStatusIdArg, mergeStatusTaskOption, mergeStatusWaitOption, mergeStatusTimeoutOption);
         command.Subcommands.Add(mergeStatusCommand);
 
         var commentViewCommand = new Command("comment-view", "View a single pull request comment");

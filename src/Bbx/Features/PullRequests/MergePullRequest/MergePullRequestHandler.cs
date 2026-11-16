@@ -1,12 +1,14 @@
 using System.Text.Json;
+using Bbx.Api;
 using Bbx.Auth;
 using Bbx.Features.Common;
+using Bbx.Features.PullRequests.PullRequestMergeStatus;
 
 namespace Bbx.Features.PullRequests.MergePullRequest;
 
 public sealed class MergePullRequestHandler(BitbucketClient client, CredentialManager credentials)
 {
-    public async Task<JsonElement> HandleAsync(MergePullRequestRequest request, CancellationToken ct)
+    public async Task<CommandOutcome> HandleAsync(MergePullRequestRequest request, CancellationToken ct)
     {
         var (ws, repo) = Resolve.WorkspaceAndRepo(credentials, request.Workspace, request.Repository,
             "Error: Workspace and repository required.");
@@ -21,8 +23,50 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
         };
         if (!string.IsNullOrEmpty(request.Message)) body["message"] = request.Message;
 
-        return await client.PostAsync<JsonElement>(
-            $"/repositories/{ws}/{repo}/pullrequests/{request.Id}/merge", body, ct);
+        // async=true makes Bitbucket queue the merge and answer 202 at once.
+        // Without it Bitbucket holds the request open while it merges, and on
+        // 16 Nov 2026 that ran past the client's 30s timeout: bbx exited 1
+        // with no idea whether the merge had been queued. Polling is ours to
+        // bound with --timeout; a hung POST is not.
+        ApiResponse response;
+        try
+        {
+            response = await client.PostForResponseAsync(
+                $"/repositories/{ws}/{repo}/pullrequests/{request.Id}/merge?async=true", body, ct,
+                MergeRequestTimeout);
+        }
+        catch (OperationCanceledException e) when (e.InnerException is TimeoutException)
+        {
+            // The request may have reached Bitbucket, so "try again" could
+            // merge twice or race a queued merge. Say what is unknown.
+            throw new BbxUserException(
+                $"Error: Bitbucket did not answer the merge of PR #{request.Id} in time. The merge may "
+                + $"still have been queued. Check `bbx pr view {request.Id} -w {ws} -r {repo}` before "
+                + "merging again.");
+        }
+
+        // 200 carries the merged pull request, in case Bitbucket ignores
+        // async. 202 names the task only in the Location header; this used to
+        // print the empty body as "" and exit 0, leaving the PR open and the
+        // task ID nowhere.
+        if (response.Status != 202) return new CommandOutcome(response.Body);
+
+        var statusUrl = MergeTask.StatusUrl(response);
+        var taskId = statusUrl is null ? null : MergeTask.IdFrom(statusUrl);
+        if (taskId is null)
+        {
+            return new CommandOutcome(
+                MergeTask.Queued(ws, repo, request.Id, null, null, null, null),
+                ExitCodes.Pending,
+                $"Bitbucket queued the merge of PR #{request.Id} but sent no task link. "
+                + "Check the pull request's state before merging again.");
+        }
+
+        if (!request.Wait)
+            return new CommandOutcome(MergeTask.Queued(ws, repo, request.Id, taskId, statusUrl, null, null));
+
+        return await MergeTask.WaitAsync(client, ws, repo, request.Id, taskId, statusUrl,
+            request.TimeoutSeconds, request.PollInterval ?? MergeTask.DefaultInterval, ct);
     }
 
     /// <summary>
@@ -87,6 +131,14 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
     }
 
     private const string DefaultStrategy = "merge_commit";
+
+    /// <summary>
+    /// Even with async=true, Bitbucket took over 30s just to accept a merge
+    /// during the 16 Nov 2026 slowdown (two live runs on throwaway
+    /// repositories). A timed-out merge is the worst outcome, because nobody
+    /// knows whether it was queued, so this call gets longer than the rest.
+    /// </summary>
+    internal static readonly TimeSpan MergeRequestTimeout = TimeSpan.FromSeconds(120);
 
     /// <summary>
     /// Bitbucket accepts merge_commit, squash, fast_forward, squash_fast_forward,

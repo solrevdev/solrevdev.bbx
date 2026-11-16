@@ -75,6 +75,32 @@ public class BitbucketClient : IDisposable
     public Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
         => SendForJsonAsync<T>(HttpMethod.Put, endpoint, content, ct);
 
+    /// <summary>
+    /// POST and keep the status and <c>Location</c> header, which
+    /// <see cref="PostAsync{T}"/> throws away. The merge endpoint answers 202
+    /// when it queues the merge, and the only place it names the task is the
+    /// Location header; dropping it is how <c>bbx pr merge</c> printed a bare
+    /// <c>""</c> and lost the task ID.
+    /// </summary>
+    public async Task<ApiResponse> PostForResponseAsync(string endpoint, object? body = null,
+        CancellationToken ct = default, TimeSpan? timeout = null)
+    {
+        using var response = await SendAsync(HttpMethod.Post, endpoint, JsonContent(body), ct, timeout: timeout);
+        await EnsureSuccessAsync(response);
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var location = response.Headers.Location;
+        if (location is { IsAbsoluteUri: false } && response.RequestMessage?.RequestUri is { } requestUri)
+            location = new Uri(requestUri, location);
+
+        JsonElement parsed = default;
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            try { parsed = JsonSerializer.Deserialize<JsonElement>(json, JsonOptions); }
+            catch (JsonException) { }
+        }
+        return new ApiResponse((int)response.StatusCode, location, parsed);
+    }
+
     private static StringContent? JsonContent(object? body) => body is null
         ? null
         : new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
@@ -129,11 +155,12 @@ public class BitbucketClient : IDisposable
         HttpContent? content,
         CancellationToken ct,
         string? accept = null,
-        HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
+        HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead,
+        TimeSpan? timeout = null)
     {
         var current = new Uri(_client.BaseAddress!, NormalizeEndpoint(endpoint));
         var response = await SendOnceAsync(
-            method, current.AbsoluteUri, content, ct, accept, completionOption, IsApiOrigin(current));
+            method, current.AbsoluteUri, content, ct, accept, completionOption, IsApiOrigin(current), timeout);
 
         // Redirects are followed here rather than by HttpClient because
         // HttpClient drops the Authorization header when it follows one, which
@@ -170,7 +197,8 @@ public class BitbucketClient : IDisposable
         CancellationToken ct,
         string? accept,
         HttpCompletionOption completionOption,
-        bool applyAuth = true)
+        bool applyAuth = true,
+        TimeSpan? timeout = null)
     {
         var request = new HttpRequestMessage(method, url)
         {
@@ -184,8 +212,29 @@ public class BitbucketClient : IDisposable
         {
             await _auth.ApplyAsync(request, ct);
         }
-        return await _client.SendAsync(request, completionOption, ct);
+        var limit = timeout ?? DefaultTimeout;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(limit);
+        try
+        {
+            return await _client.SendAsync(request, completionOption, deadline.Token);
+        }
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
+        {
+            // Keep the shape HttpClient.Timeout used to give: Program tells a
+            // timeout (exit 1) from Ctrl+C (exit 130) by the inner
+            // TimeoutException, and a bare cancellation would read as Ctrl+C.
+            throw new TaskCanceledException(
+                $"{method} {new Uri(url).AbsolutePath} got no answer within {limit.TotalSeconds:0} seconds.",
+                new TimeoutException(e.Message, e));
+        }
     }
+
+    /// <summary>
+    /// Applied per request rather than through <c>HttpClient.Timeout</c>, so a
+    /// call that is slow by nature can ask for longer.
+    /// </summary>
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
     private bool IsApiOrigin(Uri target) => Uri.Compare(
         target,
@@ -256,7 +305,7 @@ public class BitbucketClient : IDisposable
         {
         }
 
-        throw new HttpRequestException(errorMessage);
+        throw new HttpRequestException(errorMessage, null, response.StatusCode);
     }
 
     private static JsonSerializerOptions JsonOptions => new()
@@ -278,6 +327,12 @@ public class BitbucketClient : IDisposable
         // dispose it here.
     }
 }
+
+/// <summary>
+/// A response whose status and Location header matter as well as its body.
+/// <see cref="Body"/> is the default element (ValueKind Undefined) when there was no JSON body.
+/// </summary>
+public sealed record ApiResponse(int Status, Uri? Location, JsonElement Body);
 
 public class PaginatedResponse<T>
 {

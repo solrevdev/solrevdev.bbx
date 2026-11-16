@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Bbx.Auth;
 using Bbx.Composition;
+using Bbx.Features.Common;
 
 namespace Bbx.Commands;
 
@@ -8,7 +9,21 @@ internal static class CommandRunner
 {
     public static Task RunJsonAsync<T>(Func<Task<T>> handler) => RunAsync(
         requireAuth: true,
-        async () => Console.WriteLine(JsonSerializer.Serialize(NoBodyAsNull(await handler()), JsonOptions.Current)));
+        async () =>
+        {
+            object? result = await handler();
+            if (result is CommandOutcome outcome)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(NoBodyAsNull(outcome.Output), JsonOptions.Current));
+                // Print first, then fail: the JSON is what a caller needs to
+                // follow up (a merge task ID), even when the exit code says
+                // the job is not finished.
+                if (outcome.ExitCode != 0)
+                    throw new BbxExitException(outcome.ExitCode, outcome.Message ?? "");
+                return;
+            }
+            Console.WriteLine(JsonSerializer.Serialize(NoBodyAsNull(result), JsonOptions.Current));
+        });
 
     /// <summary>
     /// A write that answers 204 has no body, so the client deserializes it to

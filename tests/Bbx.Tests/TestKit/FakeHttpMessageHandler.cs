@@ -21,6 +21,12 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
         _responders.Enqueue(responder);
     }
 
+    /// <summary>
+    /// Never answer the next request, as a server that has stopped replying.
+    /// The call ends only when its token is cancelled.
+    /// </summary>
+    public bool HangNext { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         // HttpClient hands the token straight to its handler without checking it
@@ -34,6 +40,11 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
             body = await request.Content.ReadAsStringAsync(cancellationToken);
         }
         CallBodies.Add(body);
+        if (HangNext)
+        {
+            HangNext = false;
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
         if (_responders.Count == 0)
             throw new InvalidOperationException($"No scripted response for {request.Method} {request.RequestUri}");
         return _responders.Dequeue()(request);

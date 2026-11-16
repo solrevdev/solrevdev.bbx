@@ -78,6 +78,11 @@ public class Program
                 EnableDefaultExceptionHandler = false,
             }, cancellationToken);
         }
+        catch (BbxExitException ex)
+        {
+            if (!string.IsNullOrEmpty(ex.Message)) Console.Error.WriteLine(ex.Message);
+            return ex.ExitCode;
+        }
         catch (BbxUserException ex)
         {
             Console.Error.WriteLine(ex.Message);
