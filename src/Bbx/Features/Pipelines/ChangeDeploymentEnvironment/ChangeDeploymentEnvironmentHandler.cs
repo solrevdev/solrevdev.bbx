@@ -31,6 +31,8 @@ public sealed class ChangeDeploymentEnvironmentHandler(BitbucketClient client, C
         await client.PostAsync<JsonElement>(
             $"repositories/{ws}/{repo}/environments/{Uri.EscapeDataString(request.Environment)}/changes/",
             new { change }, ct);
-        return $"✓ Updated deployment environment {request.Environment}";
+        // Say queued, not updated: a read straight afterwards can still show
+        // the old values.
+        return $"✓ Queued change to deployment environment {request.Environment} (Bitbucket applies it in the background)";
     }
 }

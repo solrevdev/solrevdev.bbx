@@ -75,6 +75,31 @@ public class BitbucketClient : IDisposable
     public Task<T?> PutMultipartAsync<T>(string endpoint, MultipartFormDataContent content, CancellationToken ct = default)
         => SendForJsonAsync<T>(HttpMethod.Put, endpoint, content, ct);
 
+    /// <summary>
+    /// POST and keep the status and <c>Location</c> header, which
+    /// <see cref="PostAsync{T}"/> throws away. The merge endpoint answers 202
+    /// when it queues the merge, and the only place it names the task is the
+    /// Location header; dropping it is how <c>bbx pr merge</c> printed a bare
+    /// <c>""</c> and lost the task ID.
+    /// </summary>
+    public async Task<ApiResponse> PostForResponseAsync(string endpoint, object? body = null, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Post, endpoint, JsonContent(body), ct);
+        await EnsureSuccessAsync(response);
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var location = response.Headers.Location;
+        if (location is { IsAbsoluteUri: false } && response.RequestMessage?.RequestUri is { } requestUri)
+            location = new Uri(requestUri, location);
+
+        JsonElement parsed = default;
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            try { parsed = JsonSerializer.Deserialize<JsonElement>(json, JsonOptions); }
+            catch (JsonException) { }
+        }
+        return new ApiResponse((int)response.StatusCode, location, parsed);
+    }
+
     private static StringContent? JsonContent(object? body) => body is null
         ? null
         : new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
@@ -278,6 +303,12 @@ public class BitbucketClient : IDisposable
         // dispose it here.
     }
 }
+
+/// <summary>
+/// A response whose status and Location header matter as well as its body.
+/// <see cref="Body"/> is the default element (ValueKind Undefined) when there was no JSON body.
+/// </summary>
+public sealed record ApiResponse(int Status, Uri? Location, JsonElement Body);
 
 public class PaginatedResponse<T>
 {

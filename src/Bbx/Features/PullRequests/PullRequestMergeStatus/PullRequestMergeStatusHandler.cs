@@ -7,14 +7,21 @@ namespace Bbx.Features.PullRequests.PullRequestMergeStatus;
 
 public sealed class PullRequestMergeStatusHandler(BitbucketClient client, CredentialManager credentials)
 {
-    public async Task<JsonElement> HandleAsync(PullRequestMergeStatusRequest request, CancellationToken ct)
+    public async Task<CommandOutcome> HandleAsync(PullRequestMergeStatusRequest request, CancellationToken ct)
     {
         var (ws, repo) = Resolve.WorkspaceAndRepo(credentials, request.Workspace, request.Repository,
             "Error: Workspace and repository required.");
-        // A merge asked for asynchronously answers 202 with a task ID. This
-        // reports whether that task has finished.
-        return await client.GetAsync<JsonElement>(
-            $"repositories/{ws}/{repo}/pullrequests/{request.Id}/merge/task-status/{Uri.EscapeDataString(request.TaskId)}",
-            ct);
+        var taskId = MergeTask.IdFrom(request.TaskId);
+
+        if (request.Wait)
+        {
+            return await MergeTask.WaitAsync(client, ws, repo, request.Id, taskId, null,
+                request.TimeoutSeconds, request.PollInterval ?? MergeTask.DefaultInterval, ct);
+        }
+
+        // Without --wait this reports the task as Bitbucket has it, PENDING
+        // included, and exits 0: the caller asked for a status, not a result.
+        return new CommandOutcome(
+            await client.GetAsync<JsonElement>(MergeTask.Endpoint(ws, repo, request.Id, taskId), ct));
     }
 }

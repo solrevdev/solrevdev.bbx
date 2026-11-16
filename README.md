@@ -32,7 +32,7 @@
 Bitbucket has no first-party CLI. `bbx` fills that gap the way `gh` does for GitHub:
 
 - **JSON on stdout, diagnostics on stderr.** Pipe straight into `jq` without filtering noise.
-- **Exit codes that mean something.** `0` on success, `1` on any failure, so `set -e` and `if !` work.
+- **Exit codes that mean something.** `0` on success, `1` on any failure, so `set -e` and `if !` work. `75` means a queued merge has not finished yet.
 - **One credential.** An Atlassian API token, stored `0600`, with scopes you choose.
 - **Wide coverage.** Repos, pull requests, branches, tags, commits, source files, downloads, pipelines, snippets, workspaces, projects and users.
 - **Errors you can act on.** A missing scope tells you which scope and where to re-issue the token.
@@ -237,7 +237,7 @@ bbx pr statuses 42 -w myws -r myrepo
 
 bbx pr diffstat 42 -w myws -r myrepo      # per-file line counts
 bbx pr conflicts 42 -w myws -r myrepo
-bbx pr merge-status 42 --task-id <id> -w myws -r myrepo
+bbx pr merge-status 42 --task-id <id> --wait -w myws -r myrepo   # follow a queued merge
 bbx pr activity -w myws -r myrepo         # no ID: the whole repository
 
 bbx pr comment 42 --body "LGTM" -w myws -r myrepo

@@ -25,7 +25,10 @@ relevant table.
 - **exit codes:** `0` on success, `1` on any handled error
   (`BbxUserException` for user-facing errors like "not authenticated",
   `HttpRequestException` for network/API failures wrapped with
-  `"Error: "`).
+  `"Error: "`). `75` means "not finished yet, check again": only
+  `pr merge` and `pr merge-status --wait` use it, when Bitbucket has queued
+  a merge that is still pending at `--timeout`. The JSON on stdout still
+  carries the task ID.
 - **No interactive prompts by default for an agent.** Set
   `BBX_NO_INTERACTIVE=1` or redirect stdin to disable the first-run
   credential prompt and the `--yes`-less confirmation prompts.
@@ -182,7 +185,7 @@ offered; use `remove`.
 | `view <id>` | `GET repositories/{ws}/{repo}/pullrequests/{id}` |
 | `create` | `POST repositories/{ws}/{repo}/pullrequests` — `--title`, `--source`, `--dest`, `--body`, `--close-source-branch`, `--reviewers <account-id>` |
 | `update <id>` | `PUT repositories/{ws}/{repo}/pullrequests/{id}` — `--title`, `--body`, `--dest`, `--reviewers <account-id>...`, `--close-source-branch`, `--no-close-source-branch`. Open pull requests only. |
-| `merge <id>` | `POST .../merge` — `--strategy`, `--message`, `--close-source-branch`, `--yes`. Six strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`, `rebase_fast_forward`, `rebase_merge`. Left off, `bbx` reads the destination branch's `default_merge_strategy` (two extra GETs); named explicitly, it is sent straight through with no lookups. May answer 202 with a task ID instead of merging on the spot; read it with `merge-status` |
+| `merge <id>` | `POST .../merge` — `--strategy`, `--message`, `--close-source-branch`, `--yes`. Six strategies: `merge_commit`, `squash`, `fast_forward`, `squash_fast_forward`, `rebase_fast_forward`, `rebase_merge`. Left off, `bbx` reads the destination branch's `default_merge_strategy` (two extra GETs); named explicitly, it is sent straight through with no lookups. Waits for a queued merge: see below. `--no-wait`, `--timeout <seconds>` (default 120) |
 | `approve <id>` / `unapprove <id>` | `POST/DELETE .../approve` |
 | `decline <id>` | `POST .../decline`. Takes no body, so there is no `--close-source-branch` here: the source branch stays until `bbx branch delete` removes it |
 | `comments <id>` / `comment <id>` | `GET/POST .../comments` — `--body` for `comment`. Each row carries `deleted`; a tombstone reads `deleted: true` with empty `content` |
@@ -195,13 +198,41 @@ offered; use `remove`.
 | `commits <id>` | `GET .../commits` |
 | `diffstat <id>` | `GET .../pullrequests/{id}/diffstat` — per-file line counts, cheaper than the whole diff |
 | `conflicts <id>` | `GET .../pullrequests/{id}/conflicts` — answers 403 to an API token |
-| `merge-status <id>` | `GET .../pullrequests/{id}/merge/task-status/{task-id}` — `--task-id` |
+| `merge-status <id>` | `GET .../pullrequests/{id}/merge/task-status/{task-id}` — `--task-id` takes the `task_id` or the `task_status_url` that `merge` printed. `--wait` polls like `merge` does, with `--timeout`. Without `--wait` it prints Bitbucket's status (`PENDING` or `SUCCESS` with `merge_result`) and exits 0 |
 | `activity [<id>]` | `GET .../pullrequests/activity` with no ID, `.../pullrequests/{id}/activity` with one — `--limit` |
 | `comment-view <id>` | `GET .../comments/{comment-id}` — `--comment-id` |
 | `comment-update <id>` | `PUT .../comments/{comment-id}` — `--comment-id`, `--body` |
 | `comment-delete <id>` | `DELETE .../comments/{comment-id}` — `--comment-id`, `--yes`. Leaves a tombstone: `comments` still counts the row and shows `"content": ""` |
 | `comment-resolve <id>` / `comment-unresolve <id>` | `POST/DELETE .../comments/{comment-id}/resolve` — `--comment-id` |
 | `tasks view <id>` | `GET .../tasks/{task-id}` — `--task-id` |
+
+#### Queued merges (202)
+
+Bitbucket sometimes queues a merge instead of running it inline, most often when
+it is slow. It answers 202 and names a task. `pr merge` then polls that task
+every 3 seconds:
+
+| What happens | stdout | Exit |
+| --- | --- | --- |
+| Merged inline (200), or the queued task finishes | the merged pull request, as before | `0` |
+| Still `PENDING` at `--timeout` | `{"status": "queued", "task_id": …, "task_status_url": …, "task_status": "PENDING", "waited_seconds": …, "next": "bbx pr merge-status …"}` | `75` |
+| The task fails | the error, on stderr | `1` |
+| `--no-wait` | the same `"status": "queued"` record, at once | `0` |
+
+A queued merge can still land after the timeout, or be dropped: during the
+Bitbucket slowdown of 16 Nov 2026 two of three queued merges vanished and the
+third landed 40 minutes later. So on exit 75, do not merge again. Follow the
+task, which is the command the `next` field holds:
+
+```bash
+bbx pr merge 42 -r myrepo --yes; rc=$?
+if [ $rc -eq 75 ]; then
+  bbx pr merge-status 42 -r myrepo --task-id <task_id> --wait --timeout 900
+fi
+```
+
+`pr view` can report `OPEN` for a while after a queued merge has landed. Trust
+the task status over it.
 
 `pr update` sends only the flags you pass. Anything you leave out keeps its
 current value, so you can retitle a pull request without touching its

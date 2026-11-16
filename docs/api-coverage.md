@@ -32,6 +32,17 @@ Nothing was added except two optional query parameters on `POST .../pipelines/` 
 on-demand runs, `merge_defaults` and `target_branch_to_create`, both covered by
 `bbx pipeline trigger --yaml` (1.4.0). No other operation, body or response changed.
 
+## Endpoints that answer 202
+
+Three operations in the spec can answer 202 Accepted. Checked on 2026-11-16 after
+`bbx pr merge` lost a queued merge's task ID:
+
+| Method | Path | What 202 means | What `bbx` does |
+| --- | --- | --- | --- |
+| `POST` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/merge` | Merge queued; the task-status URL is in the `Location` header | Before 1.6.0 it printed `""` and exited 0. Now it reads the task ID from `Location` (or `links.self.href`), polls task-status for up to `--timeout` seconds (default 120), and exits 75 with `"status": "queued"` and the task ID if the merge has not finished. `--no-wait` returns the task at once with exit 0 |
+| `POST` | `/repositories/{workspace}/{repo_slug}/environments/{environment_uuid}/changes` | Change queued; empty body | `bbx pipeline deployments changes` now says "Queued change" rather than "Updated". There is no task to poll |
+| `GET` | `/repositories/{workspace}/{repo_slug}/commit/{commit}/pullrequests` | Pull request links still being indexed; the page may be partial | Left as is. `bbx commit pullrequests` prints what came back |
+
 ## Why things are skipped
 
 Four reasons account for every skip.
@@ -136,7 +147,7 @@ Three things the spec gets wrong or leaves out:
 | `POST` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/comments/{comment_id}/resolve` | cover | `bbx pr comment-resolve` |
 | `GET` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/conflicts` | cover | `bbx pr conflicts` |
 | `GET` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/diffstat` | cover | `bbx pr diffstat` |
-| `GET` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/merge/task-status/{task_id}` | cover | `bbx pr merge-status` |
+| `GET` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/merge/task-status/{task_id}` | cover | `bbx pr merge-status`, and `bbx pr merge` polls it after a 202 (1.6.0) |
 | `GET` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/tasks/{task_id}` | cover | `bbx pr tasks view` |
 | `DELETE` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pullrequest_id}/properties/{app_key}/{property_name}` | skip | Connect app property; app key unobtainable from a CLI |
 | `GET` | `/repositories/{workspace}/{repo_slug}/pullrequests/{pullrequest_id}/properties/{app_key}/{property_name}` | skip | Connect app property; app key unobtainable from a CLI |

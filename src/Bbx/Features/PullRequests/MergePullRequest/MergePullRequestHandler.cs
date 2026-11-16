@@ -1,12 +1,13 @@
 using System.Text.Json;
 using Bbx.Auth;
 using Bbx.Features.Common;
+using Bbx.Features.PullRequests.PullRequestMergeStatus;
 
 namespace Bbx.Features.PullRequests.MergePullRequest;
 
 public sealed class MergePullRequestHandler(BitbucketClient client, CredentialManager credentials)
 {
-    public async Task<JsonElement> HandleAsync(MergePullRequestRequest request, CancellationToken ct)
+    public async Task<CommandOutcome> HandleAsync(MergePullRequestRequest request, CancellationToken ct)
     {
         var (ws, repo) = Resolve.WorkspaceAndRepo(credentials, request.Workspace, request.Repository,
             "Error: Workspace and repository required.");
@@ -21,8 +22,31 @@ public sealed class MergePullRequestHandler(BitbucketClient client, CredentialMa
         };
         if (!string.IsNullOrEmpty(request.Message)) body["message"] = request.Message;
 
-        return await client.PostAsync<JsonElement>(
+        var response = await client.PostForResponseAsync(
             $"/repositories/{ws}/{repo}/pullrequests/{request.Id}/merge", body, ct);
+
+        // 200 carries the merged pull request. 202 means Bitbucket queued the
+        // merge and named the task only in the Location header; this used to
+        // print the empty body as "" and exit 0, leaving the PR open and the
+        // task ID nowhere (16 Nov 2026, during a Bitbucket slowdown).
+        if (response.Status != 202) return new CommandOutcome(response.Body);
+
+        var statusUrl = MergeTask.StatusUrl(response);
+        var taskId = statusUrl is null ? null : MergeTask.IdFrom(statusUrl);
+        if (taskId is null)
+        {
+            return new CommandOutcome(
+                MergeTask.Queued(ws, repo, request.Id, null, null, null, null),
+                ExitCodes.Pending,
+                $"Bitbucket queued the merge of PR #{request.Id} but sent no task link. "
+                + "Check the pull request's state before merging again.");
+        }
+
+        if (!request.Wait)
+            return new CommandOutcome(MergeTask.Queued(ws, repo, request.Id, taskId, statusUrl, null, null));
+
+        return await MergeTask.WaitAsync(client, ws, repo, request.Id, taskId, statusUrl,
+            request.TimeoutSeconds, request.PollInterval ?? MergeTask.DefaultInterval, ct);
     }
 
     /// <summary>

@@ -327,6 +327,18 @@ rules below are; it is still the right place to start.
     existed in either repository to test against. Verified on 2026-09-12
     against `crm.promosys` and `velocity.foremost-print.com`.
 
+36. **A merge can answer 202, and the task is named only in `Location`.**
+    `POST pullrequests/{id}/merge` queues the merge when Bitbucket is slow and
+    answers 202 with an empty body. `PostAsync` drops headers, so 1.5.0 printed
+    `""`, exited 0 and lost the task ID (16 Nov 2026; two queued merges were then
+    dropped without a word, and a third landed 40 minutes later while `pr view`
+    still said OPEN). `MergePullRequestHandler` uses `PostForResponseAsync` and
+    polls `merge/task-status/{id}` through `MergeTask`. A merge still pending at
+    the timeout exits 75 (EX_TEMPFAIL) with the task in its JSON; a handler sets
+    a non-zero exit while still printing by returning a `CommandOutcome`. Never
+    test this by merging a real pull request: the 202 path is covered with
+    faked responses in `AsyncMergeTests`.
+
 ## Live testing
 
 If you test against real Bitbucket:

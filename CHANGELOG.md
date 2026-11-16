@@ -7,6 +7,32 @@ so commit history is the source of truth for the fine grain.
 
 Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.6.0]
+
+### Fixed
+
+- `pr merge` printed `""` and exited 0 when Bitbucket queued the merge (HTTP
+  202), so the pull request stayed open and the task ID appeared nowhere. Seen
+  during the Bitbucket slowdown of 16 Nov 2026, when two queued merges were
+  dropped without a word. The client now keeps the 202's `Location` header,
+  where Bitbucket names the task.
+
+### Added
+
+- `pr merge` waits for a queued merge by polling its task status, then prints
+  the merged pull request just as a direct merge does. If the merge is still
+  pending after `--timeout` seconds (default 120) it prints
+  `"status": "queued"` with `task_id`, `task_status_url` and the follow-up
+  command, and exits **75**. A failed task exits 1. `--no-wait` prints the
+  queued record at once and exits 0.
+- `pr merge-status` takes `--wait` and `--timeout`, and `--task-id` now
+  accepts the `task_status_url` as well as the bare ID.
+
+### Changed
+
+- `pipeline deployments changes` says "Queued change" rather than "Updated",
+  because Bitbucket answers 202 and applies the change later.
+
 ## [1.5.0]
 
 ### Changed
